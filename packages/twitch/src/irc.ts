@@ -77,6 +77,7 @@ export class DisabledIrcAdapter extends EventEmitter implements TwitchIrcAdapter
 export class SocketIrcAdapter extends EventEmitter implements TwitchIrcAdapter {
   private socket: TLSSocket | null = null;
   private buffer = "";
+  private disconnectedNotified = false;
 
   constructor(
     private readonly input: {
@@ -95,6 +96,7 @@ export class SocketIrcAdapter extends EventEmitter implements TwitchIrcAdapter {
       return;
     }
 
+    this.disconnectedNotified = false;
     await new Promise<void>((resolve, reject) => {
       const socket = connect({
         host: this.input.host ?? "irc.chat.twitch.tv",
@@ -122,7 +124,7 @@ export class SocketIrcAdapter extends EventEmitter implements TwitchIrcAdapter {
       });
 
       socket.on("close", () => {
-        void this.input.events.disconnected?.("socket_closed");
+        void this.notifyDisconnected("socket_closed");
       });
     });
   }
@@ -139,12 +141,12 @@ export class SocketIrcAdapter extends EventEmitter implements TwitchIrcAdapter {
     const socket = this.socket;
     this.socket = null;
     if (socket == null || socket.destroyed) {
-      await this.input.events.disconnected?.(reason);
+      await this.notifyDisconnected(reason);
       return;
     }
 
     socket.end();
-    await this.input.events.disconnected?.(reason);
+    await this.notifyDisconnected(reason);
   }
 
   private handleData(chunk: string) {
@@ -171,6 +173,15 @@ export class SocketIrcAdapter extends EventEmitter implements TwitchIrcAdapter {
     }
 
     this.socket.write(`${line}\r\n`);
+  }
+
+  private async notifyDisconnected(reason: string) {
+    if (this.disconnectedNotified) {
+      return;
+    }
+
+    this.disconnectedNotified = true;
+    await this.input.events.disconnected?.(reason);
   }
 }
 

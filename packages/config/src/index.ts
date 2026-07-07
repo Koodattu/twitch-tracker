@@ -32,16 +32,22 @@ export const baseEnvSchema = z.object({
   TWITCH_EVENTSUB_SECRET: z.string().min(32).optional().default("replace-with-at-least-32-random-characters"),
   EVENTSUB_ENABLED: booleanFromString,
   EVENTSUB_MAX_CHANNELS: intFromString(25),
+  TWITCH_BOT_OAUTH_REDIRECT_URI: optionalUrl,
+  TWITCH_BOT_SCOPES: z.string().optional().default("chat:read user:read:chat user:read:moderated_channels moderator:read:chatters"),
   TWITCH_BOT_USER_ID: z.string().optional().default(""),
   TWITCH_BOT_LOGIN: z.string().optional().default(""),
   TWITCH_BOT_ACCESS_TOKEN: z.string().optional().default(""),
   TWITCH_BOT_REFRESH_TOKEN: z.string().optional().default(""),
+  ADMIN_TWITCH_USER_IDS: z.string().optional().default(""),
   ENABLE_TWITCH_INGESTION: booleanFromString,
   DEFAULT_BOT_JOIN_CAPACITY: intFromString(100),
   DEFAULT_BOT_JOIN_RATE_PER_10_SECONDS: intFromString(20),
-  DISCOVERY_INTERVAL_MS: intFromString(60_000),
+  DISCOVERY_INTERVAL_MS: intFromString(180_000),
   USER_HYDRATION_INTERVAL_MS: intFromString(300_000),
   ASSIGNMENT_INTERVAL_MS: intFromString(30_000),
+  CHATTERS_RECONCILIATION_INTERVAL_MS: intFromString(300_000),
+  CHATTERS_RECONCILIATION_MAX_CHANNELS: intFromString(25),
+  CHATTERS_RECONCILIATION_MAX_PAGES_PER_CHANNEL: intFromString(5),
   AGGREGATION_INTERVAL_MS: intFromString(60_000),
   AGGREGATION_BUCKET_MINUTES: intFromString(5),
   AGGREGATION_LOOKBACK_HOURS: intFromString(48),
@@ -55,7 +61,9 @@ export const baseEnvSchema = z.object({
 export type AppConfig = z.infer<typeof baseEnvSchema>;
 
 export const loadConfig = (env: NodeJS.ProcessEnv = process.env): AppConfig => {
-  return baseEnvSchema.parse(env);
+  const config = baseEnvSchema.parse(env);
+  validateAppConfig(config);
+  return config;
 };
 
 export const isPrivateDataMode = (mode: AppConfig["APP_MODE"]): boolean => {
@@ -94,4 +102,78 @@ export const parseScopeList = (scopeList: string): string[] => {
     .split(/\s+/)
     .map((scope) => scope.trim())
     .filter((scope) => scope.length > 0);
+};
+
+const validateAppConfig = (config: AppConfig) => {
+  if (config.APP_MODE !== "production") {
+    return;
+  }
+
+  const problems: string[] = [];
+  requireHttpsPublicUrl("PUBLIC_WEB_URL", config.PUBLIC_WEB_URL, problems);
+  requireHttpsPublicUrl("PUBLIC_API_URL", config.PUBLIC_API_URL, problems);
+  requireHttpsPublicUrl("TWITCH_OAUTH_REDIRECT_URI", config.TWITCH_OAUTH_REDIRECT_URI ?? "", problems);
+
+  if (config.TWITCH_BOT_OAUTH_REDIRECT_URI != null && config.TWITCH_BOT_OAUTH_REDIRECT_URI !== "") {
+    requireHttpsPublicUrl("TWITCH_BOT_OAUTH_REDIRECT_URI", config.TWITCH_BOT_OAUTH_REDIRECT_URI, problems);
+  }
+
+  if (!config.COOKIE_SECURE) {
+    problems.push("COOKIE_SECURE must be true in production.");
+  }
+
+  requireRealSecret("SESSION_SECRET", config.SESSION_SECRET, problems);
+  requireRealSecret("TWITCH_EVENTSUB_SECRET", config.TWITCH_EVENTSUB_SECRET, problems);
+
+  if (config.TWITCH_CLIENT_ID === "") {
+    problems.push("TWITCH_CLIENT_ID is required in production.");
+  }
+
+  if (config.TWITCH_CLIENT_SECRET === "") {
+    problems.push("TWITCH_CLIENT_SECRET is required in production.");
+  }
+
+  if (problems.length > 0) {
+    throw new Error(`Invalid production configuration:\n- ${problems.join("\n- ")}`);
+  }
+};
+
+const requireHttpsPublicUrl = (name: string, value: string, problems: string[]) => {
+  if (value === "") {
+    problems.push(`${name} is required in production.`);
+    return;
+  }
+
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    problems.push(`${name} must be a valid URL.`);
+    return;
+  }
+
+  if (url.protocol !== "https:") {
+    problems.push(`${name} must use https in production.`);
+  }
+
+  if (isLocalHostname(url.hostname)) {
+    problems.push(`${name} must not point to localhost or a private bind address in production.`);
+  }
+};
+
+const requireRealSecret = (name: string, value: string, problems: string[]) => {
+  const normalized = value.toLowerCase();
+  if (
+    normalized.includes("replace-with") ||
+    normalized.includes("local-development") ||
+    normalized.includes("change-me") ||
+    normalized.includes("changeme")
+  ) {
+    problems.push(`${name} must be a real random secret in production.`);
+  }
+};
+
+const isLocalHostname = (hostname: string) => {
+  const normalized = hostname.toLowerCase();
+  return normalized === "localhost" || normalized === "127.0.0.1" || normalized === "0.0.0.0" || normalized === "::1";
 };

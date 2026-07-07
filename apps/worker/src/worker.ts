@@ -3,6 +3,7 @@ import type { DbClient } from "@twitch-tracker/db";
 import { DisabledHelixAdapter, FetchHelixAdapter, type TwitchRestAdapter } from "@twitch-tracker/twitch";
 import { runAggregationLoop } from "./loops/aggregation.js";
 import { runAssignmentLoop } from "./loops/assignment.js";
+import { runChattersReconciliationLoop } from "./loops/chatters-reconciliation.js";
 import { runDiscoveryLoop } from "./loops/discovery.js";
 import { runEventSubLoop } from "./loops/eventsub.js";
 import { runIrcLoop } from "./loops/irc.js";
@@ -40,6 +41,7 @@ export const createWorker = ({ config, db }: CreateWorkerInput) => {
       runUserHydrationLoop(context);
       runAssignmentLoop(context);
       runIrcLoop(context);
+      runChattersReconciliationLoop(context);
       runEventSubLoop(context);
       runAggregationLoop(context);
       runMaintenanceLoop(context);
@@ -51,7 +53,7 @@ export const createWorker = ({ config, db }: CreateWorkerInput) => {
 };
 
 const createRestAdapter = (config: AppConfig): TwitchRestAdapter => {
-  if (!config.ENABLE_TWITCH_INGESTION || config.TWITCH_CLIENT_ID === "" || config.TWITCH_BOT_ACCESS_TOKEN === "") {
+  if (!config.ENABLE_TWITCH_INGESTION || config.TWITCH_CLIENT_ID === "") {
     return new DisabledHelixAdapter();
   }
 

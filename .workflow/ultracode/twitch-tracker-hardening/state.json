@@ -1,0 +1,88 @@
+{
+  "title": "Twitch Tracker Hardening",
+  "slug": "twitch-tracker-hardening",
+  "created_at": "2026-07-07T00:00:00.000Z",
+  "updated_at": "2026-07-07T16:00:40.000Z",
+  "status": "complete",
+  "mode": "workflow",
+  "baseline_ref": "eca7d56",
+  "risk_level": "high",
+  "eval_contract": {
+    "level": "inline",
+    "path": null,
+    "status": "ready"
+  },
+  "approval": {
+    "required": false,
+    "granted": null,
+    "notes": "No deployment, account changes, destructive operations, commits, or pushes planned."
+  },
+  "delegation": {
+    "native_agent_available": true,
+    "native_agent_planned": false,
+    "native_agent_used": false,
+    "agent_count": 0,
+    "wave_count": 0,
+    "no_delegation_reason": "Current multi-agent tool policy requires an explicit subagent/delegation request; the active request only asks to proceed with fixing.",
+    "notes": "Workflow executed in parent session."
+  },
+  "packets": [
+    {
+      "id": "01-config-api",
+      "status": "complete",
+      "owner": "parent",
+      "write_scope": [
+        "packages/config/src/index.ts",
+        "apps/api/src/routes.ts"
+      ],
+      "result_path": "results/01-config-api.md"
+    },
+    {
+      "id": "02-worker-ingestion",
+      "status": "complete",
+      "owner": "parent",
+      "write_scope": [
+        "apps/worker/src/loops/",
+        "apps/worker/src/worker.ts"
+      ],
+      "result_path": "results/02-worker-ingestion.md"
+    },
+    {
+      "id": "03-web-docs",
+      "status": "complete",
+      "owner": "parent",
+      "write_scope": [
+        "apps/web/app/",
+        ".env.example",
+        "docs/runbooks/"
+      ],
+      "result_path": "results/03-web-docs.md"
+    }
+  ],
+  "verification": {
+    "status": "pass",
+    "checks": [
+      {
+        "name": "typecheck",
+        "command": "corepack pnpm typecheck",
+        "required": true,
+        "status": "pass",
+        "evidence": "Passed with Node engine warning: current v24.4.1, wanted >=22.11 <23."
+      },
+      {
+        "name": "build",
+        "command": "corepack pnpm build",
+        "required": true,
+        "status": "pass",
+        "evidence": "Passed with Next production build and TypeScript package builds."
+      },
+      {
+        "name": "structure",
+        "command": "node scripts/check-structure.mjs",
+        "required": true,
+        "status": "pass",
+        "evidence": "Structure check passed (17 paths)."
+      }
+    ]
+  }
+}

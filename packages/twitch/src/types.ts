@@ -56,6 +56,33 @@ export type HelixUsersResponse = {
   data: HelixUser[];
 };
 
+export type HelixModeratedChannel = {
+  broadcaster_id: string;
+  broadcaster_login: string;
+  broadcaster_name: string;
+};
+
+export type HelixModeratedChannelsResponse = {
+  data: HelixModeratedChannel[];
+  pagination?: {
+    cursor?: string;
+  };
+};
+
+export type HelixChatter = {
+  user_id: string;
+  user_login: string;
+  user_name: string;
+};
+
+export type HelixChattersResponse = {
+  data: HelixChatter[];
+  pagination?: {
+    cursor?: string;
+  };
+  total?: number;
+};
+
 export type TwitchRestAdapter = {
   getLiveStreamsByLanguage(input: {
     language: string;
@@ -68,6 +95,19 @@ export type TwitchRestAdapter = {
     logins?: string[];
     accessToken: string;
   }): Promise<RawTwitchResponse<HelixUsersResponse>>;
+  getModeratedChannels(input: {
+    userId: string;
+    first?: number;
+    after?: string;
+    accessToken: string;
+  }): Promise<RawTwitchResponse<HelixModeratedChannelsResponse>>;
+  getChatters(input: {
+    broadcasterId: string;
+    moderatorId: string;
+    first?: number;
+    after?: string;
+    accessToken: string;
+  }): Promise<RawTwitchResponse<HelixChattersResponse>>;
 };
 
 export type ParsedIrcMessage = {

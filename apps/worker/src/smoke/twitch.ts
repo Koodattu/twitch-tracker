@@ -448,11 +448,12 @@ const parseOptions = (args: string[]): SmokeOptions => {
 };
 
 const loadDotEnvFile = () => {
-  if (!existsSync(".env")) {
+  const envPath = [".env", "../../.env"].find((candidate) => existsSync(candidate));
+  if (envPath == null) {
     return;
   }
 
-  const lines = readFileSync(".env", "utf8").split(/\r?\n/);
+  const lines = readFileSync(envPath, "utf8").split(/\r?\n/);
   for (const line of lines) {
     const trimmed = line.trim();
     if (trimmed === "" || trimmed.startsWith("#")) {

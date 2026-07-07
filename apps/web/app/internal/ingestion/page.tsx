@@ -1,8 +1,13 @@
 import type { InternalIngestionStatus } from "@twitch-tracker/shared";
+import { cookies } from "next/headers";
 import { getApiData } from "../../api-client";
 
 export default async function IngestionPage() {
-  const status = await getApiData<InternalIngestionStatus>("/api/internal/ingestion");
+  const cookieHeader = cookies().toString();
+  const apiInit: RequestInit = cookieHeader === ""
+    ? { cache: "no-store" }
+    : { cache: "no-store", headers: { Cookie: cookieHeader } };
+  const status = await getApiData<InternalIngestionStatus>("/api/internal/ingestion", apiInit);
 
   return (
     <>

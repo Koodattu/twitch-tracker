@@ -1,4 +1,6 @@
+import { cookies } from "next/headers";
 import { getApiData } from "../../api-client";
+import { StreamActivityChart } from "./activity-chart";
 
 type StreamSession = {
   twitchStreamId: string;
@@ -54,10 +56,58 @@ type StreamActivity = {
   }>;
 };
 
+type PrivateStreamRaw = {
+  messages: Array<{
+    messageId: string;
+    chatterUserId: string | null;
+    chatterLogin: string | null;
+    chatterDisplayName: string | null;
+    sentAt: string | null;
+    receivedAt: string;
+    rawText: string | null;
+    source: string;
+    messageType: string;
+  }>;
+  membershipEvents: Array<{
+    id: string;
+    eventType: string;
+    source: string;
+    confidence: number;
+    chatterUserId: string | null;
+    chatterLogin: string | null;
+    eventAt: string | null;
+    receivedAt: string;
+  }>;
+  presenceSnapshots: Array<{
+    id: string;
+    source: string;
+    confidence: number;
+    sampledAt: string;
+    chatterCount: number;
+    pageCount: number;
+    requestStatus: string;
+    latestError: string | null;
+  }>;
+};
+
 export default async function StreamPage({ params }: { params: Promise<{ streamId: string }> }) {
   const { streamId } = await params;
+  const cookieHeader = cookies().toString();
+  const privateApiInit: RequestInit = cookieHeader === ""
+    ? { cache: "no-store" }
+    : { cache: "no-store", headers: { Cookie: cookieHeader } };
   const stream = await getApiData<StreamSession>(`/api/streams/${streamId}`);
   const activity = await getApiData<StreamActivity>(`/api/streams/${streamId}/activity`);
+  const raw = await getApiData<PrivateStreamRaw>(`/api/private/streams/${streamId}/raw`, privateApiInit);
+  const chartPoints = (activity?.buckets ?? [])
+    .slice()
+    .reverse()
+    .map((bucket) => ({
+      time: new Date(bucket.bucketStart).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      viewers: bucket.viewerCountAvg,
+      messages: bucket.messageCount,
+      activeChatters: bucket.activeChatterCount
+    }));
 
   return (
     <>
@@ -143,6 +193,13 @@ export default async function StreamPage({ params }: { params: Promise<{ streamI
 
       <section className="panel">
         <div className="panel-header">
+          <h2>Activity Chart</h2>
+        </div>
+        <StreamActivityChart points={chartPoints} />
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
           <h2>Activity Buckets</h2>
         </div>
         {activity == null || activity.buckets.length === 0 ? (
@@ -168,6 +225,74 @@ export default async function StreamPage({ params }: { params: Promise<{ streamI
                   <td>{bucket.activeChatterCount ?? "-"}</td>
                   <td>{bucket.joinCount}/{bucket.partCount}</td>
                   <td>{formatEventCounts(bucket.eventCounts)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <h2>Chat Messages</h2>
+          <span className="badge">{raw?.messages.length ?? 0} shown</span>
+        </div>
+        {raw == null ? (
+          <p className="muted padded">Message detail is not available for this session.</p>
+        ) : raw.messages.length === 0 ? (
+          <p className="muted padded">No messages have been captured for this stream yet.</p>
+        ) : (
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Chatter</th>
+                <th>Message</th>
+              </tr>
+            </thead>
+            <tbody>
+              {raw.messages.map((message) => (
+                <tr key={message.messageId}>
+                  <td>{new Date(message.sentAt ?? message.receivedAt).toLocaleString()}</td>
+                  <td>
+                    {message.chatterLogin == null ? (
+                      <span className="muted">unknown</span>
+                    ) : (
+                      <a href={`/chatters/${message.chatterLogin}`}>{message.chatterDisplayName ?? message.chatterLogin}</a>
+                    )}
+                  </td>
+                  <td className="message-cell">{message.rawText ?? ""}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <h2>Presence Reconciliation</h2>
+          <span className="badge">{raw?.presenceSnapshots.length ?? 0} snapshots</span>
+        </div>
+        {raw == null || raw.presenceSnapshots.length === 0 ? (
+          <p className="muted padded">No Get Chatters snapshots have been stored for this stream.</p>
+        ) : (
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Sampled</th>
+                <th>Chatters</th>
+                <th>Source</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {raw.presenceSnapshots.slice(0, 20).map((snapshot) => (
+                <tr key={snapshot.id}>
+                  <td>{new Date(snapshot.sampledAt).toLocaleString()}</td>
+                  <td>{snapshot.chatterCount}</td>
+                  <td>{snapshot.source} / {snapshot.confidence}%</td>
+                  <td>{snapshot.requestStatus}</td>
                 </tr>
               ))}
             </tbody>

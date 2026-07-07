@@ -284,6 +284,9 @@ export const chatMembershipEvents = pgTable("chat_membership_events", {
   chatterLogin: text("chatter_login"),
   twitchStreamId: text("twitch_stream_id").references(() => streamSessions.twitchStreamId),
   eventType: chatMembershipEventTypeEnum("event_type").notNull(),
+  source: text("source").default("irc_membership").notNull(),
+  confidence: integer("confidence").default(70).notNull(),
+  dedupeKey: text("dedupe_key"),
   eventAt: timestamp("event_at", { withTimezone: true }),
   receivedAt: timestamp("received_at", { withTimezone: true }).defaultNow().notNull(),
   ircConnectionId: uuid("irc_connection_id").references(() => ircConnections.id),
@@ -291,7 +294,45 @@ export const chatMembershipEvents = pgTable("chat_membership_events", {
   ...timestamps
 }, (table) => ({
   channelReceivedIdx: index("chat_membership_events_channel_received_idx").on(table.broadcasterUserId, table.receivedAt),
-  chatterReceivedIdx: index("chat_membership_events_chatter_received_idx").on(table.chatterUserId, table.receivedAt)
+  chatterReceivedIdx: index("chat_membership_events_chatter_received_idx").on(table.chatterUserId, table.receivedAt),
+  dedupeKeyIdx: uniqueIndex("chat_membership_events_dedupe_key_idx").on(table.dedupeKey)
+}));
+
+export const chatPresenceSnapshots = pgTable("chat_presence_snapshots", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  broadcasterUserId: text("broadcaster_user_id").notNull().references(() => twitchUsers.twitchUserId),
+  twitchStreamId: text("twitch_stream_id").references(() => streamSessions.twitchStreamId),
+  botAccountId: uuid("bot_account_id").references(() => botAccounts.id),
+  source: text("source").notNull(),
+  confidence: integer("confidence").default(90).notNull(),
+  sampledAt: timestamp("sampled_at", { withTimezone: true }).defaultNow().notNull(),
+  chatterCount: integer("chatter_count").default(0).notNull(),
+  pageCount: integer("page_count").default(0).notNull(),
+  requestStatus: text("request_status").default("succeeded").notNull(),
+  latestError: text("latest_error"),
+  ...timestamps
+}, (table) => ({
+  channelSampledIdx: index("chat_presence_snapshots_channel_sampled_idx").on(table.broadcasterUserId, table.sampledAt),
+  streamSampledIdx: index("chat_presence_snapshots_stream_sampled_idx").on(table.twitchStreamId, table.sampledAt)
+}));
+
+export const chatPresenceObservations = pgTable("chat_presence_observations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  snapshotId: uuid("snapshot_id").notNull().references(() => chatPresenceSnapshots.id),
+  broadcasterUserId: text("broadcaster_user_id").notNull().references(() => twitchUsers.twitchUserId),
+  chatterUserId: text("chatter_user_id").references(() => twitchUsers.twitchUserId),
+  chatterLogin: text("chatter_login"),
+  chatterDisplayName: text("chatter_display_name"),
+  twitchStreamId: text("twitch_stream_id").references(() => streamSessions.twitchStreamId),
+  observedAt: timestamp("observed_at", { withTimezone: true }).defaultNow().notNull(),
+  source: text("source").notNull(),
+  confidence: integer("confidence").default(90).notNull(),
+  dedupeKey: text("dedupe_key").notNull(),
+  ...timestamps
+}, (table) => ({
+  dedupeKeyIdx: uniqueIndex("chat_presence_observations_dedupe_key_idx").on(table.dedupeKey),
+  channelObservedIdx: index("chat_presence_observations_channel_observed_idx").on(table.broadcasterUserId, table.observedAt),
+  chatterObservedIdx: index("chat_presence_observations_chatter_observed_idx").on(table.chatterUserId, table.observedAt)
 }));
 
 export const chatRoomStateEvents = pgTable("chat_room_state_events", {

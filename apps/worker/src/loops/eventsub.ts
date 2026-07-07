@@ -70,6 +70,10 @@ const channelRaidPayloadSchema = z.object({
   })
 });
 
+const genericEventSubPayloadSchema = z.object({
+  event: z.record(z.unknown())
+});
+
 export const runEventSubLoop = (context: WorkerContext) => {
   startIntervalLoop({
     name: "eventsub",
@@ -139,6 +143,16 @@ const processRawEventSubEvent = async (context: WorkerContext, row: RawEventSubR
       await processChannelRaid(context, row);
       await markEventSubProcessed(context, row);
       return "processed";
+    case "channel.shared_chat.begin":
+    case "channel.shared_chat.update":
+    case "channel.shared_chat.end":
+      await processGenericChannelEvent(context, row, "shared_chat_id");
+      await markEventSubProcessed(context, row);
+      return "processed";
+    case "user.update":
+      await processUserUpdate(context, row);
+      await markEventSubProcessed(context, row);
+      return "processed";
     default:
       await context.db
         .update(rawEventsubEvents)
@@ -150,6 +164,58 @@ const processRawEventSubEvent = async (context: WorkerContext, row: RawEventSubR
         .where(eq(rawEventsubEvents.id, row.id));
       return "ignored";
   }
+};
+
+const processUserUpdate = async (context: WorkerContext, row: RawEventSubRow) => {
+  const parsed = genericEventSubPayloadSchema.parse(row.payload);
+  const event = parsed.event;
+  const userId = readEventString(event, "user_id");
+  if (userId == null) {
+    throw new Error("user.update payload is missing user_id.");
+  }
+
+  await upsertTwitchUser(context, {
+    userId,
+    login: readEventString(event, "user_login"),
+    displayName: readEventString(event, "user_name")
+  });
+  await upsertTrackedChannel(context, userId);
+
+  await insertChannelEvent(context, {
+    eventType: "user.update",
+    broadcasterUserId: userId,
+    twitchStreamId: await findLiveStreamId(context, userId),
+    actorUserId: userId,
+    occurredAt: row.receivedAt,
+    sourceEventId: sourceEventId(row),
+    rawEventsubEventId: row.id
+  });
+};
+
+const processGenericChannelEvent = async (context: WorkerContext, row: RawEventSubRow, preferredSourceField: string) => {
+  const parsed = genericEventSubPayloadSchema.parse(row.payload);
+  const event = parsed.event;
+  const broadcasterUserId = readEventString(event, "broadcaster_user_id");
+  if (broadcasterUserId == null) {
+    throw new Error(`${row.eventType} payload is missing broadcaster_user_id.`);
+  }
+
+  await upsertTwitchUser(context, {
+    userId: broadcasterUserId,
+    login: readEventString(event, "broadcaster_user_login"),
+    displayName: readEventString(event, "broadcaster_user_name")
+  });
+  await upsertTrackedChannel(context, broadcasterUserId);
+
+  await insertChannelEvent(context, {
+    eventType: row.eventType,
+    broadcasterUserId,
+    twitchStreamId: await findLiveStreamId(context, broadcasterUserId),
+    actorUserId: null,
+    occurredAt: row.receivedAt,
+    sourceEventId: readEventString(event, preferredSourceField) ?? sourceEventId(row),
+    rawEventsubEventId: row.id
+  });
 };
 
 const processStreamOnline = async (context: WorkerContext, row: RawEventSubRow) => {
@@ -487,6 +553,31 @@ const desiredDefinitions = (broadcasterUserId: string) => [
     type: "channel.raid",
     version: "1",
     condition: { to_broadcaster_user_id: broadcasterUserId }
+  },
+  {
+    type: "channel.raid",
+    version: "1",
+    condition: { from_broadcaster_user_id: broadcasterUserId }
+  },
+  {
+    type: "channel.shared_chat.begin",
+    version: "1",
+    condition: { broadcaster_user_id: broadcasterUserId }
+  },
+  {
+    type: "channel.shared_chat.update",
+    version: "1",
+    condition: { broadcaster_user_id: broadcasterUserId }
+  },
+  {
+    type: "channel.shared_chat.end",
+    version: "1",
+    condition: { broadcaster_user_id: broadcasterUserId }
+  },
+  {
+    type: "user.update",
+    version: "1",
+    condition: { user_id: broadcasterUserId }
   }
 ];
 
@@ -670,4 +761,9 @@ const subscriptionKey = (type: string, version: string, condition: Record<string
 
 const stableConditionKey = (condition: Record<string, string>) => {
   return JSON.stringify(Object.fromEntries(Object.entries(condition).sort(([left], [right]) => left.localeCompare(right))));
+};
+
+const readEventString = (event: Record<string, unknown>, key: string): string | null => {
+  const value = event[key];
+  return typeof value === "string" && value.length > 0 ? value : null;
 };

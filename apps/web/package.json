@@ -14,7 +14,8 @@
     "@twitch-tracker/shared": "workspace:*",
     "next": "^15.3.5",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "recharts": "^3.9.2"
   },
   "devDependencies": {
     "@types/node": "^22.13.14",

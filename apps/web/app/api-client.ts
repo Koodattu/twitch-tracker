@@ -5,9 +5,15 @@ export const getApiBaseUrl = () => {
 export async function getApiData<T>(path: string, init?: RequestInit): Promise<T | null> {
   let response: Response;
   try {
+    const fetchInit =
+      init?.cache === "no-store"
+        ? init
+        : {
+            next: { revalidate: 15 },
+            ...init
+          };
     response = await fetch(`${getApiBaseUrl()}${path}`, {
-      next: { revalidate: 15 },
-      ...init
+      ...fetchInit
     });
   } catch {
     return null;

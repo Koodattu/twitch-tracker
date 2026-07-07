@@ -1,4 +1,12 @@
-import type { HelixStreamsResponse, HelixUsersResponse, RawTwitchResponse, TwitchRateLimitHeaders, TwitchRestAdapter } from "./types.js";
+import type {
+  HelixChattersResponse,
+  HelixModeratedChannelsResponse,
+  HelixStreamsResponse,
+  HelixUsersResponse,
+  RawTwitchResponse,
+  TwitchRateLimitHeaders,
+  TwitchRestAdapter
+} from "./types.js";
 
 const helixBaseUrl = "https://api.twitch.tv/helix";
 
@@ -90,6 +98,52 @@ export class FetchHelixAdapter implements TwitchRestAdapter {
       accessToken: input.accessToken
     });
   }
+
+  async getModeratedChannels(input: {
+    userId: string;
+    first?: number;
+    after?: string;
+    accessToken: string;
+  }): Promise<RawTwitchResponse<HelixModeratedChannelsResponse>> {
+    const params = new URLSearchParams({
+      user_id: input.userId,
+      first: String(input.first ?? 100)
+    });
+    if (input.after != null && input.after !== "") {
+      params.set("after", input.after);
+    }
+
+    return callHelix<HelixModeratedChannelsResponse>({
+      endpoint: "/moderation/channels",
+      params,
+      clientId: this.clientId,
+      accessToken: input.accessToken
+    });
+  }
+
+  async getChatters(input: {
+    broadcasterId: string;
+    moderatorId: string;
+    first?: number;
+    after?: string;
+    accessToken: string;
+  }): Promise<RawTwitchResponse<HelixChattersResponse>> {
+    const params = new URLSearchParams({
+      broadcaster_id: input.broadcasterId,
+      moderator_id: input.moderatorId,
+      first: String(input.first ?? 1000)
+    });
+    if (input.after != null && input.after !== "") {
+      params.set("after", input.after);
+    }
+
+    return callHelix<HelixChattersResponse>({
+      endpoint: "/chat/chatters",
+      params,
+      clientId: this.clientId,
+      accessToken: input.accessToken
+    });
+  }
 }
 
 export class DisabledHelixAdapter implements TwitchRestAdapter {
@@ -111,6 +165,30 @@ export class DisabledHelixAdapter implements TwitchRestAdapter {
       requestParams: { disabled: true },
       statusCode: 0,
       responseJson: { data: [] },
+      pagination: {},
+      rateLimit: { limit: null, remaining: null, resetAt: null, raw: {} },
+      observedAt: new Date()
+    };
+  }
+
+  async getModeratedChannels(): Promise<RawTwitchResponse<HelixModeratedChannelsResponse>> {
+    return {
+      endpoint: "/moderation/channels",
+      requestParams: { disabled: true },
+      statusCode: 0,
+      responseJson: { data: [] },
+      pagination: {},
+      rateLimit: { limit: null, remaining: null, resetAt: null, raw: {} },
+      observedAt: new Date()
+    };
+  }
+
+  async getChatters(): Promise<RawTwitchResponse<HelixChattersResponse>> {
+    return {
+      endpoint: "/chat/chatters",
+      requestParams: { disabled: true },
+      statusCode: 0,
+      responseJson: { data: [], total: 0 },
       pagination: {},
       rateLimit: { limit: null, remaining: null, resetAt: null, raw: {} },
       observedAt: new Date()

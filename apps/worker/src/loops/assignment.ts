@@ -1,7 +1,10 @@
-import { botAccounts, chatAssignments, streamSessions, streamSnapshots, subjectPrivacyStates } from "@twitch-tracker/db";
-import { and, desc, eq, isNull, or, sql } from "drizzle-orm";
+import { chatAssignments, streamSessions, streamSnapshots, subjectPrivacyStates } from "@twitch-tracker/db";
+import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { resolvePrimaryBotCredentials } from "../bot-auth.js";
 import type { WorkerContext } from "../worker.js";
 import { startIntervalLoop } from "./common.js";
+
+const activeAssignmentStatuses = ["desired", "joining", "joined"] as const;
 
 export const runAssignmentLoop = (context: WorkerContext) => {
   startIntervalLoop({
@@ -9,36 +12,22 @@ export const runAssignmentLoop = (context: WorkerContext) => {
     intervalMs: context.config.ASSIGNMENT_INTERVAL_MS,
     context,
     run: async () => {
-      if (context.config.TWITCH_BOT_LOGIN === "") {
-        return { assignmentsDesired: 0, skipped: "TWITCH_BOT_LOGIN is not configured." };
+      if (!context.config.ENABLE_TWITCH_INGESTION) {
+        return { assignmentsDesired: 0, skipped: "ENABLE_TWITCH_INGESTION is false." };
       }
 
-      const [bot] = await context.db
-        .insert(botAccounts)
-        .values({
-          twitchUserId: context.config.TWITCH_BOT_USER_ID || null,
-          login: context.config.TWITCH_BOT_LOGIN,
-          maxJoinedRooms: context.config.DEFAULT_BOT_JOIN_CAPACITY,
-          joinRatePer10Seconds: context.config.DEFAULT_BOT_JOIN_RATE_PER_10_SECONDS
-        })
-        .onConflictDoUpdate({
-          target: botAccounts.login,
-          set: {
-            enabled: true,
-            maxJoinedRooms: context.config.DEFAULT_BOT_JOIN_CAPACITY,
-            joinRatePer10Seconds: context.config.DEFAULT_BOT_JOIN_RATE_PER_10_SECONDS,
-            updatedAt: new Date()
-          }
-        })
-        .returning({ id: botAccounts.id });
-
-      if (bot == null) {
-        throw new Error("Failed to upsert bot account.");
+      const bot = await resolvePrimaryBotCredentials(context.db, context.config);
+      if (bot.botAccountId == null || bot.login == null) {
+        return { assignmentsDesired: 0, skipped: "No enabled bot account is configured." };
       }
 
-      const capacity = context.config.DEFAULT_BOT_JOIN_CAPACITY;
+      if (bot.accessToken == null) {
+        return { assignmentsDesired: 0, skipped: "No valid bot access token is configured.", botLogin: bot.login };
+      }
+
+      const capacity = bot.maxJoinedRooms;
       if (capacity <= 0) {
-        return { assignmentsDesired: 0, skipped: "DEFAULT_BOT_JOIN_CAPACITY is 0." };
+        return { assignmentsDesired: 0, skipped: "Bot join capacity is 0.", botLogin: bot.login };
       }
 
       const latestSnapshotTimes = context.db
@@ -76,6 +65,7 @@ export const runAssignmentLoop = (context: WorkerContext) => {
         .orderBy(desc(sql<number>`coalesce(${streamSnapshots.viewerCount}, -1)`), desc(streamSessions.lastSeenLiveAt))
         .limit(candidateLimit);
       const streams = uniqueAssignmentCandidates(candidateStreams).slice(0, capacity);
+      const selectedStreamIds = new Set(streams.map((row) => row.stream.twitchStreamId));
 
       for (const row of streams) {
         const stream = row.stream;
@@ -83,7 +73,7 @@ export const runAssignmentLoop = (context: WorkerContext) => {
         await context.db
           .insert(chatAssignments)
           .values({
-            botAccountId: bot.id,
+            botAccountId: bot.botAccountId,
             broadcasterUserId: stream.broadcasterUserId,
             twitchStreamId: stream.twitchStreamId,
             status: "desired",
@@ -93,14 +83,47 @@ export const runAssignmentLoop = (context: WorkerContext) => {
           .onConflictDoUpdate({
             target: [chatAssignments.botAccountId, chatAssignments.broadcasterUserId, chatAssignments.twitchStreamId],
             set: {
+              status: sql`
+                case
+                  when ${chatAssignments.status} = 'leaving' and ${chatAssignments.joinedAt} is not null then 'joined'::assignment_status
+                  when ${chatAssignments.status} in ('left', 'failed', 'leaving') then 'desired'::assignment_status
+                  else ${chatAssignments.status}
+                end
+              `,
               priorityScore,
               reason: "top_live_finnish_viewer_rank",
+              joinedAt: sql`
+                case
+                  when ${chatAssignments.status} in ('left', 'failed') then null
+                  else ${chatAssignments.joinedAt}
+                end
+              `,
+              leftAt: sql`
+                case
+                  when ${chatAssignments.status} in ('left', 'failed', 'leaving') then null
+                  else ${chatAssignments.leftAt}
+                end
+              `,
+              latestError: sql`
+                case
+                  when ${chatAssignments.status} in ('left', 'failed', 'leaving') then null
+                  else ${chatAssignments.latestError}
+                end
+              `,
               updatedAt: new Date()
             }
           });
       }
 
-      return { assignmentsDesired: streams.length, topViewerCount: streams[0]?.viewerCount ?? null };
+      const retiredAssignments = await retireAssignmentsOutsideCapacity(context, bot.botAccountId, selectedStreamIds);
+
+      return {
+        assignmentsDesired: streams.length,
+        retiredAssignments,
+        topViewerCount: streams[0]?.viewerCount ?? null,
+        botLogin: bot.login,
+        botTokenSource: bot.source
+      };
     }
   });
 };
@@ -118,4 +141,41 @@ const uniqueAssignmentCandidates = <T extends { stream: { twitchStreamId: string
   }
 
   return uniqueRows;
+};
+
+const retireAssignmentsOutsideCapacity = async (
+  context: WorkerContext,
+  botAccountId: string,
+  selectedStreamIds: Set<string>
+): Promise<number> => {
+  const activeAssignments = await context.db
+    .select({
+      id: chatAssignments.id,
+      status: chatAssignments.status,
+      twitchStreamId: chatAssignments.twitchStreamId
+    })
+    .from(chatAssignments)
+    .where(and(eq(chatAssignments.botAccountId, botAccountId), inArray(chatAssignments.status, [...activeAssignmentStatuses])));
+
+  let retired = 0;
+  for (const assignment of activeAssignments) {
+    if (assignment.twitchStreamId != null && selectedStreamIds.has(assignment.twitchStreamId)) {
+      continue;
+    }
+
+    const now = new Date();
+    const nextStatus = assignment.status === "desired" ? "left" : "leaving";
+    await context.db
+      .update(chatAssignments)
+      .set({
+        status: nextStatus,
+        leftAt: nextStatus === "left" ? now : null,
+        reason: "outside_top_live_finnish_capacity",
+        updatedAt: now
+      })
+      .where(eq(chatAssignments.id, assignment.id));
+    retired += 1;
+  }
+
+  return retired;
 };

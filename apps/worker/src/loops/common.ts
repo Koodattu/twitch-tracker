@@ -13,11 +13,21 @@ export const startIntervalLoop = (input: {
   context: LoopContext;
   run: () => Promise<Record<string, unknown>>;
 }) => {
+  let running = false;
+
   const runSafely = async () => {
     if (input.context.abortSignal.aborted) {
       return;
     }
 
+    if (running) {
+      await heartbeat(input.context.db, input.context.workerName, input.name, "skipped", {
+        reason: "previous run is still active"
+      });
+      return;
+    }
+
+    running = true;
     await runWithIngestionRecord(input.context.db, input.name, async () => {
       await heartbeat(input.context.db, input.context.workerName, input.name, "running", {});
       const summary = await input.run();
@@ -27,6 +37,8 @@ export const startIntervalLoop = (input: {
       const message = error instanceof Error ? error.message : String(error);
       await heartbeat(input.context.db, input.context.workerName, input.name, "error", { message });
       console.error(JSON.stringify({ level: "error", loop: input.name, message }));
+    }).finally(() => {
+      running = false;
     });
   };
 
