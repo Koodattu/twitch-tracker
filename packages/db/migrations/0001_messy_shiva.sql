@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "chat_assignments_identity_idx" ON "chat_assignments" USING btree ("bot_account_id","broadcaster_user_id","twitch_stream_id");

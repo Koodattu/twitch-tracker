@@ -1,0 +1,2 @@
+CREATE UNIQUE INDEX "channel_events_source_event_unique_idx" ON "channel_events" USING btree ("source","source_event_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "raids_raw_eventsub_event_idx" ON "raids" USING btree ("raw_eventsub_event_id");

@@ -2,11 +2,14 @@
 
 Status: accepted
 
-Twurple is the default SDK candidate for Twitch auth, Helix REST, EventSub, and
-possibly chat, but product code depends on project-owned Twitch adapter
-interfaces rather than Twurple objects directly. The adapters translate SDK or
-custom-client output into Raw Event Ledger rows, normalized DTOs, and domain
-state owned by this project.
+Product code depends on project-owned Twitch adapter interfaces rather than
+Twurple objects directly. The first implementation uses native `fetch` clients
+for OAuth, Helix REST, and EventSub management, Hono-owned EventSub webhook
+receipt, and a project-owned TLS IRC socket adapter. Raw line/payload
+persistence, JOIN/PART handling, reconnect behavior, and capacity management
+are core product requirements. The adapters translate SDK or custom-client
+output into Raw Event Ledger rows, normalized DTOs, and domain state owned by
+this project.
 
 **Considered Options**
 
@@ -17,9 +20,10 @@ state owned by this project.
 
 **Consequences**
 
-`@twurple/auth` and `@twurple/api` are good default candidates for auth and
-Helix calls. `@twurple/eventsub-http` should be used only if it fits cleanly
-with Hono and Caddy webhook routing. `@twurple/chat` needs an early spike before
-commitment because the product must persist raw IRC lines and control chat
-assignment, reconnect, JOIN/PART, and capacity behavior. High-level bot
-abstractions such as `@twurple/easy-bot` are out of scope.
+Twurple remains a valid future dependency if it clearly reduces maintenance
+cost behind the existing adapters. `@twurple/chat` is not the first IRC
+implementation because the product must persist raw IRC lines and control chat
+assignment, reconnect, JOIN/PART, and capacity behavior. `@twurple/eventsub-http`
+is not needed for the initial webhook receiver because Hono owns the route and
+signature verification directly. High-level bot abstractions such as
+`@twurple/easy-bot` are out of scope.

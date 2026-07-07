@@ -1,0 +1,115 @@
+{
+  "title": "Implement Twitch Tracker",
+  "slug": "implement-twitch-tracker",
+  "created_at": "2026-07-07T16:05:00+03:00",
+  "updated_at": "2026-07-07T17:10:00+03:00",
+  "status": "executing",
+  "mode": "delegated",
+  "baseline_ref": "1f4c703302fa849a29c8924cf4d36a4306fbcf0d",
+  "risk_level": "high",
+  "eval_contract": {
+    "level": "full",
+    "path": "eval-contract.md",
+    "status": "ready"
+  },
+  "approval": {
+    "required": false,
+    "granted": null,
+    "notes": "No risky approval-gated action planned for the first local scaffold increment."
+  },
+  "delegation": {
+    "native_agent_available": true,
+    "native_agent_planned": true,
+    "native_agent_used": true,
+    "agent_count": 3,
+    "wave_count": 2,
+    "no_delegation_reason": "",
+    "notes": "Use read-only explorer agents while parent owns implementation; latest sidecar reviewed live-ranking assignment/status semantics and cleanup risks."
+  },
+  "packets": [
+    {
+      "id": "01-prd-surface-review",
+      "status": "complete",
+      "owner": "read-only-agent",
+      "write_scope": [],
+      "result_path": "results/01-prd-surface-review.md"
+    },
+    {
+      "id": "02-schema-api-review",
+      "status": "complete",
+      "owner": "read-only-agent",
+      "write_scope": [],
+      "result_path": "results/02-schema-api-review.md"
+    },
+    {
+      "id": "03-scaffold",
+      "status": "complete",
+      "owner": "parent",
+      "write_scope": [
+        "package.json",
+        "pnpm-workspace.yaml",
+        "apps/",
+        "packages/",
+        "infra/"
+      ],
+      "result_path": "results/03-scaffold.md"
+    },
+    {
+      "id": "04-core-implementation",
+      "status": "complete",
+      "owner": "parent",
+      "write_scope": [
+        "apps/",
+        "packages/",
+        "infra/",
+        "compose.yaml",
+        ".env.example"
+      ],
+      "result_path": "results/04-core-implementation.md"
+    },
+    {
+      "id": "05-verification",
+      "status": "complete",
+      "owner": "parent",
+      "write_scope": [
+        ".workflow/ultracode/implement-twitch-tracker/results/",
+        ".workflow/ultracode/implement-twitch-tracker/final-report.md",
+        ".workflow/ultracode/implement-twitch-tracker/final-audit.md"
+      ],
+      "result_path": "results/05-verification.md"
+    }
+  ],
+  "verification": {
+    "status": "pending",
+    "checks": [
+      {
+        "name": "dependency install",
+        "command": "pnpm install",
+        "required": true,
+        "status": "pass",
+        "evidence": "corepack pnpm install passed; local Node v24.4.1 produced expected target-engine warning."
+      },
+      {
+        "name": "typecheck",
+        "command": "pnpm typecheck",
+        "required": true,
+        "status": "pass",
+        "evidence": "corepack pnpm typecheck passed for all workspace projects."
+      },
+      {
+        "name": "build",
+        "command": "pnpm build",
+        "required": true,
+        "status": "pass",
+        "evidence": "corepack pnpm build passed for all workspace projects."
+      },
+      {
+        "name": "docker compose config",
+        "command": "docker compose config",
+        "required": false,
+        "status": "pass",
+        "evidence": "docker compose config rendered successfully; Docker warned about C:\\Users\\Juha\\.docker\\config.json access."
+      }
+    ]
+  }
+}

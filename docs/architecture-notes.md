@@ -24,19 +24,20 @@ The intended production shape is:
 
 ## Current Stack Direction
 
-- Runtime: Node.js LTS is the conservative production default.
-- Package manager: choose one, likely pnpm or Bun. Do not mix without a reason.
+- Runtime: Node.js LTS is the production default.
+- Package manager: pnpm through Corepack.
 - API framework: Hono.
 - Frontend: Next.js and React.
-- Client data fetching: TanStack Query.
+- Client data fetching: server-rendered API reads first, TanStack Query for
+  client-side freshness, filters, polling, and interactive panels.
 - Database: PostgreSQL.
 - ORM/query layer: Drizzle.
 - Validation: Zod at runtime boundaries.
 - Deployment: Docker Compose on one server.
 
-Bun remains viable for local development or all-runtime use, but long-lived
-Twitch connections, PostgreSQL drivers, and production observability should be
-tested early before committing to it as the production runtime.
+Bun remains viable for a future local-development or all-runtime spike, but it
+is not the production baseline unless long-lived Twitch connections, PostgreSQL
+drivers, Docker behavior, and observability are re-tested.
 
 ## Twitch Source Summary
 

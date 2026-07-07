@@ -54,8 +54,8 @@ the API is the enforcement point.
 - public pages show Channel Analytics and limited Public Chatter Summaries
 - detailed chatter timelines and raw chat message history require Own Data View
   or admin authorization
-- privacy, retention, deletion, and opt-out rules must be finalized before this
-  mode is used publicly
+- technical retention controls must be enabled and public privacy, deletion, and
+  opt-out rules must be finalized before this mode is used publicly
 
 ## 3. Success Criteria
 
@@ -155,16 +155,19 @@ Backend:
 
 Twitch libraries:
 
-- Twurple is the default SDK candidate for Twitch auth, Helix REST, chat, and
-  EventSub support.
-- Twurple must be used behind project-owned adapter interfaces, not imported
-  throughout product code.
-- `@twurple/auth` and `@twurple/api` are good default candidates for auth and
-  Helix work.
-- `@twurple/eventsub-http` is a good candidate if it integrates cleanly with the
-  Hono API and Caddy webhook path.
-- `@twurple/chat` requires an early spike before commitment, because the product
-  must persist raw IRC lines and control assignment/reconnect state.
+- Twitch integration must live behind project-owned adapter interfaces, not be
+  imported throughout product code.
+- The first implementation uses native `fetch` adapters for OAuth, Helix REST,
+  and EventSub management because the API surface is small and raw payload/state
+  ownership matters.
+- Twurple remains an acceptable future candidate behind the same adapter
+  boundary if it reduces maintenance cost without weakening raw-data capture or
+  reconnect/assignment control.
+- Hono owns EventSub webhook receipt and signature verification.
+- IRC ingestion starts with a project-owned TLS IRC socket adapter because the
+  product must persist raw IRC lines and control assignment, reconnect,
+  JOIN/PART, and capacity behavior directly. `@twurple/chat` can still be
+  evaluated later behind the same adapter interface if it proves compatible.
 - High-level bot abstractions such as `@twurple/easy-bot` are out of scope.
 
 Frontend:
@@ -364,6 +367,7 @@ Inputs:
 - join/leave cooldowns
 - account connection health
 - recent errors
+- subject tracking opt-out state
 
 Priority order:
 
@@ -378,6 +382,7 @@ Anti-churn rules:
 - preserve healthy assignments unless a replacement is clearly higher priority
 - use a minimum assignment age before voluntary replacement
 - immediately free slots after confirmed stream end
+- immediately free slots after broadcaster tracking opt-out
 - immediately free slots after disqualification, repeated join failure, or
   account failure when no recovery is expected
 - rate-limit joins and leaves per account
@@ -406,8 +411,8 @@ Loops:
 - `irc`: IRC connections, raw lines, messages, JOIN/PART, reconnects
 - `eventsub`: subscription reconciliation and webhook/event processing support
 - `aggregation`: minute/hour/day buckets and derived stats
-- `maintenance`: retention, stale assignment cleanup, token validation,
-  operational housekeeping
+- `maintenance`: raw text/payload retention, stale assignment cleanup, token
+  validation, operational housekeeping
 
 Reliability requirements:
 
@@ -432,7 +437,7 @@ Retention classes:
 
 - `long_lived`: product state and public analytics
 - `raw_private_mvp`: raw payloads and raw message text, retained aggressively in
-  private MVP but removable before production
+  private MVP but redacted by configurable retention before production
 - `secret`: encrypted token/session-sensitive data
 - `operational`: runs, heartbeats, errors, rate-limit observations
 - `aggregate`: derived stats that should survive raw retention changes
@@ -523,18 +528,29 @@ following table groups are required.
 - raw REST response ledger
 - stores endpoint, request params, status, response JSON, pagination info,
   rate-limit headers, observed timestamp, and ingestion run
+- raw request/response payload fields are redacted after the configured raw
+  payload retention window while preserving operational history
 
 `raw_irc_messages`
 
 - raw IRC message ledger
 - stores raw line, parsed command, tags JSON, channel login, bot account,
   connection ID, received timestamp, and parse status
+- raw line and tags are redacted after the configured raw chat retention window
 
 `raw_eventsub_events`
 
 - raw EventSub event ledger
 - stores Twitch message/event IDs, subscription ID, event type/version,
   payload JSON, received timestamp, processing status, and error metadata
+- payload JSON is redacted after the configured raw payload retention window
+
+`eventsub_subscriptions`
+
+- durable EventSub subscription state
+- stores Twitch subscription ID if known, event type/version, condition JSON,
+  stable condition key, broadcaster, transport method, callback URL, Twitch
+  status, cost, last sync timestamp, and latest reconciliation error
 
 ### Chat Tables
 
@@ -635,6 +651,25 @@ message text.
 - explicit admin authorization list
 - can be table-backed or config-seeded during MVP
 
+`privacy_requests`
+
+- subject privacy request ledger
+- stores request type, status, subject Twitch user, requesting app user,
+  reviewing app user, details, requested/resolved timestamps, and latest error
+- used for public profile opt-out, tracking opt-out, and data-deletion workflow
+
+`subject_privacy_states`
+
+- current enforceable privacy state keyed by Twitch user ID
+- stores whether public profile/chatter summaries are hidden, whether future
+  broadcaster chat tracking is opted out, raw data redaction timestamp, data
+  deletion timestamp, and latest request reference
+
+`privacy_request_events`
+
+- append-only event history for privacy requests
+- stores request, event type, actor app user, details, and occurrence timestamp
+
 ### Operations Tables
 
 `ingestion_runs`
@@ -674,16 +709,30 @@ Public endpoints:
 - `GET /api/streams/live`
 - `GET /api/streams/recent`
 - `GET /api/streams/:streamId`
+- `GET /api/streams/:streamId/activity`
 - `GET /api/channels/:login`
 - `GET /api/channels/:login/streams`
 - `GET /api/channels/:login/viewer-history`
 - `GET /api/channels/:login/activity`
 - `GET /api/chatters/:login`
 
+Stream and channel analytics endpoints are aggregate-first.
+`/api/streams/live` returns current live Finnish stream summaries enriched with
+the latest stored viewer-count snapshot and chat-assignment state when
+available. Viewer counts come from Twitch REST snapshots; chat assignment or
+JOIN/PART state must not be presented as exact viewership.
+`/api/streams/:streamId/activity` returns bounded viewer snapshots, activity
+buckets, channel events, raids, and totals. Channel `viewer-history` returns
+bounded recent viewer snapshots from `stream_snapshots`. Channel `activity`
+returns daily stats, recent stream activity buckets, and aggregate totals from
+PostgreSQL rollup tables.
+
 Authenticated endpoints:
 
 - `GET /api/me`
 - `GET /api/me/data`
+- `GET /api/me/privacy`
+- `POST /api/me/privacy/requests`
 - `GET /api/auth/twitch/start`
 - `GET /api/auth/twitch/callback`
 - `POST /api/auth/logout`
@@ -694,9 +743,16 @@ Private/admin/internal endpoints:
 - `GET /api/internal/bot-accounts`
 - `GET /api/internal/chat-assignments`
 - `GET /api/internal/rate-limits`
+- `GET /api/internal/privacy-requests`
+- `POST /api/internal/privacy-requests/:requestId/complete`
 - `GET /api/internal/errors`
 - `GET /api/private/chatters/:login`
 - `GET /api/private/streams/:streamId/raw`
+
+The private chatter endpoint may return bounded recent message and JOIN/PART
+timelines for local/private MVP validation. The private stream raw endpoint may
+return bounded raw-linked chat, membership, and EventSub-derived rows for a
+specific stream. These are not public analytics endpoints.
 
 Webhook endpoints:
 
@@ -706,7 +762,15 @@ Access rules:
 
 - public analytics endpoints return only public-safe data
 - private endpoints require `local`/`private_mvp` mode or admin authorization
+- admin authorization can come from the product user role or the explicit
+  `admin_users` table
 - Own Data View requires logged-in Twitch identity matching the requested user
+- Own Data privacy controls let the subject hide public chatter/profile
+  summaries, opt out of future chat tracking as a broadcaster, and record a
+  data-deletion request
+- completing a data-deletion request redacts subject-linked raw message content,
+  chat identity links, raw IRC/EventSub payload references, and subject
+  aggregate rows while preserving operational audit history
 - internal diagnostics require local/private/admin access
 - API responses never include OAuth token values, secrets, raw session values,
   or full config
@@ -730,7 +794,9 @@ Pages:
 
 Frontend requirements:
 
-- use TanStack Query for server state
+- use server-rendered API reads for first-load analytics pages
+- use TanStack Query for client-side freshness, filters, polling, and
+  interactive panels when those views need browser-managed server state
 - keep access checks backed by API responses
 - design for dense analytics, not marketing copy
 - show data coverage honestly, especially when a stream is Discovered but not
@@ -824,6 +890,7 @@ Required config categories:
 - join rate-limit defaults
 - polling intervals
 - retention settings
+- stale assignment grace window
 - backup settings
 
 Invalid config should fail fast at startup.
@@ -884,11 +951,15 @@ End-to-end checks:
 
 Manual private-MVP checks:
 
+- `corepack pnpm smoke:twitch -- --require-live` passes with real Twitch
+  credentials before claiming Twitch ingestion has been verified
 - one bot account can connect to IRC
 - assigned channels are joined within rate limits
 - JOIN/PART and messages are stored
 - ended streams free assignments
 - reconnect preserves or reconciles assignments safely
+- `corepack pnpm smoke:twitch -- --require-live --eventsub-callback` passes
+  before claiming production EventSub callback readiness
 
 ## 21. Implementation Phases
 
@@ -922,7 +993,7 @@ Phase 2: REST discovery
 Phase 3: API and web analytics baseline
 
 - Hono API
-- live streams endpoint
+- live streams endpoint with latest viewer snapshot and chat-assignment state
 - channel endpoint
 - Next.js pages for live streams and channel profile
 - TanStack Query integration
@@ -932,7 +1003,7 @@ Phase 4: chat assignment and IRC ingestion
 - bot account model
 - priority assignment scheduler
 - IRC connection manager
-- `@twurple/chat` spike or custom IRC socket decision
+- project-owned IRC socket adapter
 - raw IRC storage
 - parsed messages and JOIN/PART events
 - internal ingestion diagnostics
@@ -941,7 +1012,7 @@ Phase 5: EventSub
 
 - webhook receiver
 - signature/secret validation where required by Twitch flow
-- `@twurple/eventsub-http` integration decision
+- Hono-owned webhook receipt
 - subscription reconciliation
 - stream lifecycle and raid/channel update events
 - raw and normalized event storage
@@ -957,7 +1028,8 @@ Phase 6: auth and access modes
 Phase 7: hardening
 
 - backup container
-- retention jobs
+- baseline raw retention jobs
+- Twitch credential smoke runbook
 - partitioning review for high-volume tables
 - diagnostics polish
 - public launch privacy/legal checklist
@@ -966,12 +1038,14 @@ Phase 7: hardening
 
 Before production public launch:
 
-- define raw chat retention
-- define raw payload retention
-- define deletion/opt-out process
+- run live Twitch smoke checks with production-like credentials
+- confirm raw chat retention period and defaults
+- confirm raw payload retention period and defaults
+- confirm deletion/opt-out policy, response times, and operator procedure
 - review public Chatter Summary scope
 - verify Own Data View access control
 - verify admin access control
+- verify privacy request completion flow on production-like data
 - verify no secrets in logs/API responses
 - verify Twitch Developer Agreement obligations
 - verify GDPR/privacy obligations for identifiable or pseudonymous data
@@ -985,15 +1059,12 @@ before public launch or before expanding ingestion scale:
 
 - How many bot accounts will be used in the first private MVP?
 - Will any streamers explicitly authorize or mod the bot early?
-- What exact retention periods apply to raw chat text and raw payloads before
-  public launch?
+- Are the default raw chat and raw payload retention periods acceptable for
+  public launch, or should production use shorter windows?
 - What public Chatter Summary fields are acceptable in production?
+- What public copy and operator SLA should be used for data-deletion requests?
 - What off-server backup target will be used?
 - Should EventSub start in private MVP or after REST + IRC baseline?
-- Does `@twurple/chat` expose enough raw IRC detail for the Raw Event Ledger, or
-  do we need a custom IRC socket/parser?
-- Does `@twurple/eventsub-http` fit cleanly inside Hono/Caddy routing, or should
-  Hono own webhook receipt directly?
 - Should `Get Chatters` snapshots be enabled only for modded/authorized channels
   once scopes are confirmed?
 - Will streamer opt-in become a first-class product concept?

@@ -1,0 +1,19 @@
+{
+  "name": "twitch-tracker",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=22.11 <23"
+  },
+  "scripts": {
+    "build": "corepack pnpm -r build",
+    "check:structure": "node scripts/check-structure.mjs",
+    "dev": "corepack pnpm -r --parallel dev",
+    "smoke:twitch": "corepack pnpm --filter @twitch-tracker/worker smoke:twitch",
+    "typecheck": "corepack pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}

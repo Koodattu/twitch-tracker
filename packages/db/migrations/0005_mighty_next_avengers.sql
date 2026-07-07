@@ -1,0 +1,2 @@
+DROP INDEX "channel_events_source_event_unique_idx";--> statement-breakpoint
+CREATE UNIQUE INDEX "channel_events_source_event_unique_idx" ON "channel_events" USING btree ("source","event_type","source_event_id");

@@ -1,0 +1,143 @@
+services:
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+      - "8443:443"
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+      - api
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      INTERNAL_API_URL: http://api:4000
+      NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:4000}
+    depends_on:
+      - api
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      APP_MODE: ${APP_MODE:-local}
+      PORT: 4000
+      PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:3000}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:4000}
+      INTERNAL_API_URL: ${INTERNAL_API_URL:-http://api:4000}
+      DATABASE_URL: postgres://twitch_tracker:twitch_tracker@postgres:5432/twitch_tracker
+      SESSION_SECRET: ${SESSION_SECRET:-local-development-session-secret-000000}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      TWITCH_EVENTSUB_SECRET: ${TWITCH_EVENTSUB_SECRET:-local-development-eventsub-secret-0000}
+      EVENTSUB_ENABLED: ${EVENTSUB_ENABLED:-false}
+      EVENTSUB_MAX_CHANNELS: ${EVENTSUB_MAX_CHANNELS:-25}
+      ENABLE_TWITCH_INGESTION: ${ENABLE_TWITCH_INGESTION:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      APP_MODE: ${APP_MODE:-local}
+      PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:3000}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:4000}
+      INTERNAL_API_URL: ${INTERNAL_API_URL:-http://api:4000}
+      DATABASE_URL: postgres://twitch_tracker:twitch_tracker@postgres:5432/twitch_tracker
+      SESSION_SECRET: ${SESSION_SECRET:-local-development-session-secret-000000}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      TWITCH_EVENTSUB_SECRET: ${TWITCH_EVENTSUB_SECRET:-local-development-eventsub-secret-0000}
+      EVENTSUB_ENABLED: ${EVENTSUB_ENABLED:-false}
+      EVENTSUB_MAX_CHANNELS: ${EVENTSUB_MAX_CHANNELS:-25}
+      ENABLE_TWITCH_INGESTION: ${ENABLE_TWITCH_INGESTION:-false}
+      AGGREGATION_BUCKET_MINUTES: ${AGGREGATION_BUCKET_MINUTES:-5}
+      AGGREGATION_LOOKBACK_HOURS: ${AGGREGATION_LOOKBACK_HOURS:-48}
+      RAW_CHAT_RETENTION_DAYS: ${RAW_CHAT_RETENTION_DAYS:-30}
+      RAW_PAYLOAD_RETENTION_DAYS: ${RAW_PAYLOAD_RETENTION_DAYS:-30}
+      STALE_ASSIGNMENT_GRACE_MINUTES: ${STALE_ASSIGNMENT_GRACE_MINUTES:-15}
+      WORKER_NAME: worker-1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: twitch_tracker
+      POSTGRES_USER: twitch_tracker
+      POSTGRES_PASSWORD: twitch_tracker
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U twitch_tracker -d twitch_tracker"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: "no"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgres://twitch_tracker:twitch_tracker@postgres:5432/twitch_tracker
+    command: ["pnpm", "--filter", "@twitch-tracker/db", "db:migrate"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      PGPASSWORD: twitch_tracker
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+    command:
+      - /bin/sh
+      - -c
+      - |
+        while true; do
+          timestamp=$$(date -u +%Y%m%dT%H%M%SZ)
+          pg_dump -h postgres -U twitch_tracker -d twitch_tracker > /backups/twitch_tracker_$${timestamp}.sql
+          find /backups -type f -name '*.sql' -mtime +$${BACKUP_RETENTION_DAYS} -delete
+          sleep 86400
+        done
+    volumes:
+      - postgres_backups:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  caddy_data:
+  caddy_config:
+  postgres_data:
+  postgres_backups:
