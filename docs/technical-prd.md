@@ -108,6 +108,7 @@ The following ADRs are accepted inputs to this PRD:
 - `0013-public-analytics-and-ingestion-diagnostics-first.md`
 - `0014-single-server-docker-compose-deployment.md`
 - `0015-one-modular-worker-service.md`
+- `0016-twitch-sdks-behind-adapters.md`
 
 ## 6. System Architecture
 
@@ -151,6 +152,20 @@ Backend:
 - Zod for runtime validation and contracts
 - Drizzle for PostgreSQL schema/query layer
 - PostgreSQL as the only data store
+
+Twitch libraries:
+
+- Twurple is the default SDK candidate for Twitch auth, Helix REST, chat, and
+  EventSub support.
+- Twurple must be used behind project-owned adapter interfaces, not imported
+  throughout product code.
+- `@twurple/auth` and `@twurple/api` are good default candidates for auth and
+  Helix work.
+- `@twurple/eventsub-http` is a good candidate if it integrates cleanly with the
+  Hono API and Caddy webhook path.
+- `@twurple/chat` requires an early spike before commitment, because the product
+  must persist raw IRC lines and control assignment/reconnect state.
+- High-level bot abstractions such as `@twurple/easy-bot` are out of scope.
 
 Frontend:
 
@@ -207,11 +222,16 @@ Package ownership:
 
 - `packages/db`: Drizzle schema, migrations, database client helpers
 - `packages/config`: Zod-validated environment and shared config
-- `packages/twitch`: Twitch REST, IRC, EventSub clients/parsers/schemas
+- `packages/twitch`: project-owned Twitch REST, IRC, EventSub
+  adapters/clients/parsers/schemas
 - `packages/shared`: shared DTOs, utility types, and domain helpers used by at
   least two apps
 
 Rule: code used by one app stays in that app until reuse is real.
+
+Rule: Twurple types should not become the public domain model of the app.
+Adapters translate Twurple/custom-client output into project-owned raw ledger
+records and normalized DTOs.
 
 ## 9. Twitch Integration Ownership
 
@@ -879,6 +899,7 @@ Phase 0: project scaffold
 - shared TypeScript config
 - lint/typecheck/test tooling
 - Docker Compose skeleton
+- Twitch adapter interfaces and dependency spike plan
 
 Phase 1: database and config
 
@@ -890,12 +911,13 @@ Phase 1: database and config
 
 Phase 2: REST discovery
 
-- Twitch Helix client
+- Twitch Helix client behind adapter boundary
 - `Get Streams` polling
 - stream session reconciliation
 - stream snapshots
 - user hydration
 - ingestion runs and rate-limit observations
+- raw REST response and rate-limit header capture
 
 Phase 3: API and web analytics baseline
 
@@ -910,6 +932,7 @@ Phase 4: chat assignment and IRC ingestion
 - bot account model
 - priority assignment scheduler
 - IRC connection manager
+- `@twurple/chat` spike or custom IRC socket decision
 - raw IRC storage
 - parsed messages and JOIN/PART events
 - internal ingestion diagnostics
@@ -918,6 +941,7 @@ Phase 5: EventSub
 
 - webhook receiver
 - signature/secret validation where required by Twitch flow
+- `@twurple/eventsub-http` integration decision
 - subscription reconciliation
 - stream lifecycle and raid/channel update events
 - raw and normalized event storage
@@ -966,6 +990,10 @@ before public launch or before expanding ingestion scale:
 - What public Chatter Summary fields are acceptable in production?
 - What off-server backup target will be used?
 - Should EventSub start in private MVP or after REST + IRC baseline?
+- Does `@twurple/chat` expose enough raw IRC detail for the Raw Event Ledger, or
+  do we need a custom IRC socket/parser?
+- Does `@twurple/eventsub-http` fit cleanly inside Hono/Caddy routing, or should
+  Hono own webhook receipt directly?
 - Should `Get Chatters` snapshots be enabled only for modded/authorized channels
   once scopes are confirmed?
 - Will streamer opt-in become a first-class product concept?
@@ -996,3 +1024,7 @@ before public launch or before expanding ingestion scale:
   https://dev.twitch.tv/docs/authentication/validate-tokens/
 - Twitch Developer Agreement:
   https://legal.twitch.com/en/legal/developer-agreement/
+- Twurple:
+  https://twurple.js.org/
+- Twurple GitHub:
+  https://github.com/twurple/twurple
