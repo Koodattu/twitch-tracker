@@ -1,10 +1,13 @@
-import { cookies } from "next/headers";
-import { getApiData } from "../../api-client";
+import Link from "next/link";
+import { getApiData, getAuthenticatedApiInit } from "../../api-client";
+import { formatCount, formatDateTime, formatStatus } from "../../format";
+import { Avatar, EmptyState, MetricCard, StatusPill } from "../../ui";
 
 type ChatterSummary = {
   login: string;
   publicSummary: boolean;
   detailAvailable: boolean;
+  hiddenBySubjectRequest?: boolean;
 };
 
 type PrivateChatterProfile = {
@@ -51,125 +54,122 @@ type PrivateChatterProfile = {
   }>;
 };
 
+type ViewerState = {
+  user: null | { isAdmin: boolean; login: string | null };
+  mode: string;
+};
+
 export default async function ChatterPage({ params }: { params: Promise<{ login: string }> }) {
   const { login } = await params;
-  const cookieHeader = cookies().toString();
-  const privateApiInit: RequestInit = cookieHeader === ""
-    ? { cache: "no-store" }
-    : { cache: "no-store", headers: { Cookie: cookieHeader } };
-  const summary = await getApiData<ChatterSummary>(`/api/chatters/${login}`);
-  const profile = await getApiData<PrivateChatterProfile>(`/api/private/chatters/${login}`, privateApiInit);
+  const apiInit = await getAuthenticatedApiInit();
+  const [summary, profile, viewer] = await Promise.all([
+    getApiData<ChatterSummary>(`/api/chatters/${login}`, apiInit),
+    getApiData<PrivateChatterProfile>(`/api/private/chatters/${login}`, apiInit),
+    getApiData<ViewerState>("/api/me", apiInit)
+  ]);
+  const name = profile?.user.displayName ?? profile?.user.login ?? summary?.login ?? login;
+  const detailLabel = viewer?.user?.isAdmin === true
+    ? "Admin view"
+    : profile == null
+      ? "Limited public view"
+      : "Private MVP view";
 
   return (
     <>
-      <section className="page-title">
-        <h1>{profile?.user.displayName ?? summary?.login ?? login}</h1>
-        <p>{summary?.detailAvailable ? "Private MVP profile is available in this deployment mode." : "Public chatter summary."}</p>
+      <section className="page-title page-title-wide">
+        <div className="breadcrumbs"><Link href="/">Live streams</Link><span>/</span><span>Observed chatter</span></div>
+        <div className="page-heading-row">
+          <div className="identity-heading">
+            <Avatar name={name} src={profile?.user.profileImageUrl} size="large" />
+            <div><span className="eyebrow">Chatter activity</span><h1>{name}</h1></div>
+          </div>
+          <StatusPill tone={profile == null ? "neutral" : viewer?.user?.isAdmin ? "accent" : "warning"}>{detailLabel}</StatusPill>
+        </div>
+        <p>Captured chat-room activity associated with this Twitch identity. Presence signals are evidence from chat, never proof of stream viewership.</p>
       </section>
 
-      <section className="stat-row">
-        <div className="stat">
-          <span className="muted">Messages</span>
-          <strong>{profile?.summary.messageCount ?? 0}</strong>
-        </div>
-        <div className="stat">
-          <span className="muted">Channels</span>
-          <strong>{profile?.summary.channelCount ?? 0}</strong>
-        </div>
-        <div className="stat">
-          <span className="muted">Presence</span>
-          <strong>{profile?.presenceObservations.length ?? 0}</strong>
-        </div>
-      </section>
+      {summary == null && profile == null ? (
+        <div className="callout callout-warning"><div><strong>Chatter data unavailable</strong><p>This identity may not have been observed, may be hidden by request, or the API may be unavailable.</p></div></div>
+      ) : null}
 
-      <section className="panel">
-        <div className="panel-header">
-          <h2>Chatter Summary</h2>
-          <span className="badge">{summary?.detailAvailable ? "private detail enabled" : "limited public view"}</span>
-        </div>
-        <table className="table">
-          <tbody>
-            <tr>
-              <th>Login</th>
-              <td>{summary?.login ?? login}</td>
-            </tr>
-            <tr>
-              <th>Raw timeline</th>
-              <td>{summary?.detailAvailable ? "Available through private endpoints" : "Requires own-data login"}</td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
+      {profile == null ? (
+        <section className="panel">
+          <div className="panel-header"><div className="panel-heading"><h2>Detailed activity is private</h2><p>Raw timelines are protected by the API.</p></div><StatusPill>Restricted</StatusPill></div>
+          <EmptyState
+            title={summary?.hiddenBySubjectRequest ? "Hidden by subject request" : "No detailed access"}
+            description={summary?.hiddenBySubjectRequest
+              ? "This public chatter summary has been hidden through the tracker’s privacy controls."
+              : "Sign in to inspect your own captured messages. Administrators can inspect captured data across accounts."}
+            action={<Link className="button" href="/me">Go to my data</Link>}
+          />
+        </section>
+      ) : (
+        <>
+          <section className="stat-row" aria-label="Chatter summary">
+            <MetricCard label="Messages captured" value={formatCount(profile.summary.messageCount)} detail={profile.summary.firstMessageAt == null ? "No first message timestamp" : `Since ${formatDateTime(profile.summary.firstMessageAt)}`} />
+            <MetricCard label="Channels active" value={formatCount(profile.summary.channelCount)} />
+            <MetricCard label="Presence observations" value={formatCount(profile.presenceObservations.length)} detail="Sampled chat-room evidence" />
+            <MetricCard
+              label="Last message"
+              value={profile.summary.lastMessageAt == null ? "—" : "Recorded"}
+              detail={profile.summary.lastMessageAt == null ? undefined : formatDateTime(profile.summary.lastMessageAt)}
+            />
+          </section>
 
-      <section className="panel">
-        <div className="panel-header">
-          <h2>Recent Messages</h2>
-          <span className="badge">{profile?.recentMessages.length ?? 0} shown</span>
-        </div>
-        {profile == null ? (
-          <p className="muted padded">Detailed chatter data is not available.</p>
-        ) : profile.recentMessages.length === 0 ? (
-          <p className="muted padded">No messages have been captured for this chatter.</p>
-        ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Time</th>
-                <th>Channel</th>
-                <th>Message</th>
-              </tr>
-            </thead>
-            <tbody>
-              {profile.recentMessages.map((message) => (
-                <tr key={message.messageId}>
-                  <td>{new Date(message.sentAt ?? message.receivedAt).toLocaleString()}</td>
-                  <td>{message.broadcasterLogin == null ? "-" : <a href={`/channels/${message.broadcasterLogin}`}>{message.broadcasterDisplayName ?? message.broadcasterLogin}</a>}</td>
-                  <td className="message-cell">{message.rawText ?? ""}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </section>
+          <section className="panel">
+            <div className="panel-header"><div className="panel-heading"><h2>Recent messages</h2><p>Newest captured messages first</p></div><StatusPill tone="accent">{profile.recentMessages.length} loaded</StatusPill></div>
+            {profile.recentMessages.length === 0 ? (
+              <EmptyState title="No messages captured" description="No retained chat messages are connected to this chatter." />
+            ) : (
+              <div className="message-list">
+                {profile.recentMessages.map((message) => (
+                  <article className="message-item" key={message.messageId}>
+                    <div className="message-meta">
+                      <strong>{message.broadcasterLogin == null ? "Unknown channel" : <Link href={`/channels/${message.broadcasterLogin}`}>{message.broadcasterDisplayName ?? message.broadcasterLogin}</Link>}</strong>
+                      <span>{formatDateTime(message.sentAt ?? message.receivedAt)}</span>
+                      {message.twitchStreamId == null ? <span>No linked stream</span> : <Link href={`/streams/${message.twitchStreamId}`}>Open stream session</Link>}
+                    </div>
+                    <p className="message-body">{message.rawText ?? "Message text has been redacted."}</p>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
 
-      <section className="panel">
-        <div className="panel-header">
-          <h2>Presence And Membership</h2>
-          <span className="badge">{profile?.membershipEvents.length ?? 0} JOIN/PART</span>
-        </div>
-        {profile == null ? (
-          <p className="muted padded">Presence detail is not available.</p>
-        ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Time</th>
-                <th>Channel</th>
-                <th>Signal</th>
-                <th>Confidence</th>
-              </tr>
-            </thead>
-            <tbody>
-              {profile.presenceObservations.slice(0, 80).map((observation) => (
-                <tr key={observation.id}>
-                  <td>{new Date(observation.observedAt).toLocaleString()}</td>
-                  <td>{observation.broadcasterLogin == null ? "-" : observation.broadcasterDisplayName ?? observation.broadcasterLogin}</td>
-                  <td>{observation.source}</td>
-                  <td>{observation.confidence}%</td>
-                </tr>
-              ))}
-              {profile.membershipEvents.slice(0, 80).map((event) => (
-                <tr key={event.id}>
-                  <td>{new Date(event.eventAt ?? event.receivedAt).toLocaleString()}</td>
-                  <td>{event.broadcasterLogin == null ? "-" : event.broadcasterDisplayName ?? event.broadcasterLogin}</td>
-                  <td>{event.eventType} / {event.source}</td>
-                  <td>{event.confidence}%</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </section>
+          <section className="panel">
+            <div className="panel-header"><div className="panel-heading"><h2>Presence and membership</h2><p>JOIN/PART and authorized Get Chatters evidence</p></div><StatusPill>{profile.presenceObservations.length + profile.membershipEvents.length} signals</StatusPill></div>
+            {profile.presenceObservations.length === 0 && profile.membershipEvents.length === 0 ? (
+              <EmptyState title="No presence evidence" description="No retained membership or presence observations are connected to this chatter." />
+            ) : (
+              <div className="table-scroll" role="region" aria-label="Chatter presence and membership evidence" tabIndex={0}>
+                <table className="table">
+                  <thead><tr><th scope="col">Time</th><th scope="col">Channel</th><th scope="col">Stream</th><th scope="col">Signal</th><th scope="col">Confidence</th></tr></thead>
+                  <tbody>
+                    {profile.presenceObservations.slice(0, 80).map((observation) => (
+                      <tr key={observation.id}>
+                        <td className="time-cell">{formatDateTime(observation.observedAt)}</td>
+                        <td>{observation.broadcasterLogin == null ? <span className="muted">Unknown</span> : <Link href={`/channels/${observation.broadcasterLogin}`}>{observation.broadcasterDisplayName ?? observation.broadcasterLogin}</Link>}</td>
+                        <td>{observation.twitchStreamId == null ? <span className="muted">Not linked</span> : <Link href={`/streams/${observation.twitchStreamId}`}>Open session</Link>}</td>
+                        <td><StatusPill>{formatStatus(observation.source)}</StatusPill></td><td className="number-cell">{observation.confidence}%</td>
+                      </tr>
+                    ))}
+                    {profile.membershipEvents.slice(0, 80).map((event) => (
+                      <tr key={event.id}>
+                        <td className="time-cell">{formatDateTime(event.eventAt ?? event.receivedAt)}</td>
+                        <td>{event.broadcasterLogin == null ? <span className="muted">Unknown</span> : <Link href={`/channels/${event.broadcasterLogin}`}>{event.broadcasterDisplayName ?? event.broadcasterLogin}</Link>}</td>
+                        <td>{event.twitchStreamId == null ? <span className="muted">Not linked</span> : <Link href={`/streams/${event.twitchStreamId}`}>Open session</Link>}</td>
+                        <td><StatusPill tone={event.eventType === "join" ? "success" : "neutral"}>{formatStatus(event.eventType)} · {formatStatus(event.source)}</StatusPill></td><td className="number-cell">{event.confidence}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
+          <p className="data-note">Detailed rows are bounded and subject to retention, redaction, deletion, and tracking opt-out controls. An absent row does not prove an absent chat visit.</p>
+        </>
+      )}
     </>
   );
 }

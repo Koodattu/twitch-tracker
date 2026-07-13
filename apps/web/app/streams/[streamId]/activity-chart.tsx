@@ -2,6 +2,7 @@
 
 import {
   CartesianGrid,
+  Legend,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -23,17 +24,18 @@ export function StreamActivityChart({ points }: { points: ActivityPoint[] }) {
   }
 
   return (
-    <div className="chart-wrap">
+    <div className="chart-wrap" role="img" aria-label="Line chart comparing viewers, captured messages, and active chatters over the stream session">
       <ResponsiveContainer width="100%" height={280}>
-        <LineChart data={points} margin={{ top: 8, right: 18, bottom: 8, left: 0 }}>
-          <CartesianGrid stroke="#d8e4e0" strokeDasharray="3 3" />
-          <XAxis dataKey="time" minTickGap={32} tick={{ fontSize: 12 }} />
-          <YAxis yAxisId="left" tick={{ fontSize: 12 }} />
-          <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12 }} />
-          <Tooltip />
-          <Line yAxisId="left" type="monotone" dataKey="viewers" name="Viewers" stroke="#256f68" dot={false} strokeWidth={2} connectNulls />
-          <Line yAxisId="right" type="monotone" dataKey="messages" name="Messages" stroke="#6f4e25" dot={false} strokeWidth={2} />
-          <Line yAxisId="right" type="monotone" dataKey="activeChatters" name="Active chatters" stroke="#7c3aed" dot={false} strokeWidth={2} connectNulls />
+        <LineChart data={points} margin={{ top: 8, right: 18, bottom: 8, left: 0 }} accessibilityLayer>
+          <CartesianGrid stroke="rgba(255,255,255,0.08)" strokeDasharray="3 5" vertical={false} />
+          <XAxis dataKey="time" minTickGap={32} tick={{ fill: "#8f899b", fontSize: 11 }} axisLine={{ stroke: "rgba(255,255,255,0.1)" }} tickLine={false} />
+          <YAxis yAxisId="left" tick={{ fill: "#8f899b", fontSize: 11 }} axisLine={false} tickLine={false} width={42} />
+          <YAxis yAxisId="right" orientation="right" tick={{ fill: "#8f899b", fontSize: 11 }} axisLine={false} tickLine={false} width={42} />
+          <Tooltip contentStyle={{ background: "#211d2f", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12, boxShadow: "0 14px 36px rgba(0,0,0,0.35)", fontSize: 12 }} labelStyle={{ color: "#f7f5fb", fontWeight: 700 }} />
+          <Legend iconType="circle" iconSize={7} wrapperStyle={{ color: "#a7a1b4", fontSize: 11, paddingTop: 10 }} />
+          <Line yAxisId="left" type="monotone" dataKey="viewers" name="Viewers" stroke="#48d597" dot={false} strokeWidth={2.25} connectNulls activeDot={{ r: 4 }} />
+          <Line yAxisId="right" type="monotone" dataKey="messages" name="Messages" stroke="#a970ff" dot={false} strokeWidth={2.25} activeDot={{ r: 4 }} />
+          <Line yAxisId="right" type="monotone" dataKey="activeChatters" name="Active chatters" stroke="#f4c86b" dot={false} strokeWidth={2.25} connectNulls activeDot={{ r: 4 }} />
         </LineChart>
       </ResponsiveContainer>
     </div>

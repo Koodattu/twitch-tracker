@@ -740,6 +740,7 @@ Authenticated endpoints:
 Private/admin/internal endpoints:
 
 - `GET /api/internal/ingestion`
+- `GET /api/internal/messages`
 - `GET /api/internal/bot-accounts`
 - `GET /api/internal/chat-assignments`
 - `GET /api/internal/rate-limits`
@@ -791,6 +792,8 @@ Pages:
 - `/me`: Own Data View after Twitch login
 - `/internal/ingestion`: worker status, bot accounts, chat assignments, rate
   limits, recent errors
+- `/internal/messages`: paginated captured-message archive with chatter,
+  channel, and stream context for admins
 
 Frontend requirements:
 

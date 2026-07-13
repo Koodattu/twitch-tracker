@@ -78,18 +78,22 @@ corepack pnpm smoke:twitch -- --require-live --irc-channel=some_channel
 
 Use a channel where joining with the bot account is acceptable.
 
-## Bot OAuth Admin Setup
+## Twitch OAuth and Admin Setup
 
 Set these before using the bot-account admin flow:
 
 - `ADMIN_TWITCH_USER_IDS`: comma- or space-separated Twitch user IDs that should be admins at login
+- `ADMIN_TWITCH_LOGINS`: bootstrap-only verified Twitch logins. On first matching
+  sign-in, the API records the immutable Twitch user ID as an admin grant. The
+  default is `Vaarattu`.
 - `TWITCH_OAUTH_REDIRECT_URI`: normal user login callback, for example `https://example.com/api/auth/twitch/callback`
 - `TWITCH_BOT_OAUTH_REDIRECT_URI`: bot login callback, for example `https://example.com/api/internal/bot-accounts/oauth/callback`
 - `TWITCH_BOT_SCOPES`: recommended MVP value is `chat:read user:read:chat user:read:moderated_channels moderator:read:chatters`
 
 Operator flow:
 
-1. Log in through `/me` with a Twitch account listed in `ADMIN_TWITCH_USER_IDS`.
+1. Log in through `/me` with a Twitch account listed in
+   `ADMIN_TWITCH_USER_IDS` or `ADMIN_TWITCH_LOGINS`.
 2. Open `/internal/bot-accounts`.
 3. Click `Connect bot` and authorize with the dedicated bot Twitch account.
 4. Confirm the bot account shows a stored token with `valid` status.

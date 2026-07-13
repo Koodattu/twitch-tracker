@@ -39,6 +39,7 @@ export const baseEnvSchema = z.object({
   TWITCH_BOT_ACCESS_TOKEN: z.string().optional().default(""),
   TWITCH_BOT_REFRESH_TOKEN: z.string().optional().default(""),
   ADMIN_TWITCH_USER_IDS: z.string().optional().default(""),
+  ADMIN_TWITCH_LOGINS: z.string().optional().default("Vaarattu"),
   ENABLE_TWITCH_INGESTION: booleanFromString,
   DEFAULT_BOT_JOIN_CAPACITY: intFromString(100),
   DEFAULT_BOT_JOIN_RATE_PER_10_SECONDS: intFromString(20),

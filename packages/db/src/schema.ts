@@ -273,6 +273,8 @@ export const chatMessages = pgTable("chat_messages", {
   rawEventsubEventId: uuid("raw_eventsub_event_id").references(() => rawEventsubEvents.id),
   ...timestamps
 }, (table) => ({
+  receivedIdx: index("chat_messages_received_idx").on(table.receivedAt),
+  streamReceivedIdx: index("chat_messages_stream_received_idx").on(table.twitchStreamId, table.receivedAt),
   channelReceivedIdx: index("chat_messages_channel_received_idx").on(table.broadcasterUserId, table.receivedAt),
   chatterReceivedIdx: index("chat_messages_chatter_received_idx").on(table.chatterUserId, table.receivedAt)
 }));

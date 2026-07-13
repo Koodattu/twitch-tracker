@@ -57,6 +57,13 @@
       "when": 1783444000000,
       "tag": "0007_chat_presence_reconciliation",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1783958400000,
+      "tag": "0008_message_archive_indexes",
+      "breakpoints": true
     }
   ]
 }

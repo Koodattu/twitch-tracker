@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { encryptSecret, hashSessionToken, isPrivateDataMode, parseScopeList, type AppConfig } from "@twitch-tracker/config";
+import { decryptSecret, encryptSecret, hashSessionToken, parseScopeList, type AppConfig } from "@twitch-tracker/config";
 import {
   adminUsers,
   appUsers,
@@ -31,8 +31,8 @@ import {
   workerHeartbeats,
   type DbClient
 } from "@twitch-tracker/db";
-import { createEventSubEnvelope, eventSubHeaders, exchangeTwitchAuthorizationCode, FetchHelixAdapter, validateTwitchAccessToken, verifyEventSubSignature } from "@twitch-tracker/twitch";
-import { and, desc, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
+import { createEventSubEnvelope, eventSubHeaders, exchangeTwitchAuthorizationCode, FetchHelixAdapter, refreshTwitchUserAccessToken, validateTwitchAccessToken, verifyEventSubSignature } from "@twitch-tracker/twitch";
+import { and, desc, eq, gt, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import type { MiddlewareHandler } from "hono";
@@ -57,11 +57,17 @@ const privacyRequestBodySchema = z.object({
   requestType: z.enum(["public_profile_opt_out", "tracking_opt_out", "data_deletion"]),
   note: z.string().max(1000).optional()
 });
+const messageArchiveQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).max(100_000).default(1),
+  q: z.string().trim().max(100).default("")
+});
 const sessionCookieName = "twitch_tracker_session";
 const oauthStateCookieName = "twitch_oauth_state";
 const botOauthStateCookieName = "twitch_bot_oauth_state";
 const activeChatAssignmentStatuses = ["desired", "joining", "joined", "leaving"] as const;
 type ActiveChatAssignmentStatus = (typeof activeChatAssignmentStatuses)[number];
+const messageArchivePageSize = 100;
+const twitchTokenValidationIntervalMs = 55 * 60 * 1000;
 
 export const createApiApp = ({ config, db }: CreateApiAppInput) => {
   const app = new Hono<ApiBindings>();
@@ -84,6 +90,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
 
   app.get("/api/streams/live", async (c) => {
     const db = c.get("db");
+    const canSeeSuppressed = await hasAdminAccess(c);
     const latestSnapshotTimes = db
       .select({
         twitchStreamId: streamSnapshots.twitchStreamId,
@@ -99,6 +106,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
         broadcasterId: streamSessions.broadcasterUserId,
         broadcasterLogin: twitchUsers.login,
         broadcasterDisplayName: twitchUsers.displayName,
+        broadcasterProfileImageUrl: twitchUsers.profileImageUrl,
         title: streamSessions.latestTitle,
         categoryName: streamSessions.latestCategoryName,
         language: streamSessions.language,
@@ -119,13 +127,13 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
         )
       )
       .leftJoin(subjectPrivacyStates, eq(streamSessions.broadcasterUserId, subjectPrivacyStates.twitchUserId))
-      .where(
-        and(
-          isNull(streamSessions.endedAt),
-          eq(streamSessions.language, "fi"),
-          or(isNull(subjectPrivacyStates.twitchUserId), eq(subjectPrivacyStates.trackingOptedOut, false))
-        )
-      )
+      .where(canSeeSuppressed
+        ? and(isNull(streamSessions.endedAt), eq(streamSessions.language, "fi"))
+        : and(
+            isNull(streamSessions.endedAt),
+            eq(streamSessions.language, "fi"),
+            or(isNull(subjectPrivacyStates.twitchUserId), eq(subjectPrivacyStates.trackingOptedOut, false))
+          ))
       .orderBy(desc(sql<number>`coalesce(${streamSnapshots.viewerCount}, -1)`), desc(streamSessions.lastSeenLiveAt))
       .limit(200);
 
@@ -170,12 +178,15 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
   });
 
   app.get("/api/streams/recent", async (c) => {
+    const canSeeSuppressed = await hasAdminAccess(c);
     const rows = await c
       .get("db")
       .select({ stream: streamSessions })
       .from(streamSessions)
       .leftJoin(subjectPrivacyStates, eq(streamSessions.broadcasterUserId, subjectPrivacyStates.twitchUserId))
-      .where(or(isNull(subjectPrivacyStates.twitchUserId), eq(subjectPrivacyStates.trackingOptedOut, false)))
+      .where(canSeeSuppressed
+        ? undefined
+        : or(isNull(subjectPrivacyStates.twitchUserId), eq(subjectPrivacyStates.trackingOptedOut, false)))
       .orderBy(desc(streamSessions.startedAt))
       .limit(50);
 
@@ -309,10 +320,14 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
       .get("db")
       .select({
         stream: streamSessions,
+        broadcasterLogin: twitchUsers.login,
+        broadcasterDisplayName: twitchUsers.displayName,
+        broadcasterProfileImageUrl: twitchUsers.profileImageUrl,
         publicProfileHidden: subjectPrivacyStates.publicProfileHidden,
         trackingOptedOut: subjectPrivacyStates.trackingOptedOut
       })
       .from(streamSessions)
+      .leftJoin(twitchUsers, eq(streamSessions.broadcasterUserId, twitchUsers.twitchUserId))
       .leftJoin(subjectPrivacyStates, eq(streamSessions.broadcasterUserId, subjectPrivacyStates.twitchUserId))
       .where(eq(streamSessions.twitchStreamId, params.streamId))
       .limit(1);
@@ -325,7 +340,14 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
       return c.json({ error: { code: "not_found", message: "Stream not found." } }, 404);
     }
 
-    return c.json({ data: row.stream });
+    return c.json({
+      data: {
+        ...row.stream,
+        broadcasterLogin: row.broadcasterLogin,
+        broadcasterDisplayName: row.broadcasterDisplayName,
+        broadcasterProfileImageUrl: row.broadcasterProfileImageUrl
+      }
+    });
   });
 
   app.get("/api/channels/:login", async (c) => {
@@ -538,7 +560,8 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
       .where(eq(twitchUsers.login, params.login.toLowerCase()))
       .limit(1);
 
-    if (row != null && isSubjectSuppressed(row) && !(await hasPrivilegedAccess(c))) {
+    const hasDetailAccess = await hasPrivilegedAccess(c);
+    if (row != null && isSubjectSuppressed(row) && !hasDetailAccess) {
       return c.json({
         data: {
           login: row.login ?? params.login,
@@ -553,18 +576,20 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
       data: {
         login: row?.login ?? params.login,
         publicSummary: true,
-        detailAvailable: isPrivateDataMode(c.get("config").APP_MODE)
+        detailAvailable: hasDetailAccess
       }
     });
   });
 
   app.get("/api/me", async (c) => {
     const session = await getCurrentSession(c);
+    const apiConfig = c.get("config");
 
     return c.json({
       data: {
         user: session?.user ?? null,
-        mode: c.get("config").APP_MODE
+        mode: apiConfig.APP_MODE,
+        authConfigured: isTwitchLoginConfigured(apiConfig)
       }
     });
   });
@@ -694,12 +719,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
 
   app.get("/api/auth/twitch/start", (c) => {
     const apiConfig = c.get("config");
-    if (
-      apiConfig.TWITCH_CLIENT_ID === "" ||
-      apiConfig.TWITCH_CLIENT_SECRET === "" ||
-      apiConfig.TWITCH_OAUTH_REDIRECT_URI == null ||
-      apiConfig.TWITCH_OAUTH_REDIRECT_URI === ""
-    ) {
+    if (!isTwitchLoginConfigured(apiConfig)) {
       return c.json({ error: { code: "not_configured", message: "Twitch OAuth is not configured." } }, 501);
     }
 
@@ -729,23 +749,21 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
     const apiConfig = c.get("config");
     const state = c.req.query("state");
     const code = c.req.query("code");
+    const oauthError = c.req.query("error");
     const expectedState = getCookie(c, oauthStateCookieName);
 
     if (state == null || expectedState == null || state !== expectedState) {
-      return c.json({ error: { code: "invalid_oauth_state", message: "OAuth state validation failed." } }, 400);
+      return redirectToOwnData(c, "invalid_state");
     }
 
-    if (code == null || code === "") {
-      return c.json({ error: { code: "missing_oauth_code", message: "OAuth callback is missing a code." } }, 400);
+    clearCookie(c, oauthStateCookieName, apiConfig);
+
+    if (oauthError != null || code == null || code === "") {
+      return redirectToOwnData(c, oauthError === "access_denied" ? "cancelled" : "failed");
     }
 
-    if (
-      apiConfig.TWITCH_CLIENT_ID === "" ||
-      apiConfig.TWITCH_CLIENT_SECRET === "" ||
-      apiConfig.TWITCH_OAUTH_REDIRECT_URI == null ||
-      apiConfig.TWITCH_OAUTH_REDIRECT_URI === ""
-    ) {
-      return c.json({ error: { code: "not_configured", message: "Twitch OAuth is not configured." } }, 501);
+    if (!isTwitchLoginConfigured(apiConfig)) {
+      return redirectToOwnData(c, "not_configured");
     }
 
     try {
@@ -810,6 +828,11 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
             updatedAt: now
           }
         });
+
+      await persistConfiguredAdminGrant(c.get("db"), apiConfig, {
+        twitchUserId: twitchUser.id,
+        login: twitchUser.login
+      }, now);
 
       const [appUser] = await c
         .get("db")
@@ -885,11 +908,9 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
         path: "/",
         maxAge: sessionMaxAgeSeconds
       });
-      clearCookie(c, oauthStateCookieName, apiConfig);
-
       return c.redirect(new URL("/me", apiConfig.PUBLIC_WEB_URL).toString());
     } catch {
-      return c.json({ error: { code: "twitch_oauth_failed", message: "Twitch login failed." } }, 502);
+      return redirectToOwnData(c, "failed");
     }
   });
 
@@ -907,7 +928,102 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
 
     clearCookie(c, sessionCookieName, apiConfig);
 
+    if (c.req.header("accept")?.includes("text/html") === true) {
+      return c.redirect(new URL("/", apiConfig.PUBLIC_WEB_URL).toString(), 303);
+    }
+
     return c.json({ data: { ok: true } });
+  });
+
+  app.get("/api/internal/messages", requireAdmin, async (c) => {
+    const query = messageArchiveQuerySchema.parse({
+      page: c.req.query("page"),
+      q: c.req.query("q") ?? ""
+    });
+    const db = c.get("db");
+    const searchPattern = query.q === "" ? null : `%${escapeLikePattern(query.q)}%`;
+    const searchCondition = searchPattern == null
+      ? undefined
+      : or(
+          ilike(chatMessages.chatterLogin, searchPattern),
+          ilike(chatMessages.rawText, searchPattern),
+          ilike(twitchUsers.login, searchPattern),
+          ilike(twitchUsers.displayName, searchPattern),
+          ilike(streamSessions.twitchStreamId, searchPattern),
+          ilike(streamSessions.latestTitle, searchPattern)
+        );
+
+    const [summary] = await db
+      .select({
+        messageCount: sql<number>`count(*)::int`,
+        chatterCount: sql<number>`count(distinct coalesce(${chatMessages.chatterUserId}, ${chatMessages.chatterLogin}))::int`,
+        channelCount: sql<number>`count(distinct ${chatMessages.broadcasterUserId})::int`,
+        streamCount: sql<number>`count(distinct ${chatMessages.twitchStreamId})::int`
+      })
+      .from(chatMessages);
+
+    const [matches] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(chatMessages)
+      .leftJoin(twitchUsers, eq(chatMessages.broadcasterUserId, twitchUsers.twitchUserId))
+      .leftJoin(streamSessions, eq(chatMessages.twitchStreamId, streamSessions.twitchStreamId))
+      .where(searchCondition);
+
+    const totalMatches = matches?.count ?? 0;
+    const totalPages = Math.max(1, Math.ceil(totalMatches / messageArchivePageSize));
+    const page = Math.min(query.page, totalPages);
+    const messages = await db
+      .select({
+        messageId: chatMessages.twitchMessageId,
+        chatterUserId: chatMessages.chatterUserId,
+        chatterLogin: chatMessages.chatterLogin,
+        broadcasterUserId: chatMessages.broadcasterUserId,
+        broadcasterLogin: twitchUsers.login,
+        broadcasterDisplayName: twitchUsers.displayName,
+        twitchStreamId: chatMessages.twitchStreamId,
+        streamTitle: streamSessions.latestTitle,
+        streamStartedAt: streamSessions.startedAt,
+        sentAt: chatMessages.sentAt,
+        receivedAt: chatMessages.receivedAt,
+        rawText: chatMessages.rawText,
+        source: chatMessages.source,
+        messageType: chatMessages.messageType,
+        deletedAt: chatMessages.deletedAt,
+        clearedAt: chatMessages.clearedAt
+      })
+      .from(chatMessages)
+      .leftJoin(twitchUsers, eq(chatMessages.broadcasterUserId, twitchUsers.twitchUserId))
+      .leftJoin(streamSessions, eq(chatMessages.twitchStreamId, streamSessions.twitchStreamId))
+      .where(searchCondition)
+      .orderBy(desc(chatMessages.receivedAt), desc(chatMessages.twitchMessageId))
+      .limit(messageArchivePageSize)
+      .offset((page - 1) * messageArchivePageSize);
+
+    return c.json({
+      data: {
+        summary: {
+          messageCount: summary?.messageCount ?? 0,
+          chatterCount: summary?.chatterCount ?? 0,
+          channelCount: summary?.channelCount ?? 0,
+          streamCount: summary?.streamCount ?? 0
+        },
+        messages: messages.map((message) => ({
+          ...message,
+          streamStartedAt: toIso(message.streamStartedAt),
+          sentAt: toIso(message.sentAt),
+          receivedAt: message.receivedAt.toISOString(),
+          deletedAt: toIso(message.deletedAt),
+          clearedAt: toIso(message.clearedAt)
+        })),
+        pagination: {
+          page,
+          pageSize: messageArchivePageSize,
+          totalMatches,
+          totalPages
+        },
+        query: query.q
+      }
+    });
   });
 
   app.get("/api/internal/ingestion", requireAdmin, async (c) => {
@@ -1861,8 +1977,7 @@ const requireInternal: MiddlewareHandler<ApiBindings> = async (c, next) => {
 };
 
 const requireAdmin: MiddlewareHandler<ApiBindings> = async (c, next) => {
-  const session = await getCurrentSession(c);
-  if (session?.user.isAdmin !== true) {
+  if (!(await hasAdminAccess(c))) {
     return c.json({ error: { code: "forbidden", message: "Admin login is required." } }, 403);
   }
 
@@ -1871,6 +1986,10 @@ const requireAdmin: MiddlewareHandler<ApiBindings> = async (c, next) => {
 
 const isInternalAllowed = (config: AppConfig) => {
   return config.APP_MODE === "local" || config.APP_MODE === "private_mvp";
+};
+
+const hasAdminAccess = async (c: Parameters<MiddlewareHandler<ApiBindings>>[0]): Promise<boolean> => {
+  return (await getCurrentSession(c))?.user.isAdmin === true;
 };
 
 const hasPrivilegedAccess = async (c: Parameters<MiddlewareHandler<ApiBindings>>[0]): Promise<boolean> => {
@@ -1912,16 +2031,40 @@ const getCurrentSession = async (c: Parameters<MiddlewareHandler<ApiBindings>>[0
       displayName: twitchUsers.displayName,
       profileImageUrl: twitchUsers.profileImageUrl,
       isAdmin: appUsers.isAdmin,
-      adminUserId: adminUsers.twitchUserId
+      adminUserId: adminUsers.twitchUserId,
+      oauthAccountId: oauthAccounts.id,
+      encryptedAccessToken: oauthAccounts.encryptedAccessToken,
+      encryptedRefreshToken: oauthAccounts.encryptedRefreshToken,
+      tokenExpiresAt: oauthAccounts.expiresAt,
+      tokenLastValidatedAt: oauthAccounts.lastValidatedAt
     })
     .from(sessions)
     .innerJoin(appUsers, eq(sessions.appUserId, appUsers.id))
     .innerJoin(twitchUsers, eq(appUsers.twitchUserId, twitchUsers.twitchUserId))
     .leftJoin(adminUsers, eq(appUsers.twitchUserId, adminUsers.twitchUserId))
+    .leftJoin(oauthAccounts, and(eq(oauthAccounts.appUserId, appUsers.id), eq(oauthAccounts.provider, "twitch")))
     .where(and(eq(sessions.sessionIdHash, sessionIdHash), isNull(sessions.revokedAt), gt(sessions.expiresAt, new Date())))
     .limit(1);
 
   if (row == null) {
+    return null;
+  }
+
+  const twitchSessionIsValid = await ensureTwitchSessionToken(db, apiConfig, {
+    oauthAccountId: row.oauthAccountId,
+    encryptedAccessToken: row.encryptedAccessToken,
+    encryptedRefreshToken: row.encryptedRefreshToken,
+    expiresAt: row.tokenExpiresAt,
+    lastValidatedAt: row.tokenLastValidatedAt,
+    twitchUserId: row.twitchUserId
+  });
+  if (!twitchSessionIsValid) {
+    const now = new Date();
+    await db
+      .update(sessions)
+      .set({ revokedAt: now, updatedAt: now })
+      .where(eq(sessions.sessionIdHash, sessionIdHash));
+    clearCookie(c, sessionCookieName, apiConfig);
     return null;
   }
 
@@ -1943,11 +2086,153 @@ const getCurrentSession = async (c: Parameters<MiddlewareHandler<ApiBindings>>[0
   };
 };
 
+const ensureTwitchSessionToken = async (
+  db: DbClient,
+  config: AppConfig,
+  token: {
+    oauthAccountId: string | null;
+    encryptedAccessToken: string | null;
+    encryptedRefreshToken: string | null;
+    expiresAt: Date | null;
+    lastValidatedAt: Date | null;
+    twitchUserId: string;
+  }
+): Promise<boolean> => {
+  if (token.oauthAccountId == null || token.encryptedAccessToken == null) {
+    return false;
+  }
+
+  const now = new Date();
+  const validationIsFresh = token.lastValidatedAt != null
+    && now.getTime() - token.lastValidatedAt.getTime() < twitchTokenValidationIntervalMs;
+  const tokenIsCurrent = token.expiresAt == null || token.expiresAt > now;
+  if (validationIsFresh && tokenIsCurrent) {
+    return true;
+  }
+
+  try {
+    let accessToken = decryptSecret(token.encryptedAccessToken, config.SESSION_SECRET);
+    let encryptedAccessToken = token.encryptedAccessToken;
+    let encryptedRefreshToken = token.encryptedRefreshToken;
+    let refreshStatus = "valid";
+
+    if (!tokenIsCurrent) {
+      if (
+        encryptedRefreshToken == null ||
+        config.TWITCH_CLIENT_ID === "" ||
+        config.TWITCH_CLIENT_SECRET === ""
+      ) {
+        throw new Error("Twitch login token cannot be refreshed.");
+      }
+
+      const refreshed = await refreshTwitchUserAccessToken({
+        clientId: config.TWITCH_CLIENT_ID,
+        clientSecret: config.TWITCH_CLIENT_SECRET,
+        refreshToken: decryptSecret(encryptedRefreshToken, config.SESSION_SECRET)
+      });
+      accessToken = refreshed.accessToken;
+      encryptedAccessToken = encryptSecret(refreshed.accessToken, config.SESSION_SECRET);
+      encryptedRefreshToken = refreshed.refreshToken == null
+        ? encryptedRefreshToken
+        : encryptSecret(refreshed.refreshToken, config.SESSION_SECRET);
+      refreshStatus = "refreshed";
+    }
+
+    const validation = await validateTwitchAccessToken(accessToken);
+    if (validation.clientId !== config.TWITCH_CLIENT_ID || validation.userId !== token.twitchUserId) {
+      throw new Error("Twitch login token identity changed.");
+    }
+
+    await db
+      .update(oauthAccounts)
+      .set({
+        scopes: validation.scopes,
+        encryptedAccessToken,
+        encryptedRefreshToken,
+        expiresAt: new Date(now.getTime() + validation.expiresInSeconds * 1000),
+        lastValidatedAt: now,
+        refreshStatus,
+        latestError: null,
+        updatedAt: now
+      })
+      .where(eq(oauthAccounts.id, token.oauthAccountId));
+    return true;
+  } catch {
+    await db
+      .update(oauthAccounts)
+      .set({
+        refreshStatus: "validation_failed",
+        latestError: "Twitch login validation failed.",
+        updatedAt: now
+      })
+      .where(eq(oauthAccounts.id, token.oauthAccountId));
+    return false;
+  }
+};
+
+type ConfiguredTwitchLogin = AppConfig & {
+  TWITCH_CLIENT_ID: string;
+  TWITCH_CLIENT_SECRET: string;
+  TWITCH_OAUTH_REDIRECT_URI: string;
+};
+
+const isTwitchLoginConfigured = (config: AppConfig): config is ConfiguredTwitchLogin => {
+  return config.TWITCH_CLIENT_ID !== ""
+    && config.TWITCH_CLIENT_SECRET !== ""
+    && config.TWITCH_OAUTH_REDIRECT_URI != null
+    && config.TWITCH_OAUTH_REDIRECT_URI !== "";
+};
+
+const persistConfiguredAdminGrant = async (
+  db: DbClient,
+  config: AppConfig,
+  user: { twitchUserId: string; login: string },
+  now: Date
+) => {
+  const normalizedLogin = user.login.toLowerCase();
+  const configuredLogin = parseDelimitedList(config.ADMIN_TWITCH_LOGINS)
+    .map((login) => login.toLowerCase())
+    .find((login) => login === normalizedLogin);
+  if (configuredLogin == null) {
+    return;
+  }
+
+  const grantSource = `configured-login:${configuredLogin}`;
+  const [existingGrant] = await db
+    .select({ twitchUserId: adminUsers.twitchUserId })
+    .from(adminUsers)
+    .where(eq(adminUsers.grantedBy, grantSource))
+    .limit(1);
+  if (existingGrant != null && existingGrant.twitchUserId !== user.twitchUserId) {
+    return;
+  }
+
+  await db
+    .insert(adminUsers)
+    .values({
+      twitchUserId: user.twitchUserId,
+      grantedBy: grantSource,
+      grantedAt: now,
+      updatedAt: now
+    })
+    .onConflictDoNothing({ target: adminUsers.twitchUserId });
+};
+
+const redirectToOwnData = (c: RouteContext, authStatus: string) => {
+  const url = new URL("/me", c.get("config").PUBLIC_WEB_URL);
+  url.searchParams.set("auth", authStatus);
+  return c.redirect(url.toString());
+};
+
 const parseDelimitedList = (value: string): string[] => {
   return value
     .split(/[\s,]+/)
     .map((item) => item.trim())
     .filter((item) => item.length > 0);
+};
+
+const escapeLikePattern = (value: string): string => {
+  return value.replace(/[\\%_]/g, "\\$&");
 };
 
 const toIso = (value: Date | null | undefined): string | null => {

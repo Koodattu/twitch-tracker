@@ -18,6 +18,7 @@ export type LiveStreamSummary = {
   broadcasterId: string;
   broadcasterLogin: string | null;
   broadcasterDisplayName: string | null;
+  broadcasterProfileImageUrl: string | null;
   title: string | null;
   categoryName: string | null;
   language: string | null;
