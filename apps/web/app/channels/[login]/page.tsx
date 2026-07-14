@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { getApiData, getAuthenticatedApiInit } from "../../api-client";
+import { getApiData, getPublicApiInit } from "../../api-client";
 import { formatCount, formatDateTime, formatDuration } from "../../format";
 import { Avatar, EmptyState, MetricCard, StatusPill } from "../../ui";
+import { ViewerTrendChart, type ViewerTrendPoint } from "./viewer-trend-chart";
 
 type Channel = {
   twitchUserId: string;
@@ -57,17 +58,18 @@ type ChannelActivity = {
 
 export default async function ChannelPage({ params }: { params: Promise<{ login: string }> }) {
   const { login } = await params;
-  const apiInit = await getAuthenticatedApiInit();
+  const apiInit = await getPublicApiInit();
   const [channel, streamResponse, viewerHistoryResponse, activity] = await Promise.all([
     getApiData<Channel>(`/api/channels/${login}`, apiInit),
-    getApiData<StreamSession[]>(`/api/channels/${login}/streams`, apiInit),
-    getApiData<ViewerHistoryPoint[]>(`/api/channels/${login}/viewer-history`, apiInit),
-    getApiData<ChannelActivity>(`/api/channels/${login}/activity`, apiInit)
+    getApiData<StreamSession[]>(`/api/channels/${login}/streams?limit=24`, apiInit),
+    getApiData<ViewerHistoryPoint[]>(`/api/channels/${login}/viewer-history?limit=96`, apiInit),
+    getApiData<ChannelActivity>(`/api/channels/${login}/activity?days=30&buckets=48`, apiInit)
   ]);
   const streams = streamResponse ?? [];
   const viewerHistory = viewerHistoryResponse ?? [];
   const name = channel?.displayName ?? channel?.login ?? login;
   const isLive = streams.some((stream) => stream.endedAt == null);
+  const viewerTrend = createViewerTrend(viewerHistory);
 
   return (
     <>
@@ -103,7 +105,15 @@ export default async function ChannelPage({ params }: { params: Promise<{ login:
       </section>
 
       <section className="panel">
-        <div className="panel-header"><div className="panel-heading"><h2>Stream history</h2><p>Most recent sessions first</p></div><StatusPill>{streams.length} sessions</StatusPill></div>
+        <div className="panel-header">
+          <div className="panel-heading"><h2>Viewer trend</h2><p>Recent snapshots in UTC; gaps separate stream sessions</p></div>
+          <StatusPill>{viewerHistory.length} snapshots</StatusPill>
+        </div>
+        {viewerHistoryResponse == null ? <EmptyState title="Viewer trend unavailable" description="Viewer snapshots could not be loaded right now." /> : <ViewerTrendChart points={viewerTrend} />}
+      </section>
+
+      <section className="panel">
+        <div className="panel-header"><div className="panel-heading"><h2>Stream history</h2><p>Most recent sessions first</p></div><StatusPill>{streams.length} loaded</StatusPill></div>
         {streamResponse == null ? (
           <EmptyState title="Stream history unavailable" description="The API did not return stream history for this channel." />
         ) : streams.length === 0 ? (
@@ -148,7 +158,7 @@ export default async function ChannelPage({ params }: { params: Promise<{ login:
       </section>
 
       <section className="panel">
-        <div className="panel-header"><div className="panel-heading"><h2>Viewer snapshots</h2><p>Recent REST observations across sessions</p></div><StatusPill>{viewerHistory.length} loaded</StatusPill></div>
+        <div className="panel-header"><div className="panel-heading"><h2>Latest viewer snapshots</h2><p>Most recent observations across sessions</p></div><StatusPill>{Math.min(viewerHistory.length, 12)} shown</StatusPill></div>
         {viewerHistoryResponse == null || viewerHistory.length === 0 ? (
           <EmptyState title="No viewer snapshots" description="Viewer snapshots have not been stored for this channel yet." />
         ) : (
@@ -156,7 +166,7 @@ export default async function ChannelPage({ params }: { params: Promise<{ login:
             <table className="table">
               <thead><tr><th scope="col">Observed</th><th scope="col">Viewers</th><th scope="col">Stream</th><th scope="col">Category</th></tr></thead>
               <tbody>
-                {viewerHistory.slice(0, 25).map((point) => (
+                {viewerHistory.slice(0, 12).map((point) => (
                   <tr key={`${point.twitchStreamId}-${point.observedAt}`}>
                     <td className="time-cell">{formatDateTime(point.observedAt)}</td><td className="number-cell">{formatCount(point.viewerCount)}</td><td className="message-cell"><Link href={`/streams/${point.twitchStreamId}`}>{point.title ?? point.twitchStreamId}</Link></td><td>{point.categoryName ?? <span className="muted">Unknown</span>}</td>
                   </tr>
@@ -190,4 +200,27 @@ export default async function ChannelPage({ params }: { params: Promise<{ login:
       <p className="data-note">Viewer counts come from periodic Twitch REST snapshots. Chat messages and presence signals are available only during active chat coverage.</p>
     </>
   );
+}
+
+function createViewerTrend(history: ViewerHistoryPoint[]): ViewerTrendPoint[] {
+  const points: ViewerTrendPoint[] = [];
+  let previousStreamId: string | null = null;
+
+  for (const point of history.slice().reverse()) {
+    const time = new Date(point.observedAt).toLocaleString("en-GB", {
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "UTC"
+    });
+    if (previousStreamId != null && previousStreamId !== point.twitchStreamId) {
+      points.push({ time, viewers: null, title: "Session gap" });
+    }
+
+    points.push({ time, viewers: point.viewerCount, title: point.title ?? "Untitled stream" });
+    previousStreamId = point.twitchStreamId;
+  }
+
+  return points;
 }

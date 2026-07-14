@@ -24,11 +24,24 @@ export type LiveStreamSummary = {
   language: string | null;
   viewerCount: number | null;
   viewerObservedAt: string | null;
+  thumbnailUrl: string | null;
   startedAt: string;
   firstSeenAt: string;
   lastSeenLiveAt: string;
   chatAssignmentStatus: "desired" | "joining" | "joined" | "leaving" | null;
   isChatTracked: boolean;
+};
+
+export type RecentStreamSummary = {
+  streamId: string;
+  broadcasterId: string;
+  broadcasterLogin: string | null;
+  broadcasterDisplayName: string | null;
+  broadcasterProfileImageUrl: string | null;
+  title: string | null;
+  categoryName: string | null;
+  startedAt: string;
+  endedAt: string | null;
 };
 
 export type ChannelSummary = {

@@ -5,6 +5,13 @@ export const getApiBaseUrl = () => {
   return process.env.INTERNAL_API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 };
 
+export async function getPublicApiInit(): Promise<RequestInit> {
+  const cookieHeader = (await cookies()).toString();
+  return cookieHeader === ""
+    ? {}
+    : { cache: "no-store", headers: { Cookie: cookieHeader } };
+}
+
 export async function getAuthenticatedApiInit(): Promise<RequestInit> {
   const cookieHeader = (await cookies()).toString();
   return cookieHeader === ""

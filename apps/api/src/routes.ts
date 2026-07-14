@@ -32,7 +32,7 @@ import {
   type DbClient
 } from "@twitch-tracker/db";
 import { createEventSubEnvelope, eventSubHeaders, exchangeTwitchAuthorizationCode, FetchHelixAdapter, refreshTwitchUserAccessToken, validateTwitchAccessToken, verifyEventSubSignature } from "@twitch-tracker/twitch";
-import { and, desc, eq, gt, ilike, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, ilike, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import type { MiddlewareHandler } from "hono";
@@ -61,6 +61,21 @@ const messageArchiveQuerySchema = z.object({
   page: z.coerce.number().int().min(1).max(100_000).default(1),
   q: z.string().trim().max(100).default("")
 });
+const recentStreamsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).default(50),
+  status: z.enum(["all", "ended"]).default("all"),
+  language: z.string().trim().min(1).max(10).optional()
+});
+const channelStreamsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).default(50)
+});
+const channelViewerHistoryQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(500).default(500)
+});
+const channelActivityQuerySchema = z.object({
+  days: z.coerce.number().int().min(1).max(90).default(90),
+  buckets: z.coerce.number().int().min(1).max(200).default(200)
+});
 const sessionCookieName = "twitch_tracker_session";
 const oauthStateCookieName = "twitch_oauth_state";
 const botOauthStateCookieName = "twitch_bot_oauth_state";
@@ -68,6 +83,11 @@ const activeChatAssignmentStatuses = ["desired", "joining", "joined", "leaving"]
 type ActiveChatAssignmentStatus = (typeof activeChatAssignmentStatuses)[number];
 const messageArchivePageSize = 100;
 const twitchTokenValidationIntervalMs = 55 * 60 * 1000;
+const sessionLastSeenUpdateIntervalMs = 5 * 60 * 1000;
+const publicSubjectVisibilityCondition = or(
+  isNull(subjectPrivacyStates.twitchUserId),
+  and(eq(subjectPrivacyStates.publicProfileHidden, false), eq(subjectPrivacyStates.trackingOptedOut, false))
+);
 
 export const createApiApp = ({ config, db }: CreateApiAppInput) => {
   const app = new Hono<ApiBindings>();
@@ -91,14 +111,17 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
   app.get("/api/streams/live", async (c) => {
     const db = c.get("db");
     const canSeeSuppressed = await hasAdminAccess(c);
-    const latestSnapshotTimes = db
+    const latestSnapshot = db
       .select({
-        twitchStreamId: streamSnapshots.twitchStreamId,
-        observedAt: sql<Date>`max(${streamSnapshots.observedAt})`.as("latest_observed_at")
+        viewerCount: streamSnapshots.viewerCount,
+        observedAt: streamSnapshots.observedAt,
+        thumbnailUrl: streamSnapshots.thumbnailUrl
       })
       .from(streamSnapshots)
-      .groupBy(streamSnapshots.twitchStreamId)
-      .as("latest_snapshot_times");
+      .where(eq(streamSnapshots.twitchStreamId, streamSessions.twitchStreamId))
+      .orderBy(desc(streamSnapshots.observedAt), desc(streamSnapshots.id))
+      .limit(1)
+      .as("latest_snapshot");
 
     const rows = await db
       .select({
@@ -110,34 +133,28 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
         title: streamSessions.latestTitle,
         categoryName: streamSessions.latestCategoryName,
         language: streamSessions.language,
-        viewerCount: streamSnapshots.viewerCount,
-        viewerObservedAt: streamSnapshots.observedAt,
+        viewerCount: latestSnapshot.viewerCount,
+        viewerObservedAt: latestSnapshot.observedAt,
+        thumbnailUrl: latestSnapshot.thumbnailUrl,
         startedAt: streamSessions.startedAt,
         firstSeenAt: streamSessions.firstSeenAt,
         lastSeenLiveAt: streamSessions.lastSeenLiveAt
       })
       .from(streamSessions)
       .leftJoin(twitchUsers, eq(streamSessions.broadcasterUserId, twitchUsers.twitchUserId))
-      .leftJoin(latestSnapshotTimes, eq(streamSessions.twitchStreamId, latestSnapshotTimes.twitchStreamId))
-      .leftJoin(
-        streamSnapshots,
-        and(
-          eq(streamSnapshots.twitchStreamId, latestSnapshotTimes.twitchStreamId),
-          eq(streamSnapshots.observedAt, latestSnapshotTimes.observedAt)
-        )
-      )
+      .leftJoinLateral(latestSnapshot, sql`true`)
       .leftJoin(subjectPrivacyStates, eq(streamSessions.broadcasterUserId, subjectPrivacyStates.twitchUserId))
       .where(canSeeSuppressed
         ? and(isNull(streamSessions.endedAt), eq(streamSessions.language, "fi"))
         : and(
             isNull(streamSessions.endedAt),
             eq(streamSessions.language, "fi"),
-            or(isNull(subjectPrivacyStates.twitchUserId), eq(subjectPrivacyStates.trackingOptedOut, false))
+            publicSubjectVisibilityCondition
           ))
-      .orderBy(desc(sql<number>`coalesce(${streamSnapshots.viewerCount}, -1)`), desc(streamSessions.lastSeenLiveAt))
-      .limit(200);
+      .orderBy(desc(sql<number>`coalesce(${latestSnapshot.viewerCount}, -1)`), desc(streamSessions.lastSeenLiveAt))
+      .limit(100);
 
-    const liveRows = uniqueByStreamId(rows).slice(0, 100);
+    const liveRows = rows;
     const streamIds = liveRows.map((row) => row.streamId);
     const assignmentRows =
       streamIds.length === 0
@@ -178,19 +195,43 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
   });
 
   app.get("/api/streams/recent", async (c) => {
+    const query = recentStreamsQuerySchema.parse({
+      limit: c.req.query("limit"),
+      status: c.req.query("status"),
+      language: c.req.query("language")
+    });
+    const db = c.get("db");
     const canSeeSuppressed = await hasAdminAccess(c);
-    const rows = await c
-      .get("db")
-      .select({ stream: streamSessions })
+    const rows = await db
+      .select({
+        streamId: streamSessions.twitchStreamId,
+        broadcasterId: streamSessions.broadcasterUserId,
+        broadcasterLogin: twitchUsers.login,
+        broadcasterDisplayName: twitchUsers.displayName,
+        broadcasterProfileImageUrl: twitchUsers.profileImageUrl,
+        title: streamSessions.latestTitle,
+        categoryName: streamSessions.latestCategoryName,
+        startedAt: streamSessions.startedAt,
+        endedAt: streamSessions.endedAt
+      })
       .from(streamSessions)
+      .leftJoin(twitchUsers, eq(streamSessions.broadcasterUserId, twitchUsers.twitchUserId))
       .leftJoin(subjectPrivacyStates, eq(streamSessions.broadcasterUserId, subjectPrivacyStates.twitchUserId))
-      .where(canSeeSuppressed
-        ? undefined
-        : or(isNull(subjectPrivacyStates.twitchUserId), eq(subjectPrivacyStates.trackingOptedOut, false)))
-      .orderBy(desc(streamSessions.startedAt))
-      .limit(50);
+      .where(and(
+        query.status === "ended" ? isNotNull(streamSessions.endedAt) : undefined,
+        query.language == null ? undefined : eq(streamSessions.language, query.language),
+        canSeeSuppressed ? undefined : publicSubjectVisibilityCondition
+      ))
+      .orderBy(query.status === "ended" ? desc(streamSessions.endedAt) : desc(streamSessions.startedAt))
+      .limit(query.limit);
 
-    return c.json({ data: rows.map((row) => row.stream) });
+    return c.json({
+      data: rows.map((row) => ({
+        ...row,
+        startedAt: row.startedAt.toISOString(),
+        endedAt: toIso(row.endedAt)
+      }))
+    });
   });
 
   app.get("/api/streams/:streamId/activity", async (c) => {
@@ -215,74 +256,73 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
       return c.json({ error: { code: "not_found", message: "Stream not found." } }, 404);
     }
 
-    const [totals] = await db
-      .select({
-        viewerCountMax: sql<number | null>`max(${streamActivityBuckets.viewerCountMax})`,
-        viewerCountAvg: sql<number | null>`round(avg(${streamActivityBuckets.viewerCountAvg}) filter (where ${streamActivityBuckets.viewerCountAvg} is not null))::int`,
-        messageCount: sql<number>`coalesce(sum(${streamActivityBuckets.messageCount}), 0)::int`,
-        joinCount: sql<number>`coalesce(sum(${streamActivityBuckets.joinCount}), 0)::int`,
-        partCount: sql<number>`coalesce(sum(${streamActivityBuckets.partCount}), 0)::int`,
-        activeChatterCountMax: sql<number | null>`max(${streamActivityBuckets.activeChatterCount})`
-      })
-      .from(streamActivityBuckets)
-      .where(eq(streamActivityBuckets.twitchStreamId, params.streamId));
-
-    const snapshots = await db
-      .select({
-        observedAt: streamSnapshots.observedAt,
-        viewerCount: streamSnapshots.viewerCount,
-        title: streamSnapshots.title,
-        categoryName: streamSnapshots.categoryName
-      })
-      .from(streamSnapshots)
-      .where(eq(streamSnapshots.twitchStreamId, params.streamId))
-      .orderBy(desc(streamSnapshots.observedAt))
-      .limit(500);
-
-    const buckets = await db
-      .select({
-        bucketStart: streamActivityBuckets.bucketStart,
-        bucketMinutes: streamActivityBuckets.bucketMinutes,
-        viewerCountMin: streamActivityBuckets.viewerCountMin,
-        viewerCountMax: streamActivityBuckets.viewerCountMax,
-        viewerCountAvg: streamActivityBuckets.viewerCountAvg,
-        messageCount: streamActivityBuckets.messageCount,
-        joinCount: streamActivityBuckets.joinCount,
-        partCount: streamActivityBuckets.partCount,
-        activeChatterCount: streamActivityBuckets.activeChatterCount,
-        eventCounts: streamActivityBuckets.eventCounts
-      })
-      .from(streamActivityBuckets)
-      .where(eq(streamActivityBuckets.twitchStreamId, params.streamId))
-      .orderBy(desc(streamActivityBuckets.bucketStart))
-      .limit(300);
-
-    const events = await db
-      .select({
-        id: channelEvents.id,
-        eventType: channelEvents.eventType,
-        actorUserId: channelEvents.actorUserId,
-        occurredAt: channelEvents.occurredAt,
-        source: channelEvents.source,
-        sourceEventId: channelEvents.sourceEventId
-      })
-      .from(channelEvents)
-      .where(eq(channelEvents.twitchStreamId, params.streamId))
-      .orderBy(desc(channelEvents.occurredAt))
-      .limit(100);
-
-    const streamRaids = await db
-      .select({
-        id: raids.id,
-        sourceBroadcasterUserId: raids.sourceBroadcasterUserId,
-        targetBroadcasterUserId: raids.targetBroadcasterUserId,
-        viewerCount: raids.viewerCount,
-        occurredAt: raids.occurredAt
-      })
-      .from(raids)
-      .where(or(eq(raids.sourceStreamId, params.streamId), eq(raids.targetStreamId, params.streamId)))
-      .orderBy(desc(raids.occurredAt))
-      .limit(100);
+    const [totalRows, snapshots, buckets, events, streamRaids] = await Promise.all([
+      db
+        .select({
+          viewerCountMax: sql<number | null>`max(${streamActivityBuckets.viewerCountMax})`,
+          viewerCountAvg: sql<number | null>`round(avg(${streamActivityBuckets.viewerCountAvg}) filter (where ${streamActivityBuckets.viewerCountAvg} is not null))::int`,
+          messageCount: sql<number>`coalesce(sum(${streamActivityBuckets.messageCount}), 0)::int`,
+          joinCount: sql<number>`coalesce(sum(${streamActivityBuckets.joinCount}), 0)::int`,
+          partCount: sql<number>`coalesce(sum(${streamActivityBuckets.partCount}), 0)::int`,
+          activeChatterCountMax: sql<number | null>`max(${streamActivityBuckets.activeChatterCount})`
+        })
+        .from(streamActivityBuckets)
+        .where(eq(streamActivityBuckets.twitchStreamId, params.streamId)),
+      db
+        .select({
+          observedAt: streamSnapshots.observedAt,
+          viewerCount: streamSnapshots.viewerCount,
+          title: streamSnapshots.title,
+          categoryName: streamSnapshots.categoryName
+        })
+        .from(streamSnapshots)
+        .where(eq(streamSnapshots.twitchStreamId, params.streamId))
+        .orderBy(desc(streamSnapshots.observedAt))
+        .limit(500),
+      db
+        .select({
+          bucketStart: streamActivityBuckets.bucketStart,
+          bucketMinutes: streamActivityBuckets.bucketMinutes,
+          viewerCountMin: streamActivityBuckets.viewerCountMin,
+          viewerCountMax: streamActivityBuckets.viewerCountMax,
+          viewerCountAvg: streamActivityBuckets.viewerCountAvg,
+          messageCount: streamActivityBuckets.messageCount,
+          joinCount: streamActivityBuckets.joinCount,
+          partCount: streamActivityBuckets.partCount,
+          activeChatterCount: streamActivityBuckets.activeChatterCount,
+          eventCounts: streamActivityBuckets.eventCounts
+        })
+        .from(streamActivityBuckets)
+        .where(eq(streamActivityBuckets.twitchStreamId, params.streamId))
+        .orderBy(desc(streamActivityBuckets.bucketStart))
+        .limit(300),
+      db
+        .select({
+          id: channelEvents.id,
+          eventType: channelEvents.eventType,
+          actorUserId: channelEvents.actorUserId,
+          occurredAt: channelEvents.occurredAt,
+          source: channelEvents.source,
+          sourceEventId: channelEvents.sourceEventId
+        })
+        .from(channelEvents)
+        .where(eq(channelEvents.twitchStreamId, params.streamId))
+        .orderBy(desc(channelEvents.occurredAt))
+        .limit(100),
+      db
+        .select({
+          id: raids.id,
+          sourceBroadcasterUserId: raids.sourceBroadcasterUserId,
+          targetBroadcasterUserId: raids.targetBroadcasterUserId,
+          viewerCount: raids.viewerCount,
+          occurredAt: raids.occurredAt
+        })
+        .from(raids)
+        .where(or(eq(raids.sourceStreamId, params.streamId), eq(raids.targetStreamId, params.streamId)))
+        .orderBy(desc(raids.occurredAt))
+        .limit(100)
+    ]);
+    const totals = totalRows[0];
 
     return c.json({
       data: {
@@ -377,6 +417,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
 
   app.get("/api/channels/:login/streams", async (c) => {
     const params = loginParamSchema.parse(c.req.param());
+    const query = channelStreamsQuerySchema.parse({ limit: c.req.query("limit") });
     const [channel] = await c
       .get("db")
       .select({
@@ -406,13 +447,14 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
       .leftJoin(twitchUsers, eq(streamSessions.broadcasterUserId, twitchUsers.twitchUserId))
       .where(eq(streamSessions.broadcasterUserId, channel.twitchUserId))
       .orderBy(desc(streamSessions.startedAt))
-      .limit(50);
+      .limit(query.limit);
 
     return c.json({ data: rows.map((row) => row.stream) });
   });
 
   app.get("/api/channels/:login/viewer-history", async (c) => {
     const params = loginParamSchema.parse(c.req.param());
+    const query = channelViewerHistoryQuerySchema.parse({ limit: c.req.query("limit") });
     const [channel] = await c
       .get("db")
       .select({
@@ -447,7 +489,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
       .from(streamSnapshots)
       .where(eq(streamSnapshots.broadcasterUserId, channel.twitchUserId))
       .orderBy(desc(streamSnapshots.observedAt))
-      .limit(500);
+      .limit(query.limit);
 
     return c.json({
       data: rows.map((row) => ({
@@ -459,6 +501,10 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
 
   app.get("/api/channels/:login/activity", async (c) => {
     const params = loginParamSchema.parse(c.req.param());
+    const query = channelActivityQuerySchema.parse({
+      days: c.req.query("days"),
+      buckets: c.req.query("buckets")
+    });
     const [channel] = await c
       .get("db")
       .select({
@@ -479,54 +525,53 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
       return c.json({ error: { code: "not_found", message: "Channel not found." } }, 404);
     }
 
-    const daily = await c
-      .get("db")
-      .select({
-        day: channelDailyStats.day,
-        streamCount: channelDailyStats.streamCount,
-        liveSeconds: channelDailyStats.liveSeconds,
-        viewerCountMax: channelDailyStats.viewerCountMax,
-        viewerCountAvg: channelDailyStats.viewerCountAvg,
-        messageCount: channelDailyStats.messageCount,
-        aggregateEngagement: channelDailyStats.aggregateEngagement
-      })
-      .from(channelDailyStats)
-      .where(eq(channelDailyStats.broadcasterUserId, channel.twitchUserId))
-      .orderBy(desc(channelDailyStats.day))
-      .limit(90);
-
-    const recentBuckets = await c
-      .get("db")
-      .select({
-        twitchStreamId: streamActivityBuckets.twitchStreamId,
-        bucketStart: streamActivityBuckets.bucketStart,
-        bucketMinutes: streamActivityBuckets.bucketMinutes,
-        viewerCountMin: streamActivityBuckets.viewerCountMin,
-        viewerCountMax: streamActivityBuckets.viewerCountMax,
-        viewerCountAvg: streamActivityBuckets.viewerCountAvg,
-        messageCount: streamActivityBuckets.messageCount,
-        joinCount: streamActivityBuckets.joinCount,
-        partCount: streamActivityBuckets.partCount,
-        activeChatterCount: streamActivityBuckets.activeChatterCount,
-        eventCounts: streamActivityBuckets.eventCounts
-      })
-      .from(streamActivityBuckets)
-      .innerJoin(streamSessions, eq(streamActivityBuckets.twitchStreamId, streamSessions.twitchStreamId))
-      .where(eq(streamSessions.broadcasterUserId, channel.twitchUserId))
-      .orderBy(desc(streamActivityBuckets.bucketStart))
-      .limit(200);
-
-    const [totals] = await c
-      .get("db")
-      .select({
-        streamCount: sql<number>`coalesce(sum(${channelDailyStats.streamCount}), 0)::int`,
-        liveSeconds: sql<number>`coalesce(sum(${channelDailyStats.liveSeconds}), 0)::int`,
-        messageCount: sql<number>`coalesce(sum(${channelDailyStats.messageCount}), 0)::int`,
-        viewerCountMax: sql<number | null>`max(${channelDailyStats.viewerCountMax})`,
-        viewerCountAvg: sql<number | null>`round(avg(${channelDailyStats.viewerCountAvg}) filter (where ${channelDailyStats.viewerCountAvg} is not null))::int`
-      })
-      .from(channelDailyStats)
-      .where(eq(channelDailyStats.broadcasterUserId, channel.twitchUserId));
+    const db = c.get("db");
+    const [daily, recentBuckets, totalRows] = await Promise.all([
+      db
+        .select({
+          day: channelDailyStats.day,
+          streamCount: channelDailyStats.streamCount,
+          liveSeconds: channelDailyStats.liveSeconds,
+          viewerCountMax: channelDailyStats.viewerCountMax,
+          viewerCountAvg: channelDailyStats.viewerCountAvg,
+          messageCount: channelDailyStats.messageCount,
+          aggregateEngagement: channelDailyStats.aggregateEngagement
+        })
+        .from(channelDailyStats)
+        .where(eq(channelDailyStats.broadcasterUserId, channel.twitchUserId))
+        .orderBy(desc(channelDailyStats.day))
+        .limit(query.days),
+      db
+        .select({
+          twitchStreamId: streamActivityBuckets.twitchStreamId,
+          bucketStart: streamActivityBuckets.bucketStart,
+          bucketMinutes: streamActivityBuckets.bucketMinutes,
+          viewerCountMin: streamActivityBuckets.viewerCountMin,
+          viewerCountMax: streamActivityBuckets.viewerCountMax,
+          viewerCountAvg: streamActivityBuckets.viewerCountAvg,
+          messageCount: streamActivityBuckets.messageCount,
+          joinCount: streamActivityBuckets.joinCount,
+          partCount: streamActivityBuckets.partCount,
+          activeChatterCount: streamActivityBuckets.activeChatterCount,
+          eventCounts: streamActivityBuckets.eventCounts
+        })
+        .from(streamActivityBuckets)
+        .innerJoin(streamSessions, eq(streamActivityBuckets.twitchStreamId, streamSessions.twitchStreamId))
+        .where(eq(streamSessions.broadcasterUserId, channel.twitchUserId))
+        .orderBy(desc(streamActivityBuckets.bucketStart))
+        .limit(query.buckets),
+      db
+        .select({
+          streamCount: sql<number>`coalesce(sum(${channelDailyStats.streamCount}), 0)::int`,
+          liveSeconds: sql<number>`coalesce(sum(${channelDailyStats.liveSeconds}), 0)::int`,
+          messageCount: sql<number>`coalesce(sum(${channelDailyStats.messageCount}), 0)::int`,
+          viewerCountMax: sql<number | null>`max(${channelDailyStats.viewerCountMax})`,
+          viewerCountAvg: sql<number | null>`round(avg(${channelDailyStats.viewerCountAvg}) filter (where ${channelDailyStats.viewerCountAvg} is not null))::int`
+        })
+        .from(channelDailyStats)
+        .where(eq(channelDailyStats.broadcasterUserId, channel.twitchUserId))
+    ]);
+    const totals = totalRows[0];
 
     return c.json({
       data: {
@@ -2025,6 +2070,7 @@ const getCurrentSession = async (c: Parameters<MiddlewareHandler<ApiBindings>>[0
   const [row] = await db
     .select({
       sessionIdHash: sessions.sessionIdHash,
+      lastSeenAt: sessions.lastSeenAt,
       appUserId: appUsers.id,
       twitchUserId: twitchUsers.twitchUserId,
       login: twitchUsers.login,
@@ -2068,10 +2114,14 @@ const getCurrentSession = async (c: Parameters<MiddlewareHandler<ApiBindings>>[0
     return null;
   }
 
-  await db
-    .update(sessions)
-    .set({ lastSeenAt: new Date(), updatedAt: new Date() })
-    .where(eq(sessions.sessionIdHash, sessionIdHash));
+  const now = new Date();
+  const lastSeenThreshold = new Date(now.getTime() - sessionLastSeenUpdateIntervalMs);
+  if (row.lastSeenAt < lastSeenThreshold) {
+    await db
+      .update(sessions)
+      .set({ lastSeenAt: now, updatedAt: now })
+      .where(and(eq(sessions.sessionIdHash, sessionIdHash), lt(sessions.lastSeenAt, lastSeenThreshold)));
+  }
 
   return {
     sessionIdHash,
@@ -2256,21 +2306,6 @@ const rankChatAssignmentStatus = (status: string): number => {
 
 const isActiveChatAssignmentStatus = (status: string): status is ActiveChatAssignmentStatus => {
   return activeChatAssignmentStatuses.includes(status as ActiveChatAssignmentStatus);
-};
-
-const uniqueByStreamId = <T extends { streamId: string }>(rows: T[]): T[] => {
-  const seen = new Set<string>();
-  const uniqueRows: T[] = [];
-  for (const row of rows) {
-    if (seen.has(row.streamId)) {
-      continue;
-    }
-
-    seen.add(row.streamId);
-    uniqueRows.push(row);
-  }
-
-  return uniqueRows;
 };
 
 const clearCookie = (c: Parameters<MiddlewareHandler<ApiBindings>>[0], name: string, config: AppConfig) => {

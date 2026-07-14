@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import "./globals.css";
 import { getApiData, getAuthenticatedApiInit } from "./api-client";
 import { AppHeader, type NavigationViewer } from "./navigation";
-import { QueryProvider } from "./query-provider";
 
 export const metadata: Metadata = {
   title: {
@@ -17,19 +17,23 @@ type MeResponse = {
   authConfigured: boolean;
 };
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const apiInit = await getAuthenticatedApiInit();
-  const me = await getApiData<MeResponse>("/api/me", apiInit);
-
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body>
-        <QueryProvider>
-          <a className="skip-link" href="#main-content">Skip to content</a>
-          <AppHeader viewer={me?.user ?? null} authConfigured={me?.authConfigured ?? false} />
-          <main className="shell" id="main-content">{children}</main>
-        </QueryProvider>
+        <a className="skip-link" href="#main-content">Skip to content</a>
+        <Suspense fallback={<AppHeader viewer={null} authConfigured={false} loading />}>
+          <ViewerHeader />
+        </Suspense>
+        <main className="shell" id="main-content">{children}</main>
       </body>
     </html>
   );
+}
+
+async function ViewerHeader() {
+  const apiInit = await getAuthenticatedApiInit();
+  const me = await getApiData<MeResponse>("/api/me", apiInit);
+
+  return <AppHeader viewer={me?.user ?? null} authConfigured={me?.authConfigured ?? false} />;
 }

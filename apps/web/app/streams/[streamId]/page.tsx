@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getApiData, getAuthenticatedApiInit } from "../../api-client";
+import { getApiData, getAuthenticatedApiInit, getPublicApiInit } from "../../api-client";
 import { formatCount, formatDateTime, formatDuration, formatStatus } from "../../format";
 import { Avatar, EmptyState, MetricCard, StatusPill } from "../../ui";
 import { StreamActivityChart } from "./activity-chart";
@@ -79,11 +79,11 @@ type PrivateStreamRaw = {
 
 export default async function StreamPage({ params }: { params: Promise<{ streamId: string }> }) {
   const { streamId } = await params;
-  const apiInit = await getAuthenticatedApiInit();
+  const [apiInit, authenticatedApiInit] = await Promise.all([getPublicApiInit(), getAuthenticatedApiInit()]);
   const [stream, activity, raw] = await Promise.all([
     getApiData<StreamSession>(`/api/streams/${streamId}`, apiInit),
     getApiData<StreamActivity>(`/api/streams/${streamId}/activity`, apiInit),
-    getApiData<PrivateStreamRaw>(`/api/private/streams/${streamId}/raw`, apiInit)
+    getApiData<PrivateStreamRaw>(`/api/private/streams/${streamId}/raw`, authenticatedApiInit)
   ]);
   const chartPoints = (activity?.buckets ?? []).slice().reverse().map((bucket) => ({
     time: new Date(bucket.bucketStart).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" }),

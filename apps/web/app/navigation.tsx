@@ -11,7 +11,7 @@ export type NavigationViewer = null | {
   isAdmin: boolean;
 };
 
-export function AppHeader({ viewer, authConfigured }: { viewer: NavigationViewer; authConfigured: boolean }) {
+export function AppHeader({ viewer, authConfigured, loading = false }: { viewer: NavigationViewer; authConfigured: boolean; loading?: boolean }) {
   const pathname = usePathname();
   const links = [
     { href: "/", label: "Live" },
@@ -45,7 +45,9 @@ export function AppHeader({ viewer, authConfigured }: { viewer: NavigationViewer
         </nav>
 
         <div className="account-area">
-          {viewer == null ? (
+          {loading ? (
+            <span className="account-skeleton" aria-label="Loading account" />
+          ) : viewer == null ? (
             authConfigured ? (
               <a className="button button-compact" href="/api/auth/twitch/start">Log in with Twitch</a>
             ) : (

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getApiData, getAuthenticatedApiInit } from "../../api-client";
+import { getApiData, getAuthenticatedApiInit, getPublicApiInit } from "../../api-client";
 import { formatCount, formatDateTime, formatStatus } from "../../format";
 import { Avatar, EmptyState, MetricCard, StatusPill } from "../../ui";
 
@@ -61,11 +61,11 @@ type ViewerState = {
 
 export default async function ChatterPage({ params }: { params: Promise<{ login: string }> }) {
   const { login } = await params;
-  const apiInit = await getAuthenticatedApiInit();
+  const [apiInit, authenticatedApiInit] = await Promise.all([getPublicApiInit(), getAuthenticatedApiInit()]);
   const [summary, profile, viewer] = await Promise.all([
     getApiData<ChatterSummary>(`/api/chatters/${login}`, apiInit),
-    getApiData<PrivateChatterProfile>(`/api/private/chatters/${login}`, apiInit),
-    getApiData<ViewerState>("/api/me", apiInit)
+    getApiData<PrivateChatterProfile>(`/api/private/chatters/${login}`, authenticatedApiInit),
+    getApiData<ViewerState>("/api/me", authenticatedApiInit)
   ]);
   const name = profile?.user.displayName ?? profile?.user.login ?? summary?.login ?? login;
   const detailLabel = viewer?.user?.isAdmin === true

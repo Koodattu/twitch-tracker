@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { index, integer, jsonb, pgEnum, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid, boolean } from "drizzle-orm/pg-core";
 
 export const appModeEnum = pgEnum("app_mode", ["local", "private_mvp", "production"]);
@@ -27,7 +28,9 @@ export const twitchUsers = pgTable("twitch_users", {
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).defaultNow().notNull(),
   lastMetadataRefreshAt: timestamp("last_metadata_refresh_at", { withTimezone: true }),
   ...timestamps
-});
+}, (table) => ({
+  loginIdx: index("twitch_users_login_idx").on(table.login)
+}));
 
 export const twitchUserNameHistory = pgTable("twitch_user_name_history", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -75,6 +78,9 @@ export const streamSessions = pgTable("stream_sessions", {
   ...timestamps
 }, (table) => ({
   broadcasterLiveIdx: index("stream_sessions_broadcaster_live_idx").on(table.broadcasterUserId, table.endedAt),
+  broadcasterStartedIdx: index("stream_sessions_broadcaster_started_idx").on(table.broadcasterUserId, table.startedAt),
+  liveLanguageIdx: index("stream_sessions_live_language_idx").on(table.language, table.lastSeenLiveAt).where(sql`${table.endedAt} is null`),
+  recentEndedIdx: index("stream_sessions_recent_ended_idx").on(table.language, table.endedAt).where(sql`${table.endedAt} is not null`),
   startedAtIdx: index("stream_sessions_started_at_idx").on(table.startedAt)
 }));
 
@@ -141,6 +147,7 @@ export const chatAssignments = pgTable("chat_assignments", {
 }, (table) => ({
   activeAssignmentIdx: index("chat_assignments_active_idx").on(table.status, table.priorityScore),
   channelAssignmentIdx: index("chat_assignments_channel_idx").on(table.broadcasterUserId, table.status),
+  streamStatusIdx: index("chat_assignments_stream_status_idx").on(table.twitchStreamId, table.status),
   assignmentIdentityIdx: uniqueIndex("chat_assignments_identity_idx").on(table.botAccountId, table.broadcasterUserId, table.twitchStreamId)
 }));
 
@@ -362,6 +369,7 @@ export const channelEvents = pgTable("channel_events", {
   ...timestamps
 }, (table) => ({
   channelOccurredIdx: index("channel_events_channel_occurred_idx").on(table.broadcasterUserId, table.occurredAt),
+  streamOccurredIdx: index("channel_events_stream_occurred_idx").on(table.twitchStreamId, table.occurredAt),
   sourceEventIdx: index("channel_events_source_event_idx").on(table.source, table.sourceEventId),
   sourceEventUniqueIdx: uniqueIndex("channel_events_source_event_unique_idx").on(table.source, table.eventType, table.sourceEventId)
 }));
@@ -377,6 +385,8 @@ export const raids = pgTable("raids", {
   rawEventsubEventId: uuid("raw_eventsub_event_id").references(() => rawEventsubEvents.id),
   ...timestamps
 }, (table) => ({
+  sourceStreamOccurredIdx: index("raids_source_stream_occurred_idx").on(table.sourceStreamId, table.occurredAt),
+  targetStreamOccurredIdx: index("raids_target_stream_occurred_idx").on(table.targetStreamId, table.occurredAt),
   rawEventsubEventIdx: uniqueIndex("raids_raw_eventsub_event_idx").on(table.rawEventsubEventId)
 }));
 

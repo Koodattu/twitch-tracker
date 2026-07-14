@@ -10,7 +10,7 @@ export function Avatar({ name, src, size = "medium" }: { name: string; src?: str
 
   return (
     <span className={`avatar avatar-${size}`} aria-hidden="true">
-      {src == null || src === "" ? <span>{initials}</span> : <img src={src} alt="" />}
+      {src == null || src === "" ? <span>{initials}</span> : <img src={src} alt="" width={74} height={74} loading="lazy" decoding="async" />}
     </span>
   );
 }
