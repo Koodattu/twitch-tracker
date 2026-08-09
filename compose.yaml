@@ -1,146 +1,298 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+x-node-security: &node-security
+  init: true
+  read_only: true
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  stop_grace_period: 45s
+  logging: *default-logging
+
+x-app-environment: &app-environment
+  APP_MODE: production
+  PUBLIC_WEB_URL: https://${PUBLIC_DOMAIN:?Set PUBLIC_DOMAIN}
+  PUBLIC_API_URL: https://${PUBLIC_DOMAIN:?Set PUBLIC_DOMAIN}
+  INTERNAL_API_URL: http://api:4000
+  DATABASE_URL_FILE: /run/secrets/database_url
+  SESSION_SECRET_FILE: /run/secrets/session_secret
+  SESSION_TTL_DAYS: ${SESSION_TTL_DAYS:-30}
+  COOKIE_SECURE: "true"
+  TWITCH_CLIENT_ID: ${TWITCH_CLIENT_ID:?Set TWITCH_CLIENT_ID}
+  TWITCH_CLIENT_SECRET_FILE: /run/secrets/twitch_client_secret
+  TWITCH_OAUTH_REDIRECT_URI: https://${PUBLIC_DOMAIN:?Set PUBLIC_DOMAIN}/api/auth/twitch/callback
+  TWITCH_LOGIN_SCOPES: ${TWITCH_LOGIN_SCOPES:-}
+  TWITCH_EVENTSUB_SECRET_FILE: /run/secrets/twitch_eventsub_secret
+  EVENTSUB_ENABLED: ${EVENTSUB_ENABLED:-false}
+  EVENTSUB_MAX_CHANNELS: ${EVENTSUB_MAX_CHANNELS:-25}
+  TWITCH_BOT_OAUTH_REDIRECT_URI: https://${PUBLIC_DOMAIN:?Set PUBLIC_DOMAIN}/api/internal/bot-accounts/oauth/callback
+  TWITCH_BOT_SCOPES: ${TWITCH_BOT_SCOPES:-chat:read user:read:chat user:read:moderated_channels moderator:read:chatters}
+  ADMIN_TWITCH_USER_IDS: ${ADMIN_TWITCH_USER_IDS:?Set ADMIN_TWITCH_USER_IDS}
+  ADMIN_TWITCH_LOGINS: ${ADMIN_TWITCH_LOGINS:-}
+  ENABLE_TWITCH_INGESTION: ${ENABLE_TWITCH_INGESTION:-false}
+  DEFAULT_BOT_JOIN_CAPACITY: ${DEFAULT_BOT_JOIN_CAPACITY:-100}
+  DEFAULT_BOT_JOIN_RATE_PER_10_SECONDS: ${DEFAULT_BOT_JOIN_RATE_PER_10_SECONDS:-20}
+  DISCOVERY_INTERVAL_MS: ${DISCOVERY_INTERVAL_MS:-180000}
+  USER_HYDRATION_INTERVAL_MS: ${USER_HYDRATION_INTERVAL_MS:-300000}
+  ASSIGNMENT_INTERVAL_MS: ${ASSIGNMENT_INTERVAL_MS:-30000}
+  CHATTERS_RECONCILIATION_INTERVAL_MS: ${CHATTERS_RECONCILIATION_INTERVAL_MS:-300000}
+  CHATTERS_RECONCILIATION_MAX_CHANNELS: ${CHATTERS_RECONCILIATION_MAX_CHANNELS:-25}
+  CHATTERS_RECONCILIATION_MAX_PAGES_PER_CHANNEL: ${CHATTERS_RECONCILIATION_MAX_PAGES_PER_CHANNEL:-5}
+  AGGREGATION_INTERVAL_MS: ${AGGREGATION_INTERVAL_MS:-60000}
+  AGGREGATION_BUCKET_MINUTES: ${AGGREGATION_BUCKET_MINUTES:-5}
+  AGGREGATION_LOOKBACK_HOURS: ${AGGREGATION_LOOKBACK_HOURS:-48}
+  MAINTENANCE_INTERVAL_MS: ${MAINTENANCE_INTERVAL_MS:-300000}
+  RAW_CHAT_RETENTION_DAYS: ${RAW_CHAT_RETENTION_DAYS:-30}
+  RAW_PAYLOAD_RETENTION_DAYS: ${RAW_PAYLOAD_RETENTION_DAYS:-30}
+  STALE_ASSIGNMENT_GRACE_MINUTES: ${STALE_ASSIGNMENT_GRACE_MINUTES:-15}
+  BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+
 services:
   caddy:
-    image: caddy:2.8-alpine
+    image: caddy:2.11.4-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+    pull_policy: always
     restart: unless-stopped
+    init: true
+    read_only: true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
     ports:
-      - "8080:80"
-      - "8443:443"
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      PUBLIC_DOMAIN: ${PUBLIC_DOMAIN:?Set PUBLIC_DOMAIN}
+      CADDY_EMAIL: ${CADDY_EMAIL:?Set CADDY_EMAIL}
     volumes:
       - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    networks:
+      - edge
     depends_on:
-      - web
-      - api
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:2019/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging: *default-logging
 
   web:
+    <<: *node-security
+    image: twitch-tracker-web:${IMAGE_TAG:?Set IMAGE_TAG to an immutable release ID}
     build:
       context: .
-      dockerfile: apps/web/Dockerfile
+      dockerfile: Dockerfile
+      target: web
+      args:
+        VCS_REF: ${VCS_REF:?Set VCS_REF to the Git commit}
     restart: unless-stopped
-    env_file:
-      - path: .env
-        required: false
     environment:
       INTERNAL_API_URL: http://api:4000
-      NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:4000}
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+      - /app/apps/web/.next/cache:size=128m,uid=1000,gid=1000,mode=0750
+    networks:
+      - edge
     depends_on:
-      - api
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
   api:
+    <<: *node-security
+    image: twitch-tracker-api:${IMAGE_TAG:?Set IMAGE_TAG to an immutable release ID}
     build:
       context: .
-      dockerfile: apps/api/Dockerfile
+      dockerfile: Dockerfile
+      target: api
+      args:
+        VCS_REF: ${VCS_REF:?Set VCS_REF to the Git commit}
     restart: unless-stopped
-    env_file:
-      - path: .env
-        required: false
     environment:
-      APP_MODE: ${APP_MODE:-local}
+      <<: *app-environment
       PORT: 4000
-      PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:3000}
-      PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:4000}
-      INTERNAL_API_URL: ${INTERNAL_API_URL:-http://api:4000}
-      DATABASE_URL: postgres://twitch_tracker:twitch_tracker@postgres:5432/twitch_tracker
-      SESSION_SECRET: ${SESSION_SECRET:-local-development-session-secret-000000}
-      COOKIE_SECURE: ${COOKIE_SECURE:-false}
-      TWITCH_EVENTSUB_SECRET: ${TWITCH_EVENTSUB_SECRET:-local-development-eventsub-secret-0000}
-      EVENTSUB_ENABLED: ${EVENTSUB_ENABLED:-false}
-      EVENTSUB_MAX_CHANNELS: ${EVENTSUB_MAX_CHANNELS:-25}
-      ENABLE_TWITCH_INGESTION: ${ENABLE_TWITCH_INGESTION:-false}
+    secrets:
+      - database_url
+      - session_secret
+      - twitch_client_secret
+      - twitch_eventsub_secret
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    networks:
+      - edge
+      - backend
     depends_on:
-      postgres:
-        condition: service_healthy
-
-  worker:
-    build:
-      context: .
-      dockerfile: apps/worker/Dockerfile
-    restart: unless-stopped
-    env_file:
-      - path: .env
-        required: false
-    environment:
-      APP_MODE: ${APP_MODE:-local}
-      PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:3000}
-      PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:4000}
-      INTERNAL_API_URL: ${INTERNAL_API_URL:-http://api:4000}
-      DATABASE_URL: postgres://twitch_tracker:twitch_tracker@postgres:5432/twitch_tracker
-      SESSION_SECRET: ${SESSION_SECRET:-local-development-session-secret-000000}
-      COOKIE_SECURE: ${COOKIE_SECURE:-false}
-      TWITCH_EVENTSUB_SECRET: ${TWITCH_EVENTSUB_SECRET:-local-development-eventsub-secret-0000}
-      EVENTSUB_ENABLED: ${EVENTSUB_ENABLED:-false}
-      EVENTSUB_MAX_CHANNELS: ${EVENTSUB_MAX_CHANNELS:-25}
-      ENABLE_TWITCH_INGESTION: ${ENABLE_TWITCH_INGESTION:-false}
-      AGGREGATION_BUCKET_MINUTES: ${AGGREGATION_BUCKET_MINUTES:-5}
-      AGGREGATION_LOOKBACK_HOURS: ${AGGREGATION_LOOKBACK_HOURS:-48}
-      CHATTERS_RECONCILIATION_INTERVAL_MS: ${CHATTERS_RECONCILIATION_INTERVAL_MS:-300000}
-      CHATTERS_RECONCILIATION_MAX_CHANNELS: ${CHATTERS_RECONCILIATION_MAX_CHANNELS:-25}
-      CHATTERS_RECONCILIATION_MAX_PAGES_PER_CHANNEL: ${CHATTERS_RECONCILIATION_MAX_PAGES_PER_CHANNEL:-5}
-      RAW_CHAT_RETENTION_DAYS: ${RAW_CHAT_RETENTION_DAYS:-30}
-      RAW_PAYLOAD_RETENTION_DAYS: ${RAW_PAYLOAD_RETENTION_DAYS:-30}
-      STALE_ASSIGNMENT_GRACE_MINUTES: ${STALE_ASSIGNMENT_GRACE_MINUTES:-15}
-      WORKER_NAME: worker-1
-    depends_on:
-      postgres:
-        condition: service_healthy
       migrate:
         condition: service_completed_successfully
-
-  postgres:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: twitch_tracker
-      POSTGRES_USER: twitch_tracker
-      POSTGRES_PASSWORD: twitch_tracker
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U twitch_tracker -d twitch_tracker"]
-      interval: 5s
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 20s
       timeout: 5s
-      retries: 10
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+      retries: 5
+      start_period: 20s
 
-  migrate:
+  worker:
+    <<: *node-security
+    image: twitch-tracker-worker:${IMAGE_TAG:?Set IMAGE_TAG to an immutable release ID}
     build:
       context: .
-      dockerfile: apps/api/Dockerfile
-    restart: "no"
-    env_file:
-      - path: .env
-        required: false
+      dockerfile: Dockerfile
+      target: worker
+      args:
+        VCS_REF: ${VCS_REF:?Set VCS_REF to the Git commit}
+    restart: unless-stopped
+    stop_grace_period: 1m
     environment:
-      DATABASE_URL: postgres://twitch_tracker:twitch_tracker@postgres:5432/twitch_tracker
-    command: ["pnpm", "--filter", "@twitch-tracker/db", "db:migrate"]
+      <<: *app-environment
+      WORKER_NAME: ${WORKER_NAME:-worker-1}
+      WORKER_HEALTH_MAX_AGE_MS: ${WORKER_HEALTH_MAX_AGE_MS:-900000}
+      WORKER_EXPECTED_LOOP_COUNT: "8"
+    secrets:
+      - database_url
+      - session_secret
+      - twitch_client_secret
+      - twitch_eventsub_secret
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    networks:
+      - backend
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "dist/health.js"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 5m
+
+  postgres:
+    image: postgres:16.14-alpine3.24@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+    pull_policy: always
+    restart: unless-stopped
+    shm_size: 256mb
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
+
+  migrate:
+    <<: *node-security
+    image: twitch-tracker-migrate:${IMAGE_TAG:?Set IMAGE_TAG to an immutable release ID}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: migrate
+      args:
+        VCS_REF: ${VCS_REF:?Set VCS_REF to the Git commit}
+    restart: "no"
+    environment:
+      DATABASE_URL_FILE: /run/secrets/database_url
+    secrets:
+      - database_url
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    networks:
+      - backend
     depends_on:
       postgres:
         condition: service_healthy
 
   backup:
-    image: postgres:16-alpine
+    image: postgres:16.14-alpine3.24@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+    pull_policy: always
     restart: unless-stopped
+    init: true
+    user: "70:70"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     environment:
-      PGPASSWORD: twitch_tracker
+      PGHOST: postgres
+      PGDATABASE: ${POSTGRES_DB:?Set POSTGRES_DB}
+      PGUSER: ${POSTGRES_USER:?Set POSTGRES_USER}
+      PGPASSWORD_FILE: /run/secrets/postgres_password
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
-    command:
-      - /bin/sh
-      - -c
-      - |
-        while true; do
-          timestamp=$$(date -u +%Y%m%dT%H%M%SZ)
-          pg_dump -h postgres -U twitch_tracker -d twitch_tracker > /backups/twitch_tracker_$${timestamp}.sql
-          find /backups -type f -name '*.sql' -mtime +$${BACKUP_RETENTION_DAYS} -delete
-          sleep 86400
-        done
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+    secrets:
+      - postgres_password
+    command: ["/bin/sh", "/scripts/backup.sh"]
     volumes:
-      - postgres_backups:/backups
+      - ./infra/postgres:/scripts:ro
+      - type: bind
+        source: ${BACKUP_HOST_PATH:?Set BACKUP_HOST_PATH to an off-host mounted directory}
+        target: /backups
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    networks:
+      - backend
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "test", "-s", "/backups/.last-success"]
+      interval: 5m
+      timeout: 5s
+      retries: 3
+      start_period: 5m
+    logging: *default-logging
+
+networks:
+  edge:
+  backend:
+
+secrets:
+  postgres_password:
+    file: ${POSTGRES_PASSWORD_FILE:?Set POSTGRES_PASSWORD_FILE}
+  database_url:
+    file: ${DATABASE_URL_FILE:?Set DATABASE_URL_FILE}
+  session_secret:
+    file: ${SESSION_SECRET_FILE:?Set SESSION_SECRET_FILE}
+  twitch_client_secret:
+    file: ${TWITCH_CLIENT_SECRET_FILE:?Set TWITCH_CLIENT_SECRET_FILE}
+  twitch_eventsub_secret:
+    file: ${TWITCH_EVENTSUB_SECRET_FILE:?Set TWITCH_EVENTSUB_SECRET_FILE}
 
 volumes:
   caddy_data:
   caddy_config:
   postgres_data:
-  postgres_backups:

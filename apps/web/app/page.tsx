@@ -1,8 +1,11 @@
 import type { LiveStreamSummary, RecentStreamSummary } from "@twitch-tracker/shared";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getApiData, getPublicApiInit } from "./api-client";
 import { formatCount, formatDateTime, formatDuration, formatRelativeTime, getSizedThumbnailUrl } from "./format";
 import { Avatar, EmptyState, MetricCard, StatusPill } from "./ui";
+
+export const metadata: Metadata = { title: "Live streams" };
 
 export default async function HomePage() {
   const apiInit = await getPublicApiInit();
@@ -12,6 +15,7 @@ export default async function HomePage() {
   ]);
   const streams = streamResponse ?? [];
   const recentStreams = recentResponse ?? [];
+  const streamsAvailable = streamResponse != null;
   const featuredStreams = streams.slice(0, 4);
   const totalViewers = streams.reduce((sum, stream) => sum + (stream.viewerCount ?? 0), 0);
   const trackedStreams = streams.filter((stream) => stream.isChatTracked).length;
@@ -31,15 +35,17 @@ export default async function HomePage() {
             <h1>What’s live right now</h1>
             <p>Finnish-language streams ranked by the latest viewer snapshot, with chat coverage shown separately.</p>
           </div>
-          <StatusPill tone={streams.length > 0 ? "success" : "neutral"}>{streams.length > 0 ? "Live data" : "Waiting for data"}</StatusPill>
+          <StatusPill tone={!streamsAvailable ? "danger" : streams.length > 0 ? "success" : "neutral"}>{!streamsAvailable ? "Unavailable" : streams.length > 0 ? "Live data" : "Waiting for data"}</StatusPill>
         </div>
       </section>
 
-      <section className="stat-row" aria-label="Live stream summary">
-        <MetricCard label="Live streams" value={formatCount(streams.length)} detail="Currently classified as language: Finnish" />
-        <MetricCard label="Chat tracked" value={formatCount(trackedStreams)} detail="Streams with active chat coverage" />
-        <MetricCard label="Current viewers" value={formatCount(totalViewers)} detail={latestObservation == null ? "No viewer snapshot yet" : `Latest snapshot ${formatRelativeTime(latestObservation, now)}`} />
-      </section>
+      {streamsAvailable ? (
+        <section className="stat-row" aria-label="Live stream summary">
+          <MetricCard label="Live streams" value={formatCount(streams.length)} detail="Currently broadcasting in Finnish" />
+          <MetricCard label="Chat tracked" value={formatCount(trackedStreams)} detail="Streams with active chat coverage" />
+          <MetricCard label="Current viewers" value={formatCount(totalViewers)} detail={latestObservation == null ? "No viewer snapshot yet" : `Latest snapshot ${formatRelativeTime(latestObservation, now)}`} />
+        </section>
+      ) : null}
 
       {featuredStreams.length === 0 ? null : (
         <section className="directory-section" aria-labelledby="top-live-heading">
@@ -64,13 +70,13 @@ export default async function HomePage() {
             <h2>Full live ranking</h2>
             <p>Viewer counts are periodic snapshots, not real-time telemetry.</p>
           </div>
-          <StatusPill tone="accent">{streams.length} live</StatusPill>
+          <StatusPill tone={streamsAvailable ? "accent" : "danger"}>{streamsAvailable ? `${streams.length} live` : "Unavailable"}</StatusPill>
         </div>
 
         {streamResponse == null ? (
           <EmptyState title="Live data is unavailable" description="The analytics service could not be reached. Try again shortly." />
         ) : streams.length === 0 ? (
-          <EmptyState title="No live streams captured" description="No live Finnish Stream has been discovered yet." />
+          <EmptyState title="No live streams captured" description="No live Finnish stream has been discovered yet." />
         ) : (
           <div className="table-scroll" role="region" aria-label="Live Finnish stream ranking" tabIndex={0}>
             <table className="table live-ranking-table">
@@ -126,7 +132,7 @@ export default async function HomePage() {
             <h2>Recently ended</h2>
             <p>Continue exploring sessions after they leave the live ranking.</p>
           </div>
-          <StatusPill>{recentStreams.length} sessions</StatusPill>
+          <StatusPill tone={recentResponse == null ? "danger" : "neutral"}>{recentResponse == null ? "Unavailable" : `${recentStreams.length} sessions`}</StatusPill>
         </div>
         {recentResponse == null ? (
           <EmptyState title="Recent sessions are unavailable" description="Historical stream sessions could not be loaded right now." />
@@ -139,7 +145,7 @@ export default async function HomePage() {
         )}
       </section>
 
-      <p className="data-note">A Discovered Stream is tracked at metadata level. “Chat tracked” means the tracker currently has chat coverage; it does not identify viewers.</p>
+      <p className="data-note">A discovered stream is tracked at metadata level. “Chat tracked” means the tracker currently has chat coverage; it does not identify viewers.</p>
     </>
   );
 }

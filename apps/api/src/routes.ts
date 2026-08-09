@@ -98,7 +98,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
     await next();
   });
 
-  app.get("/api/health", (c) => {
+  app.get("/api/health/live", (c) => {
     return c.json({
       data: {
         ok: true,
@@ -106,6 +106,28 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
         timestamp: new Date().toISOString()
       }
     });
+  });
+
+  app.get("/api/health", async (c) => {
+    try {
+      await c.get("db").execute(sql`select 1`);
+      return c.json({
+        data: {
+          ok: true,
+          mode: c.get("config").APP_MODE,
+          timestamp: new Date().toISOString()
+        }
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(JSON.stringify({ level: "error", message: "api readiness check failed", error: message }));
+      return c.json({
+        data: {
+          ok: false,
+          timestamp: new Date().toISOString()
+        }
+      }, 503);
+    }
   });
 
   app.get("/api/streams/live", async (c) => {

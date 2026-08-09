@@ -3,7 +3,7 @@ import type { WorkerContext } from "../worker.js";
 import { startIntervalLoop } from "./common.js";
 
 export const runAggregationLoop = (context: WorkerContext) => {
-  startIntervalLoop({
+  return startIntervalLoop({
     name: "aggregation",
     intervalMs: context.config.AGGREGATION_INTERVAL_MS,
     context,

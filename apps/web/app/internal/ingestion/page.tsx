@@ -1,8 +1,11 @@
 import type { InternalIngestionStatus } from "@twitch-tracker/shared";
 import Link from "next/link";
+import type { Metadata } from "next";
 import { getApiData, getAuthenticatedApiInit } from "../../api-client";
 import { formatCount, formatDateTime, formatStatus } from "../../format";
 import { EmptyState, MetricCard, StatusPill } from "../../ui";
+
+export const metadata: Metadata = { title: "Ingestion health" };
 
 export default async function IngestionPage() {
   const apiInit = await getAuthenticatedApiInit();

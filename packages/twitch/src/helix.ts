@@ -7,6 +7,7 @@ import type {
   TwitchRateLimitHeaders,
   TwitchRestAdapter
 } from "./types.js";
+import { fetchWithTimeout } from "./fetch.js";
 
 const helixBaseUrl = "https://api.twitch.tv/helix";
 
@@ -32,7 +33,7 @@ const callHelix = async <T>(input: {
 }): Promise<RawTwitchResponse<T>> => {
   const url = `${helixBaseUrl}${input.endpoint}?${input.params.toString()}`;
   const observedAt = new Date();
-  const response = await fetch(url, {
+  const response = await fetchWithTimeout(url, {
     headers: {
       "Client-Id": input.clientId,
       Authorization: `Bearer ${input.accessToken}`

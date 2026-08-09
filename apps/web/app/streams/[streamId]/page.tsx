@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { getApiData, getAuthenticatedApiInit, getPublicApiInit } from "../../api-client";
 import { formatCount, formatDateTime, formatDuration, formatStatus } from "../../format";
 import { Avatar, EmptyState, MetricCard, StatusPill } from "../../ui";
@@ -77,6 +78,8 @@ type PrivateStreamRaw = {
   }>;
 };
 
+export const metadata: Metadata = { title: "Stream session" };
+
 export default async function StreamPage({ params }: { params: Promise<{ streamId: string }> }) {
   const { streamId } = await params;
   const [apiInit, authenticatedApiInit] = await Promise.all([getPublicApiInit(), getAuthenticatedApiInit()]);
@@ -105,7 +108,7 @@ export default async function StreamPage({ params }: { params: Promise<{ streamI
             <Avatar name={broadcasterName} src={stream?.broadcasterProfileImageUrl} size="large" />
             <div><span className="eyebrow">{stream?.latestCategoryName ?? "Stream session"}</span><h1>{stream?.latestTitle ?? streamId}</h1></div>
           </div>
-          <StatusPill tone={stream?.endedAt == null && stream != null ? "success" : "neutral"}>{stream == null ? "Unavailable" : stream.endedAt == null ? "Live" : "Ended"}</StatusPill>
+          <StatusPill tone={stream == null ? "danger" : stream.endedAt == null ? "success" : "neutral"}>{stream == null ? "Unavailable" : stream.endedAt == null ? "Live" : "Ended"}</StatusPill>
         </div>
         <p>{stream == null ? "This stream session could not be loaded." : `${broadcasterName} · ${formatDateTime(stream.startedAt)} · ${formatDuration(durationSeconds)} observed`}</p>
       </section>
@@ -113,16 +116,16 @@ export default async function StreamPage({ params }: { params: Promise<{ streamI
       {stream == null ? <div className="callout callout-warning"><div><strong>Stream metadata unavailable</strong><p>The stream may be hidden, missing, or the API may be temporarily unavailable. Accessible aggregate sections are shown below.</p></div></div> : null}
 
       <section className="stat-row" aria-label="Stream summary">
-        <MetricCard label="Peak viewers" value={formatCount(activity?.totals.viewerCountMax)} detail={activity?.totals.viewerCountAvg == null ? "No average yet" : `${formatCount(activity.totals.viewerCountAvg)} average`} />
+        <MetricCard label="Peak viewers" value={formatCount(activity?.totals.viewerCountMax)} detail={activity == null ? "Activity unavailable" : activity.totals.viewerCountAvg == null ? "No average yet" : `${formatCount(activity.totals.viewerCountAvg)} average`} />
         <MetricCard label="Messages captured" value={formatCount(activity?.totals.messageCount)} />
         <MetricCard label="Active chatters" value={formatCount(activity?.totals.activeChatterCountMax)} detail="Maximum observed in an activity bucket" />
-        <MetricCard label="JOIN / PART" value={activity == null ? "—" : `${formatCount(activity.totals.joinCount)} / ${formatCount(activity.totals.partCount)}`} />
+        <MetricCard label="Joins / parts" value={activity == null ? "—" : `${formatCount(activity.totals.joinCount)} / ${formatCount(activity.totals.partCount)}`} />
         <MetricCard label="Observed duration" value={stream == null ? "—" : formatDuration(durationSeconds)} />
       </section>
 
       <section className="panel">
-        <div className="panel-header"><div className="panel-heading"><h2>Activity over time</h2><p>Viewer snapshots and captured chat activity use separate scales</p></div><StatusPill>{chartPoints.length} points</StatusPill></div>
-        <StreamActivityChart points={chartPoints} />
+        <div className="panel-header"><div className="panel-heading"><h2>Activity over time</h2><p>Viewer snapshots and captured chat activity use separate scales</p></div><StatusPill tone={activity == null ? "danger" : "neutral"}>{activity == null ? "Unavailable" : `${chartPoints.length} points`}</StatusPill></div>
+        {activity == null ? <EmptyState title="Activity chart unavailable" description="Stream activity could not be loaded right now." /> : <StreamActivityChart points={chartPoints} />}
       </section>
 
       <section className="panel">
@@ -132,15 +135,15 @@ export default async function StreamPage({ params }: { params: Promise<{ streamI
             <tr><th scope="row">Twitch started</th><td className="time-cell">{formatDateTime(stream?.startedAt)}</td></tr>
             <tr><th scope="row">First discovered</th><td className="time-cell">{formatDateTime(stream?.firstSeenAt)}</td></tr>
             <tr><th scope="row">Last seen live</th><td className="time-cell">{formatDateTime(stream?.lastSeenLiveAt)}</td></tr>
-            <tr><th scope="row">Ended</th><td className="time-cell">{stream?.endedAt == null ? "Still live or awaiting confirmation" : formatDateTime(stream.endedAt)}</td></tr>
+            <tr><th scope="row">Ended</th><td className="time-cell">{stream == null ? "Unavailable" : stream.endedAt == null ? "Still live or awaiting confirmation" : formatDateTime(stream.endedAt)}</td></tr>
             <tr><th scope="row">Stream ID</th><td className="mono-cell">{streamId}</td></tr>
           </tbody></table>
         </div>
       </section>
 
       <section className="panel">
-        <div className="panel-header"><div className="panel-heading"><h2>Viewer snapshots</h2><p>Latest periodic observations</p></div><StatusPill>{activity?.snapshots.length ?? 0} loaded</StatusPill></div>
-        {activity == null || activity.snapshots.length === 0 ? <EmptyState title="No viewer snapshots" description="No viewer-count observations are stored for this stream." /> : (
+        <div className="panel-header"><div className="panel-heading"><h2>Viewer snapshots</h2><p>Latest periodic observations</p></div><StatusPill tone={activity == null ? "danger" : "neutral"}>{activity == null ? "Unavailable" : `${activity.snapshots.length} loaded`}</StatusPill></div>
+        {activity == null ? <EmptyState title="Viewer snapshots unavailable" description="Viewer-count observations could not be loaded right now." /> : activity.snapshots.length === 0 ? <EmptyState title="No viewer snapshots" description="No viewer-count observations are stored for this stream." /> : (
           <div className="table-scroll" role="region" aria-label="Stream viewer snapshots" tabIndex={0}>
             <table className="table"><thead><tr><th scope="col">Observed</th><th scope="col">Viewers</th><th scope="col">Category</th><th scope="col">Title</th></tr></thead><tbody>
               {activity.snapshots.slice(0, 25).map((snapshot) => <tr key={snapshot.observedAt}><td className="time-cell">{formatDateTime(snapshot.observedAt)}</td><td className="number-cell">{formatCount(snapshot.viewerCount)}</td><td>{snapshot.categoryName ?? <span className="muted">Unknown</span>}</td><td className="message-cell">{snapshot.title ?? "Untitled"}</td></tr>)}
@@ -151,9 +154,9 @@ export default async function StreamPage({ params }: { params: Promise<{ streamI
 
       <section className="panel">
         <div className="panel-header"><div className="panel-heading"><h2>Activity buckets</h2><p>Bounded aggregate detail</p></div></div>
-        {activity == null || activity.buckets.length === 0 ? <EmptyState title="No activity buckets" description="Aggregation has not produced activity buckets for this stream." /> : (
+        {activity == null ? <EmptyState title="Activity buckets unavailable" description="Aggregate activity could not be loaded right now." /> : activity.buckets.length === 0 ? <EmptyState title="No activity buckets" description="Aggregation has not produced activity buckets for this stream." /> : (
           <div className="table-scroll" role="region" aria-label="Stream activity buckets" tabIndex={0}>
-            <table className="table"><thead><tr><th scope="col">Bucket</th><th scope="col">Viewers</th><th scope="col">Messages</th><th scope="col">Active chatters</th><th scope="col">JOIN / PART</th><th scope="col">Events</th></tr></thead><tbody>
+            <table className="table"><thead><tr><th scope="col">Bucket</th><th scope="col">Viewers</th><th scope="col">Messages</th><th scope="col">Active chatters</th><th scope="col">Joins / parts</th><th scope="col">Events</th></tr></thead><tbody>
               {activity.buckets.slice(0, 30).map((bucket) => <tr key={bucket.bucketStart}><td className="time-cell">{formatDateTime(bucket.bucketStart)}</td><td className="number-cell">{formatCount(bucket.viewerCountAvg)}</td><td className="number-cell">{formatCount(bucket.messageCount)}</td><td className="number-cell">{formatCount(bucket.activeChatterCount)}</td><td className="number-cell">{formatCount(bucket.joinCount)} / {formatCount(bucket.partCount)}</td><td>{formatEventCounts(bucket.eventCounts)}</td></tr>)}
             </tbody></table>
           </div>
@@ -197,8 +200,8 @@ export default async function StreamPage({ params }: { params: Promise<{ streamI
       )}
 
       <section className="panel">
-        <div className="panel-header"><div className="panel-heading"><h2>Channel events</h2><p>EventSub and normalized lifecycle evidence</p></div><StatusPill>{(activity?.events.length ?? 0) + (activity?.raids.length ?? 0)} events</StatusPill></div>
-        {activity == null || (activity.events.length === 0 && activity.raids.length === 0) ? <EmptyState title="No channel events" description="No retained channel events are linked to this stream." /> : (
+        <div className="panel-header"><div className="panel-heading"><h2>Channel events</h2><p>Recorded lifecycle events and raids</p></div><StatusPill tone={activity == null ? "danger" : "neutral"}>{activity == null ? "Unavailable" : `${activity.events.length + activity.raids.length} events`}</StatusPill></div>
+        {activity == null ? <EmptyState title="Channel events unavailable" description="Channel events could not be loaded right now." /> : activity.events.length === 0 && activity.raids.length === 0 ? <EmptyState title="No channel events" description="No retained channel events are linked to this stream." /> : (
           <div className="table-scroll" role="region" aria-label="Stream channel events" tabIndex={0}><table className="table"><thead><tr><th scope="col">Time</th><th scope="col">Type</th><th scope="col">Source</th><th scope="col">Actor</th></tr></thead><tbody>
             {activity.events.slice(0, 50).map((event) => <tr key={event.id}><td className="time-cell">{formatDateTime(event.occurredAt)}</td><td><StatusPill>{formatStatus(event.eventType)}</StatusPill></td><td>{formatStatus(event.source)}</td><td className="mono-cell">{event.actorUserId ?? "—"}</td></tr>)}
             {activity.raids.slice(0, 25).map((raid) => <tr key={raid.id}><td className="time-cell">{formatDateTime(raid.occurredAt)}</td><td><StatusPill tone="accent">Raid</StatusPill></td><td>{raid.viewerCount == null ? "EventSub" : `${formatCount(raid.viewerCount)} viewers`}</td><td className="mono-cell">{raid.sourceBroadcasterUserId ?? raid.targetBroadcasterUserId ?? "—"}</td></tr>)}

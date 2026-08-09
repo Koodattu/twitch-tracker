@@ -7,7 +7,7 @@ import { startIntervalLoop } from "./common.js";
 const activeAssignmentStatuses = ["desired", "joining", "joined"] as const;
 
 export const runAssignmentLoop = (context: WorkerContext) => {
-  startIntervalLoop({
+  return startIntervalLoop({
     name: "assignment",
     intervalMs: context.config.ASSIGNMENT_INTERVAL_MS,
     context,

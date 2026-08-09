@@ -84,8 +84,8 @@ Set these before using the bot-account admin flow:
 
 - `ADMIN_TWITCH_USER_IDS`: comma- or space-separated Twitch user IDs that should be admins at login
 - `ADMIN_TWITCH_LOGINS`: bootstrap-only verified Twitch logins. On first matching
-  sign-in, the API records the immutable Twitch user ID as an admin grant. The
-  default is `Vaarattu`.
+  sign-in, the API records the immutable Twitch user ID as an admin grant. There
+  is no production default; prefer `ADMIN_TWITCH_USER_IDS` when possible.
 - `TWITCH_OAUTH_REDIRECT_URI`: normal user login callback, for example `https://example.com/api/auth/twitch/callback`
 - `TWITCH_BOT_OAUTH_REDIRECT_URI`: bot login callback, for example `https://example.com/api/internal/bot-accounts/oauth/callback`
 - `TWITCH_BOT_SCOPES`: recommended MVP value is `chat:read user:read:chat user:read:moderated_channels moderator:read:chatters`

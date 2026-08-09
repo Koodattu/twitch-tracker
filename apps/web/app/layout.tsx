@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 import "./globals.css";
 import { getApiData, getAuthenticatedApiInit } from "./api-client";
@@ -10,6 +10,13 @@ export const metadata: Metadata = {
     template: "%s · Twitch Tracker"
   },
   description: "Live Finnish Twitch stream, channel, and chat activity analytics."
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#0b0a11"
 };
 
 type MeResponse = {

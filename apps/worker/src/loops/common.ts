@@ -13,21 +13,13 @@ export const startIntervalLoop = (input: {
   context: LoopContext;
   run: () => Promise<Record<string, unknown>>;
 }) => {
-  let running = false;
+  let activeRun: Promise<void> | null = null;
 
   const runSafely = async () => {
     if (input.context.abortSignal.aborted) {
       return;
     }
 
-    if (running) {
-      await heartbeat(input.context.db, input.context.workerName, input.name, "skipped", {
-        reason: "previous run is still active"
-      });
-      return;
-    }
-
-    running = true;
     await runWithIngestionRecord(input.context.db, input.name, async () => {
       await heartbeat(input.context.db, input.context.workerName, input.name, "running", {});
       const summary = await input.run();
@@ -37,18 +29,57 @@ export const startIntervalLoop = (input: {
       const message = error instanceof Error ? error.message : String(error);
       await heartbeat(input.context.db, input.context.workerName, input.name, "error", { message });
       console.error(JSON.stringify({ level: "error", loop: input.name, message }));
-    }).finally(() => {
-      running = false;
     });
   };
 
-  void runSafely();
+  const scheduleRun = () => {
+    if (input.context.abortSignal.aborted) {
+      return;
+    }
+
+    if (activeRun != null) {
+      void heartbeat(input.context.db, input.context.workerName, input.name, "skipped", {
+        reason: "previous run is still active"
+      }).catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(JSON.stringify({ level: "error", loop: input.name, message }));
+      });
+      return;
+    }
+
+    const task = runSafely();
+    activeRun = task;
+    const clearActiveRun = () => {
+      if (activeRun === task) {
+        activeRun = null;
+      }
+    };
+    void task.then(clearActiveRun, clearActiveRun);
+  };
+
+  scheduleRun();
   const timer = setInterval(() => {
-    void runSafely();
+    scheduleRun();
   }, input.intervalMs);
 
-  input.context.abortSignal.addEventListener("abort", () => {
-    clearInterval(timer);
+  return new Promise<void>((resolve) => {
+    const stop = () => {
+      clearInterval(timer);
+      const currentRun = activeRun;
+      if (currentRun == null) {
+        resolve();
+        return;
+      }
+
+      void currentRun.then(resolve, resolve);
+    };
+
+    if (input.context.abortSignal.aborted) {
+      stop();
+      return;
+    }
+
+    input.context.abortSignal.addEventListener("abort", stop, { once: true });
   });
 };
 

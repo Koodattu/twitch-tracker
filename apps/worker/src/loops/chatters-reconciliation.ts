@@ -24,7 +24,7 @@ const getChattersSource = "helix.get_chatters";
 const presenceConfidence = 90;
 
 export const runChattersReconciliationLoop = (context: WorkerContext) => {
-  startIntervalLoop({
+  return startIntervalLoop({
     name: "chatters-reconciliation",
     intervalMs: context.config.CHATTERS_RECONCILIATION_INTERVAL_MS,
     context,

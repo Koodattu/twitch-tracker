@@ -1,5 +1,6 @@
 import { appModes } from "@twitch-tracker/shared";
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { z } from "zod";
 
 const optionalUrl = z.string().url().or(z.literal("")).optional();
@@ -16,6 +17,13 @@ const intFromString = (defaultValue: number) =>
     .transform((value) => (value == null || value === "" ? defaultValue : Number(value)))
     .pipe(z.number().int().nonnegative());
 
+const positiveIntFromString = (defaultValue: number) =>
+  z
+    .string()
+    .optional()
+    .transform((value) => (value == null || value === "" ? defaultValue : Number(value)))
+    .pipe(z.number().int().positive());
+
 export const baseEnvSchema = z.object({
   APP_MODE: z.enum(appModes).default("local"),
   PUBLIC_WEB_URL: z.string().url().default("http://localhost:3000"),
@@ -23,7 +31,7 @@ export const baseEnvSchema = z.object({
   INTERNAL_API_URL: z.string().url().default("http://localhost:4000"),
   DATABASE_URL: z.string().min(1),
   SESSION_SECRET: z.string().min(32),
-  SESSION_TTL_DAYS: intFromString(30),
+  SESSION_TTL_DAYS: positiveIntFromString(30),
   COOKIE_SECURE: booleanFromString,
   TWITCH_CLIENT_ID: z.string().optional().default(""),
   TWITCH_CLIENT_SECRET: z.string().optional().default(""),
@@ -39,32 +47,61 @@ export const baseEnvSchema = z.object({
   TWITCH_BOT_ACCESS_TOKEN: z.string().optional().default(""),
   TWITCH_BOT_REFRESH_TOKEN: z.string().optional().default(""),
   ADMIN_TWITCH_USER_IDS: z.string().optional().default(""),
-  ADMIN_TWITCH_LOGINS: z.string().optional().default("Vaarattu"),
+  ADMIN_TWITCH_LOGINS: z.string().optional().default(""),
   ENABLE_TWITCH_INGESTION: booleanFromString,
   DEFAULT_BOT_JOIN_CAPACITY: intFromString(100),
   DEFAULT_BOT_JOIN_RATE_PER_10_SECONDS: intFromString(20),
-  DISCOVERY_INTERVAL_MS: intFromString(180_000),
-  USER_HYDRATION_INTERVAL_MS: intFromString(300_000),
-  ASSIGNMENT_INTERVAL_MS: intFromString(30_000),
-  CHATTERS_RECONCILIATION_INTERVAL_MS: intFromString(300_000),
+  DISCOVERY_INTERVAL_MS: positiveIntFromString(180_000),
+  USER_HYDRATION_INTERVAL_MS: positiveIntFromString(300_000),
+  ASSIGNMENT_INTERVAL_MS: positiveIntFromString(30_000),
+  CHATTERS_RECONCILIATION_INTERVAL_MS: positiveIntFromString(300_000),
   CHATTERS_RECONCILIATION_MAX_CHANNELS: intFromString(25),
   CHATTERS_RECONCILIATION_MAX_PAGES_PER_CHANNEL: intFromString(5),
-  AGGREGATION_INTERVAL_MS: intFromString(60_000),
-  AGGREGATION_BUCKET_MINUTES: intFromString(5),
-  AGGREGATION_LOOKBACK_HOURS: intFromString(48),
-  MAINTENANCE_INTERVAL_MS: intFromString(300_000),
+  AGGREGATION_INTERVAL_MS: positiveIntFromString(60_000),
+  AGGREGATION_BUCKET_MINUTES: positiveIntFromString(5),
+  AGGREGATION_LOOKBACK_HOURS: positiveIntFromString(48),
+  MAINTENANCE_INTERVAL_MS: positiveIntFromString(300_000),
   RAW_CHAT_RETENTION_DAYS: intFromString(30),
   RAW_PAYLOAD_RETENTION_DAYS: intFromString(30),
-  STALE_ASSIGNMENT_GRACE_MINUTES: intFromString(15),
-  BACKUP_RETENTION_DAYS: intFromString(14)
+  STALE_ASSIGNMENT_GRACE_MINUTES: positiveIntFromString(15),
+  BACKUP_RETENTION_DAYS: positiveIntFromString(14)
 });
 
 export type AppConfig = z.infer<typeof baseEnvSchema>;
 
 export const loadConfig = (env: NodeJS.ProcessEnv = process.env): AppConfig => {
-  const config = baseEnvSchema.parse(env);
+  const config = baseEnvSchema.parse(resolveSecretFiles(env));
   validateAppConfig(config);
   return config;
+};
+
+const secretKeys = [
+  "DATABASE_URL",
+  "SESSION_SECRET",
+  "TWITCH_CLIENT_SECRET",
+  "TWITCH_EVENTSUB_SECRET",
+  "TWITCH_BOT_ACCESS_TOKEN",
+  "TWITCH_BOT_REFRESH_TOKEN"
+] as const;
+
+const resolveSecretFiles = (env: NodeJS.ProcessEnv): NodeJS.ProcessEnv => {
+  const resolved = { ...env };
+
+  for (const key of secretKeys) {
+    const fileKey = `${key}_FILE`;
+    const filePath = env[fileKey];
+    if (filePath == null || filePath === "") {
+      continue;
+    }
+
+    if (env[key] != null && env[key] !== "") {
+      throw new Error(`${key} and ${fileKey} cannot both be set.`);
+    }
+
+    resolved[key] = readFileSync(filePath, "utf8").trimEnd();
+  }
+
+  return resolved;
 };
 
 export const isPrivateDataMode = (mode: AppConfig["APP_MODE"]): boolean => {
@@ -115,6 +152,10 @@ const validateAppConfig = (config: AppConfig) => {
   requireHttpsPublicUrl("PUBLIC_API_URL", config.PUBLIC_API_URL, problems);
   requireHttpsPublicUrl("TWITCH_OAUTH_REDIRECT_URI", config.TWITCH_OAUTH_REDIRECT_URI ?? "", problems);
 
+  if (new URL(config.PUBLIC_WEB_URL).origin !== new URL(config.PUBLIC_API_URL).origin) {
+    problems.push("PUBLIC_WEB_URL and PUBLIC_API_URL must use the same origin in production.");
+  }
+
   if (config.TWITCH_BOT_OAUTH_REDIRECT_URI != null && config.TWITCH_BOT_OAUTH_REDIRECT_URI !== "") {
     requireHttpsPublicUrl("TWITCH_BOT_OAUTH_REDIRECT_URI", config.TWITCH_BOT_OAUTH_REDIRECT_URI, problems);
   }
@@ -132,6 +173,10 @@ const validateAppConfig = (config: AppConfig) => {
 
   if (config.TWITCH_CLIENT_SECRET === "") {
     problems.push("TWITCH_CLIENT_SECRET is required in production.");
+  }
+
+  if (config.ADMIN_TWITCH_USER_IDS.trim() === "" && config.ADMIN_TWITCH_LOGINS.trim() === "") {
+    problems.push("At least one production administrator must be configured.");
   }
 
   if (problems.length > 0) {

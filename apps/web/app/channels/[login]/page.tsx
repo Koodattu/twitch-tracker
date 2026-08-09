@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { getApiData, getPublicApiInit } from "../../api-client";
 import { formatCount, formatDateTime, formatDuration } from "../../format";
 import { Avatar, EmptyState, MetricCard, StatusPill } from "../../ui";
@@ -56,6 +57,11 @@ type ChannelActivity = {
   }>;
 };
 
+export async function generateMetadata({ params }: { params: Promise<{ login: string }> }): Promise<Metadata> {
+  const { login } = await params;
+  return { title: `${login} channel` };
+}
+
 export default async function ChannelPage({ params }: { params: Promise<{ login: string }> }) {
   const { login } = await params;
   const apiInit = await getPublicApiInit();
@@ -84,7 +90,7 @@ export default async function ChannelPage({ params }: { params: Promise<{ login:
             </div>
           </div>
           <div className="page-actions">
-            {isLive ? <StatusPill tone="success">Live now</StatusPill> : <StatusPill>Offline</StatusPill>}
+            {streamResponse == null ? <StatusPill tone="danger">Unavailable</StatusPill> : isLive ? <StatusPill tone="success">Live now</StatusPill> : <StatusPill>Offline</StatusPill>}
             <a className="button button-secondary" href={`https://www.twitch.tv/${channel?.login ?? login}`} target="_blank" rel="noreferrer">Open on Twitch ↗</a>
           </div>
         </div>
@@ -98,22 +104,22 @@ export default async function ChannelPage({ params }: { params: Promise<{ login:
       ) : null}
 
       <section className="stat-row" aria-label="Channel summary">
-        <MetricCard label="Streams observed" value={formatCount(activity?.totals.streamCount ?? streams.length)} />
+        <MetricCard label="Streams observed" value={activity == null && streamResponse == null ? "—" : formatCount(activity?.totals.streamCount ?? streams.length)} />
         <MetricCard label="Live time" value={activity == null ? "—" : formatDuration(activity.totals.liveSeconds)} />
-        <MetricCard label="Peak viewers" value={formatCount(activity?.totals.viewerCountMax)} detail={activity?.totals.viewerCountAvg == null ? "No average yet" : `${formatCount(activity.totals.viewerCountAvg)} average viewers`} />
+        <MetricCard label="Peak viewers" value={formatCount(activity?.totals.viewerCountMax)} detail={activity == null ? "Activity unavailable" : activity.totals.viewerCountAvg == null ? "No average yet" : `${formatCount(activity.totals.viewerCountAvg)} average viewers`} />
         <MetricCard label="Messages captured" value={formatCount(activity?.totals.messageCount)} detail="Only while chat tracking was active" />
       </section>
 
       <section className="panel">
         <div className="panel-header">
           <div className="panel-heading"><h2>Viewer trend</h2><p>Recent snapshots in UTC; gaps separate stream sessions</p></div>
-          <StatusPill>{viewerHistory.length} snapshots</StatusPill>
+          <StatusPill tone={viewerHistoryResponse == null ? "danger" : "neutral"}>{viewerHistoryResponse == null ? "Unavailable" : `${viewerHistory.length} snapshots`}</StatusPill>
         </div>
         {viewerHistoryResponse == null ? <EmptyState title="Viewer trend unavailable" description="Viewer snapshots could not be loaded right now." /> : <ViewerTrendChart points={viewerTrend} />}
       </section>
 
       <section className="panel">
-        <div className="panel-header"><div className="panel-heading"><h2>Stream history</h2><p>Most recent sessions first</p></div><StatusPill>{streams.length} loaded</StatusPill></div>
+        <div className="panel-header"><div className="panel-heading"><h2>Stream history</h2><p>Most recent sessions first</p></div><StatusPill tone={streamResponse == null ? "danger" : "neutral"}>{streamResponse == null ? "Unavailable" : `${streams.length} loaded`}</StatusPill></div>
         {streamResponse == null ? (
           <EmptyState title="Stream history unavailable" description="The API did not return stream history for this channel." />
         ) : streams.length === 0 ? (
@@ -139,7 +145,9 @@ export default async function ChannelPage({ params }: { params: Promise<{ login:
 
       <section className="panel">
         <div className="panel-header"><div className="panel-heading"><h2>Daily activity</h2><p>Fourteen latest aggregate days</p></div></div>
-        {activity == null || activity.daily.length === 0 ? (
+        {activity == null ? (
+          <EmptyState title="Daily activity unavailable" description="Daily channel activity could not be loaded right now." />
+        ) : activity.daily.length === 0 ? (
           <EmptyState title="No daily rollups" description="Daily channel activity has not been aggregated yet." />
         ) : (
           <div className="table-scroll" role="region" aria-label="Daily channel activity" tabIndex={0}>
@@ -158,8 +166,10 @@ export default async function ChannelPage({ params }: { params: Promise<{ login:
       </section>
 
       <section className="panel">
-        <div className="panel-header"><div className="panel-heading"><h2>Latest viewer snapshots</h2><p>Most recent observations across sessions</p></div><StatusPill>{Math.min(viewerHistory.length, 12)} shown</StatusPill></div>
-        {viewerHistoryResponse == null || viewerHistory.length === 0 ? (
+        <div className="panel-header"><div className="panel-heading"><h2>Latest viewer snapshots</h2><p>Most recent observations across sessions</p></div><StatusPill tone={viewerHistoryResponse == null ? "danger" : "neutral"}>{viewerHistoryResponse == null ? "Unavailable" : `${Math.min(viewerHistory.length, 12)} shown`}</StatusPill></div>
+        {viewerHistoryResponse == null ? (
+          <EmptyState title="Viewer snapshots unavailable" description="Viewer snapshots could not be loaded right now." />
+        ) : viewerHistory.length === 0 ? (
           <EmptyState title="No viewer snapshots" description="Viewer snapshots have not been stored for this channel yet." />
         ) : (
           <div className="table-scroll" role="region" aria-label="Channel viewer history" tabIndex={0}>
@@ -179,7 +189,9 @@ export default async function ChannelPage({ params }: { params: Promise<{ login:
 
       <section className="panel">
         <div className="panel-header"><div className="panel-heading"><h2>Recent chat activity</h2><p>Coverage buckets are not exact viewership</p></div></div>
-        {activity == null || activity.recentBuckets.length === 0 ? (
+        {activity == null ? (
+          <EmptyState title="Chat activity unavailable" description="Recent chat activity could not be loaded right now." />
+        ) : activity.recentBuckets.length === 0 ? (
           <EmptyState title="No chat buckets" description="Aggregate chat activity has not been produced for this channel yet." />
         ) : (
           <div className="table-scroll" role="region" aria-label="Recent channel chat activity" tabIndex={0}>

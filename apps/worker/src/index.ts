@@ -8,11 +8,16 @@ const worker = createWorker({ config, db });
 
 await worker.start();
 
+let shutdownPromise: Promise<void> | null = null;
+
 const shutdown = async (signal: string) => {
-  console.log(JSON.stringify({ level: "info", message: "worker shutting down", signal }));
-  await worker.stop(signal);
-  await pool.end();
-  process.exit(0);
+  shutdownPromise ??= (async () => {
+    console.log(JSON.stringify({ level: "info", message: "worker shutting down", signal }));
+    await worker.stop(signal);
+    await pool.end();
+  })();
+
+  await shutdownPromise;
 };
 
 process.on("SIGINT", () => {

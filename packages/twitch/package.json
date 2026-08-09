@@ -4,23 +4,27 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./src/index.ts",
+      "development": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "zod": "^3.25.76"
+    "zod": "4.4.3"
   },
   "devDependencies": {
-    "@types/node": "^22.13.14",
-    "typescript": "^5.8.3"
+    "@types/node": "24.13.3",
+    "typescript": "6.0.3"
   },
   "optionalDependencies": {
-    "@twurple/api": "^8.1.4",
-    "@twurple/auth": "^8.1.4",
-    "@twurple/chat": "^8.1.4",
-    "@twurple/eventsub-http": "^8.1.4"
+    "@twurple/api": "8.1.4",
+    "@twurple/auth": "8.1.4",
+    "@twurple/chat": "8.1.4",
+    "@twurple/eventsub-http": "8.1.4"
   }
 }

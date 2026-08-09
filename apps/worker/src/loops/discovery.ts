@@ -15,7 +15,7 @@ import { startIntervalLoop } from "./common.js";
 const maxDiscoveryPages = 20;
 
 export const runDiscoveryLoop = (context: WorkerContext) => {
-  startIntervalLoop({
+  return startIntervalLoop({
     name: "discovery",
     intervalMs: context.config.DISCOVERY_INTERVAL_MS,
     context,

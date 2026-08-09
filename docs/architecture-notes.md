@@ -28,8 +28,8 @@ The intended production shape is:
 - Package manager: pnpm through Corepack.
 - API framework: Hono.
 - Frontend: Next.js and React.
-- Client data fetching: server-rendered API reads first, TanStack Query for
-  client-side freshness, filters, polling, and interactive panels.
+- Client data fetching: server-rendered API reads first. Add client-side
+  freshness or polling only where an interaction requires it.
 - Database: PostgreSQL.
 - ORM/query layer: Drizzle.
 - Validation: Zod at runtime boundaries.

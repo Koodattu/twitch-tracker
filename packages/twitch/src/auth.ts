@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { fetchWithTimeout } from "./fetch.js";
 
 const twitchAuthBaseUrl = "https://id.twitch.tv/oauth2";
 
@@ -65,7 +66,7 @@ export const exchangeTwitchAuthorizationCode = async (input: {
     redirect_uri: input.redirectUri
   });
 
-  const response = await fetch(`${twitchAuthBaseUrl}/token`, {
+  const response = await fetchWithTimeout(`${twitchAuthBaseUrl}/token`, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded"
@@ -98,7 +99,7 @@ export const getTwitchAppAccessToken = async (input: {
     grant_type: "client_credentials"
   });
 
-  const response = await fetch(`${twitchAuthBaseUrl}/token`, {
+  const response = await fetchWithTimeout(`${twitchAuthBaseUrl}/token`, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded"
@@ -120,7 +121,7 @@ export const getTwitchAppAccessToken = async (input: {
 };
 
 export const validateTwitchAccessToken = async (accessToken: string): Promise<TwitchTokenValidation> => {
-  const response = await fetch(`${twitchAuthBaseUrl}/validate`, {
+  const response = await fetchWithTimeout(`${twitchAuthBaseUrl}/validate`, {
     headers: {
       Authorization: `Bearer ${accessToken}`
     }
@@ -153,7 +154,7 @@ export const refreshTwitchUserAccessToken = async (input: {
     refresh_token: input.refreshToken
   });
 
-  const response = await fetch(`${twitchAuthBaseUrl}/token`, {
+  const response = await fetchWithTimeout(`${twitchAuthBaseUrl}/token`, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded"

@@ -20,7 +20,6 @@ export async function getAuthenticatedApiInit(): Promise<RequestInit> {
 }
 
 export async function getApiData<T>(path: string, init?: RequestInit): Promise<T | null> {
-  let response: Response;
   try {
     const fetchInit =
       init?.cache === "no-store"
@@ -29,17 +28,19 @@ export async function getApiData<T>(path: string, init?: RequestInit): Promise<T
             next: { revalidate: 15 },
             ...init
           };
-    response = await fetch(`${getApiBaseUrl()}${path}`, {
-      ...fetchInit
+    const timeoutSignal = AbortSignal.timeout(10_000);
+    const response = await fetch(`${getApiBaseUrl()}${path}`, {
+      ...fetchInit,
+      signal: fetchInit.signal == null ? timeoutSignal : AbortSignal.any([fetchInit.signal, timeoutSignal])
     });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const payload = (await response.json()) as { data?: T };
+    return payload.data ?? null;
   } catch {
     return null;
   }
-
-  if (!response.ok) {
-    return null;
-  }
-
-  const payload = (await response.json()) as { data: T };
-  return payload.data;
 }

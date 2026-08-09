@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { getApiData, getAuthenticatedApiInit, getPublicApiInit } from "../../api-client";
 import { formatCount, formatDateTime, formatStatus } from "../../format";
 import { Avatar, EmptyState, MetricCard, StatusPill } from "../../ui";
@@ -9,6 +10,11 @@ type ChatterSummary = {
   detailAvailable: boolean;
   hiddenBySubjectRequest?: boolean;
 };
+
+export async function generateMetadata({ params }: { params: Promise<{ login: string }> }): Promise<Metadata> {
+  const { login } = await params;
+  return { title: `${login} activity` };
+}
 
 type PrivateChatterProfile = {
   user: {
@@ -72,7 +78,7 @@ export default async function ChatterPage({ params }: { params: Promise<{ login:
     ? "Admin view"
     : profile == null
       ? "Limited public view"
-      : "Private MVP view";
+      : "Your private view";
 
   return (
     <>
@@ -137,7 +143,7 @@ export default async function ChatterPage({ params }: { params: Promise<{ login:
           </section>
 
           <section className="panel">
-            <div className="panel-header"><div className="panel-heading"><h2>Presence and membership</h2><p>JOIN/PART and authorized Get Chatters evidence</p></div><StatusPill>{profile.presenceObservations.length + profile.membershipEvents.length} signals</StatusPill></div>
+            <div className="panel-header"><div className="panel-heading"><h2>Presence and membership</h2><p>Chat membership and authorized presence observations</p></div><StatusPill>{profile.presenceObservations.length + profile.membershipEvents.length} signals</StatusPill></div>
             {profile.presenceObservations.length === 0 && profile.membershipEvents.length === 0 ? (
               <EmptyState title="No presence evidence" description="No retained membership or presence observations are connected to this chatter." />
             ) : (

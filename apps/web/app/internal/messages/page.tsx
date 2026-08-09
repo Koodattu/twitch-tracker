@@ -1,7 +1,10 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { getApiData, getAuthenticatedApiInit } from "../../api-client";
 import { formatCount, formatDateTime, formatStatus } from "../../format";
 import { EmptyState, MetricCard, StatusPill } from "../../ui";
+
+export const metadata: Metadata = { title: "Message archive" };
 
 type MessageArchive = {
   summary: {

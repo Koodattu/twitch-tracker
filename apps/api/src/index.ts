@@ -13,11 +13,23 @@ const server = serve({ fetch: app.fetch, port }, (info) => {
   console.log(JSON.stringify({ level: "info", message: "api listening", port: info.port }));
 });
 
+let shutdownPromise: Promise<void> | null = null;
+
 const shutdown = async (signal: string) => {
-  console.log(JSON.stringify({ level: "info", message: "api shutting down", signal }));
-  server.close();
-  await pool.end();
-  process.exit(0);
+  shutdownPromise ??= (async () => {
+    console.log(JSON.stringify({ level: "info", message: "api shutting down", signal }));
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => {
+        if (error == null) resolve();
+        else reject(error);
+      });
+      const closeIdleConnections = (server as { closeIdleConnections?: () => void }).closeIdleConnections;
+      closeIdleConnections?.call(server);
+    });
+    await pool.end();
+  })();
+
+  await shutdownPromise;
 };
 
 process.on("SIGINT", () => {

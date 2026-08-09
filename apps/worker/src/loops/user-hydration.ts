@@ -6,7 +6,7 @@ import type { WorkerContext } from "../worker.js";
 import { startIntervalLoop } from "./common.js";
 
 export const runUserHydrationLoop = (context: WorkerContext) => {
-  startIntervalLoop({
+  return startIntervalLoop({
     name: "user-hydration",
     intervalMs: context.config.USER_HYDRATION_INTERVAL_MS,
     context,

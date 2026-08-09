@@ -3,7 +3,7 @@ import type { WorkerContext } from "../worker.js";
 import { startIntervalLoop } from "./common.js";
 
 export const runMaintenanceLoop = (context: WorkerContext) => {
-  startIntervalLoop({
+  return startIntervalLoop({
     name: "maintenance",
     intervalMs: context.config.MAINTENANCE_INTERVAL_MS,
     context,

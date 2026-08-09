@@ -33,21 +33,31 @@ export const createWorker = ({ config, db }: CreateWorkerInput) => {
     workerName: process.env.WORKER_NAME ?? "worker-1",
     abortSignal: abortController.signal
   };
+  let loopCompletions: Promise<void>[] = [];
 
   return {
     async start() {
       console.log(JSON.stringify({ level: "info", message: "worker starting", mode: config.APP_MODE }));
-      runDiscoveryLoop(context);
-      runUserHydrationLoop(context);
-      runAssignmentLoop(context);
-      runIrcLoop(context);
-      runChattersReconciliationLoop(context);
-      runEventSubLoop(context);
-      runAggregationLoop(context);
-      runMaintenanceLoop(context);
+      loopCompletions = [
+        runDiscoveryLoop(context),
+        runUserHydrationLoop(context),
+        runAssignmentLoop(context),
+        runIrcLoop(context),
+        runChattersReconciliationLoop(context),
+        runEventSubLoop(context),
+        runAggregationLoop(context),
+        runMaintenanceLoop(context)
+      ];
     },
     async stop(reason: string) {
       abortController.abort(reason);
+      const results = await Promise.allSettled(loopCompletions);
+      for (const result of results) {
+        if (result.status === "rejected") {
+          const message = result.reason instanceof Error ? result.reason.message : String(result.reason);
+          console.error(JSON.stringify({ level: "error", message: "worker loop shutdown failed", reason: message }));
+        }
+      }
     }
   };
 };

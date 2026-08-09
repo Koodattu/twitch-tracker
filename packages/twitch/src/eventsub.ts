@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
+import { fetchWithTimeout } from "./fetch.js";
 import type { EventSubEnvelope } from "./types.js";
 
 export const eventSubHeaders = {
@@ -51,7 +52,7 @@ const eventSubSubscriptionSchema = z.object({
   type: z.string().min(1),
   version: z.string().min(1),
   cost: z.number().int().nonnegative().nullable().optional(),
-  condition: z.record(z.string()),
+  condition: z.record(z.string(), z.string()),
   transport: z.object({
     method: z.string().min(1),
     callback: z.string().optional()
@@ -103,7 +104,7 @@ export class FetchEventSubAdapter {
       url.searchParams.set("after", input.after);
     }
 
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       headers: this.headers(input.accessToken)
     });
     const body = await readJsonResponse(response);
@@ -122,7 +123,7 @@ export class FetchEventSubAdapter {
     callback: string;
     secret: string;
   }): Promise<EventSubSubscription> {
-    const response = await fetch(eventSubBaseUrl, {
+    const response = await fetchWithTimeout(eventSubBaseUrl, {
       method: "POST",
       headers: {
         ...this.headers(input.accessToken),

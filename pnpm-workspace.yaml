@@ -1,3 +1,19 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+injectWorkspacePackages: true
+
+syncInjectedDepsAfterScripts:
+  - build
+
+allowBuilds:
+  esbuild: true
+  unrs-resolver: true
+
+minimumReleaseAgeExclude:
+  - pg-protocol@1.16.0
+  - pg@8.23.0
+
+overrides:
+  "@esbuild-kit/core-utils>esbuild": 0.25.0

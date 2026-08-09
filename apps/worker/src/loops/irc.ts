@@ -24,13 +24,7 @@ export const runIrcLoop = (context: WorkerContext) => {
   let connectedBotAccountId: string | null = null;
   let connectedLogin: string | null = null;
 
-  context.abortSignal.addEventListener("abort", () => {
-    if (adapter != null) {
-      void adapter.disconnect("worker_shutdown");
-    }
-  });
-
-  startIntervalLoop({
+  const completion = startIntervalLoop({
     name: "irc",
     intervalMs: context.config.ASSIGNMENT_INTERVAL_MS,
     context,
@@ -169,6 +163,12 @@ export const runIrcLoop = (context: WorkerContext) => {
         botLogin,
         botTokenSource: bot.source
       };
+    }
+  });
+
+  return completion.then(async () => {
+    if (adapter != null) {
+      await adapter.disconnect("worker_shutdown");
     }
   });
 };

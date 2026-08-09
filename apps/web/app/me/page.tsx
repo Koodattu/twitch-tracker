@@ -1,9 +1,12 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getApiBaseUrl, getApiData, getAuthenticatedApiInit } from "../api-client";
 import { ConfirmSubmitButton } from "../confirm-submit-button";
 import { formatCount, formatDateTime, formatStatus } from "../format";
 import { Avatar, EmptyState, MetricCard, StatusPill } from "../ui";
+
+export const metadata: Metadata = { title: "My activity" };
 
 type Me = {
   user: null | {
@@ -63,13 +66,20 @@ async function createPrivacyRequest(formData: FormData) {
   const apiInit = await getAuthenticatedApiInit();
   const headers = new Headers(apiInit.headers);
   headers.set("Content-Type", "application/json");
-  const response = await fetch(`${getApiBaseUrl()}/api/me/privacy/requests`, {
-    ...apiInit,
-    method: "POST",
-    headers,
-    body: JSON.stringify({ requestType })
-  });
-  redirect(response.ok ? "/me?privacy=received" : "/me?privacy=failed");
+  let succeeded = false;
+  try {
+    const response = await fetch(`${getApiBaseUrl()}/api/me/privacy/requests`, {
+      ...apiInit,
+      method: "POST",
+      headers,
+      body: JSON.stringify({ requestType }),
+      signal: AbortSignal.timeout(10_000)
+    });
+    succeeded = response.ok;
+  } catch {
+    succeeded = false;
+  }
+  redirect(succeeded ? "/me?privacy=received" : "/me?privacy=failed");
 }
 
 export default async function MePage({ searchParams }: { searchParams: Promise<{ auth?: string; privacy?: string }> }) {
@@ -94,7 +104,9 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
       <AuthNotice status={query.auth} />
       <PrivacyNotice status={query.privacy} />
 
-      {me?.user == null ? (
+      {me == null ? (
+        <section className="panel"><EmptyState title="Account service unavailable" description="Your account and privacy settings could not be loaded. Please try again shortly." /></section>
+      ) : me.user == null ? (
         <section className="login-panel">
           <div className="login-copy">
             <StatusPill tone="accent">Own data view</StatusPill>
@@ -103,7 +115,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
             {me?.authConfigured === true ? (
               <a className="button" href="/api/auth/twitch/start">Continue with Twitch</a>
             ) : (
-              <div className="callout callout-warning"><div><strong>Twitch login is not configured</strong><p>Add the Twitch client credentials and callback URL to enable sign-in.</p></div></div>
+              <div className="callout callout-warning"><div><strong>Twitch login is unavailable</strong><p>Sign-in is temporarily unavailable. Please try again later.</p></div></div>
             )}
           </div>
           <aside className="login-aside">
@@ -139,7 +151,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           </section>
 
           <section className="panel">
-            <div className="panel-header"><div className="panel-heading"><h2>Your recent messages</h2><p>Newest retained messages first</p></div><StatusPill tone="accent">{ownData?.recentMessages.length ?? 0} loaded</StatusPill></div>
+            <div className="panel-header"><div className="panel-heading"><h2>Your recent messages</h2><p>Newest retained messages first</p></div><StatusPill tone={ownData == null ? "danger" : "accent"}>{ownData == null ? "Unavailable" : `${ownData.recentMessages.length} loaded`}</StatusPill></div>
             {ownData == null ? (
               <EmptyState title="Activity unavailable" description="Your session is valid, but activity data could not be loaded." />
             ) : ownData.recentMessages.length === 0 ? (
@@ -163,7 +175,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           <section className="panel">
             <div className="panel-header">
               <div className="panel-heading"><h2>Privacy controls</h2><p>Manage future tracking and retained subject data</p></div>
-              <StatusPill tone={privacyData?.state.trackingOptedOut ? "warning" : "success"}>{privacyData?.state.trackingOptedOut ? "Tracking opted out" : "Tracking allowed"}</StatusPill>
+              <StatusPill tone={privacyData == null ? "danger" : privacyData.state.trackingOptedOut ? "warning" : "success"}>{privacyData == null ? "Unavailable" : privacyData.state.trackingOptedOut ? "Tracking opted out" : "Tracking allowed"}</StatusPill>
             </div>
             {privacyData == null ? (
               <EmptyState title="Privacy controls unavailable" description="Privacy state could not be loaded for this session." />
@@ -179,9 +191,9 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
                   </table>
                 </div>
                 <div className="action-row">
-                  <form action={createPrivacyRequest}><input type="hidden" name="requestType" value="public_profile_opt_out" /><button className="button button-secondary" type="submit">Hide public summary</button></form>
-                  <form action={createPrivacyRequest}><input type="hidden" name="requestType" value="tracking_opt_out" /><button className="button button-secondary" type="submit">Opt out of tracking</button></form>
-                  <form action={createPrivacyRequest}><input type="hidden" name="requestType" value="data_deletion" /><ConfirmSubmitButton className="button button-danger" message="Request deletion of retained subject data? This request cannot be undone once completed.">Request data deletion</ConfirmSubmitButton></form>
+                  <form action={createPrivacyRequest}><input type="hidden" name="requestType" value="public_profile_opt_out" /><ConfirmSubmitButton className="button button-secondary" pendingLabel="Hiding…" disabled={privacyData.state.publicProfileHidden}>Hide public summary</ConfirmSubmitButton></form>
+                  <form action={createPrivacyRequest}><input type="hidden" name="requestType" value="tracking_opt_out" /><ConfirmSubmitButton className="button button-secondary" pendingLabel="Submitting…" disabled={privacyData.state.trackingOptedOut}>Opt out of tracking</ConfirmSubmitButton></form>
+                  <form action={createPrivacyRequest}><input type="hidden" name="requestType" value="data_deletion" /><ConfirmSubmitButton className="button button-danger" pendingLabel="Requesting deletion…" disabled={privacyData.state.dataDeletedAt != null || privacyData.requests.some((request) => request.requestType === "data_deletion" && request.status === "pending")} message="Request deletion of retained subject data? This request cannot be undone once completed.">Request data deletion</ConfirmSubmitButton></form>
                 </div>
               </>
             )}
@@ -189,7 +201,9 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
 
           <section className="panel">
             <div className="panel-header"><div className="panel-heading"><h2>Privacy requests</h2><p>Your latest requests and their status</p></div></div>
-            {privacyData == null || privacyData.requests.length === 0 ? (
+            {privacyData == null ? (
+              <EmptyState title="Privacy requests unavailable" description="Request history could not be loaded for this session." />
+            ) : privacyData.requests.length === 0 ? (
               <EmptyState title="No privacy requests" description="Requests you make will appear here." />
             ) : (
               <div className="table-scroll" role="region" aria-label="Privacy request history" tabIndex={0}>
@@ -201,7 +215,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
             )}
           </section>
 
-          {me.user.isAdmin ? <p className="data-note">Admin access is enforced by the API and remains active in local, private MVP, and production deployment modes. Twitch user ID: {me.user.twitchUserId}.</p> : null}
+          {me.user.isAdmin ? <p className="data-note">Admin access is enforced by the API in every deployment mode. Twitch user ID: {me.user.twitchUserId}.</p> : null}
         </>
       )}
     </>
@@ -210,13 +224,13 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
 
 function AuthNotice({ status }: { status: string | undefined }) {
   if (status == null) return null;
-  if (status === "cancelled") return <div className="callout"><div><strong>Twitch login cancelled</strong><p>No account was connected.</p></div></div>;
-  if (status === "not_configured") return <div className="callout callout-warning"><div><strong>Twitch login is not configured</strong><p>The server is missing its Twitch OAuth settings.</p></div></div>;
-  return <div className="callout callout-danger"><div><strong>Twitch login failed</strong><p>The login could not be verified. Please start again from this page.</p></div></div>;
+  if (status === "cancelled") return <div className="callout" role="status"><div><strong>Twitch login cancelled</strong><p>No account was connected.</p></div></div>;
+  if (status === "not_configured") return <div className="callout callout-warning" role="status"><div><strong>Twitch login is unavailable</strong><p>Sign-in is temporarily unavailable. Please try again later.</p></div></div>;
+  return <div className="callout callout-danger" role="alert"><div><strong>Twitch login failed</strong><p>The login could not be verified. Please start again from this page.</p></div></div>;
 }
 
 function PrivacyNotice({ status }: { status: string | undefined }) {
-  if (status === "received") return <div className="callout"><div><strong>Privacy request received</strong><p>The updated state and request history are shown below.</p></div></div>;
-  if (status === "failed") return <div className="callout callout-danger"><div><strong>Privacy request failed</strong><p>The request was not recorded. Please try again.</p></div></div>;
+  if (status === "received") return <div className="callout" role="status" aria-live="polite"><div><strong>Privacy request received</strong><p>Your request was recorded. Its status is shown below.</p></div></div>;
+  if (status === "failed") return <div className="callout callout-danger" role="alert"><div><strong>Privacy request failed</strong><p>The request was not recorded. Please try again.</p></div></div>;
   return null;
 }

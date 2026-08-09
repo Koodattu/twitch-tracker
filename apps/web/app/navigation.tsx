@@ -13,6 +13,7 @@ export type NavigationViewer = null | {
 
 export function AppHeader({ viewer, authConfigured, loading = false }: { viewer: NavigationViewer; authConfigured: boolean; loading?: boolean }) {
   const pathname = usePathname();
+  const viewerName = viewer?.displayName ?? viewer?.login ?? "Twitch user";
   const links = [
     { href: "/", label: "Live" },
     { href: "/me", label: viewer == null ? "My data" : "My activity" },
@@ -46,7 +47,7 @@ export function AppHeader({ viewer, authConfigured, loading = false }: { viewer:
 
         <div className="account-area">
           {loading ? (
-            <span className="account-skeleton" aria-label="Loading account" />
+            <span className="account-skeleton" role="status"><span className="sr-only">Loading account</span></span>
           ) : viewer == null ? (
             authConfigured ? (
               <a className="button button-compact" href="/api/auth/twitch/start">Log in with Twitch</a>
@@ -54,10 +55,10 @@ export function AppHeader({ viewer, authConfigured, loading = false }: { viewer:
               <Link className="button button-secondary button-compact" href="/me">Twitch login</Link>
             )
           ) : (
-            <Link className="account-link" href="/me">
-              <Avatar name={viewer.displayName ?? viewer.login ?? "Twitch user"} src={viewer.profileImageUrl} size="small" />
+            <Link className="account-link" href="/me" aria-label={`Open account for ${viewerName}`}>
+              <Avatar name={viewerName} src={viewer.profileImageUrl} size="small" />
               <span className="account-copy">
-                <strong>{viewer.displayName ?? viewer.login ?? "Twitch user"}</strong>
+                <strong>{viewerName}</strong>
                 <span>{viewer.isAdmin ? "Administrator" : "Own data"}</span>
               </span>
               {viewer.isAdmin ? <StatusPill tone="accent">Admin</StatusPill> : null}

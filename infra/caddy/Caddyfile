@@ -1,11 +1,43 @@
-:80 {
-	encode gzip
+{
+	admin off
+	email {$CADDY_EMAIL}
+}
 
-	handle /api/* {
-		reverse_proxy api:4000
+:2019 {
+	respond /healthz "ok" 200
+}
+
+{$PUBLIC_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		-Server
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), geolocation=(), microphone=()"
+	}
+
+	@api path /api/*
+	handle @api {
+		reverse_proxy api:4000 {
+			transport http {
+				response_header_timeout 30s
+			}
+		}
 	}
 
 	handle {
-		reverse_proxy web:3000
+		reverse_proxy web:3000 {
+			transport http {
+				response_header_timeout 30s
+			}
+		}
+	}
+
+	log {
+		output stdout
+		format json
 	}
 }

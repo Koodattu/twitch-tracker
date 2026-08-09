@@ -71,11 +71,11 @@ const channelRaidPayloadSchema = z.object({
 });
 
 const genericEventSubPayloadSchema = z.object({
-  event: z.record(z.unknown())
+  event: z.record(z.string(), z.unknown())
 });
 
 export const runEventSubLoop = (context: WorkerContext) => {
-  startIntervalLoop({
+  return startIntervalLoop({
     name: "eventsub",
     intervalMs: context.config.MAINTENANCE_INTERVAL_MS,
     context,
