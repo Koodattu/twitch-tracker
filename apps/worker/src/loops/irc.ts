@@ -1,24 +1,23 @@
 import {
-  chatAssignments,
   chatMembershipEvents,
   chatMessages,
   channelEvents,
+  createChatAssignmentControl,
   rawIrcMessages,
   streamSessions,
   twitchUsers,
   type DbClient
 } from "@twitch-tracker/db";
 import { parseIrcLine, SocketIrcAdapter, type ParsedIrcMessage, type TwitchIrcAdapter } from "@twitch-tracker/twitch";
-import { and, count, desc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { resolvePrimaryBotCredentials } from "../bot-auth.js";
 import type { WorkerContext } from "../worker.js";
 import { startIntervalLoop } from "./common.js";
 
-const activeRoomStatuses = ["joining", "joined"] as const;
-const observableAssignmentStatuses = ["desired", "joining", "joined", "leaving", "left", "failed"] as const;
 const staleJoiningTimeoutMs = 2 * 60 * 1000;
 
 export const runIrcLoop = (context: WorkerContext) => {
+  const assignments = createChatAssignmentControl(context.db);
   let adapter: TwitchIrcAdapter | null = null;
   let connected = false;
   let connectedBotAccountId: string | null = null;
@@ -68,7 +67,12 @@ export const runIrcLoop = (context: WorkerContext) => {
               adapter = null;
               connectedBotAccountId = null;
               connectedLogin = null;
-              await markAssignmentsForDisconnectedSocket(context.db, botAccountId, reason);
+              await assignments.record({
+                type: "socket_disconnected",
+                botAccountId,
+                reason,
+                observedAt: new Date()
+              });
             },
             rawMessage: async (message) => {
               await persistRawIrcMessage(context.db, botAccountId, botLogin, message);
@@ -84,72 +88,40 @@ export const runIrcLoop = (context: WorkerContext) => {
         await adapter.connect();
       }
 
-      const staleJoiningRequeued = await recoverStaleJoiningAssignments(context.db, botAccountId);
-
-      const leavingAssignments = await context.db
-        .select({
-          assignmentId: chatAssignments.id,
-          channelLogin: twitchUsers.login
-        })
-        .from(chatAssignments)
-        .leftJoin(twitchUsers, eq(chatAssignments.broadcasterUserId, twitchUsers.twitchUserId))
-        .where(and(eq(chatAssignments.botAccountId, botAccountId), eq(chatAssignments.status, "leaving")))
-        .orderBy(desc(chatAssignments.updatedAt))
-        .limit(bot.maxJoinedRooms);
+      const commandPlan = await assignments.planIrcCommands({
+        botAccountId,
+        capacity: bot.maxJoinedRooms,
+        joinRatePer10Seconds: bot.joinRatePer10Seconds,
+        staleJoiningTimeoutMs,
+        observedAt: new Date()
+      });
 
       let parted = 0;
-      for (const assignment of leavingAssignments) {
+      for (const assignment of commandPlan.leave) {
         if (assignment.channelLogin != null) {
           await adapter.part(assignment.channelLogin);
         }
 
-        await context.db
-          .update(chatAssignments)
-          .set({
-            status: "left",
-            leftAt: new Date(),
-            updatedAt: new Date()
-          })
-          .where(eq(chatAssignments.id, assignment.assignmentId));
+        await assignments.record({
+          type: "leave_processed",
+          assignmentId: assignment.assignmentId,
+          observedAt: new Date()
+        });
         parted += 1;
       }
 
-      const [{ value: roomReservations } = { value: 0 }] = await context.db
-        .select({ value: count() })
-        .from(chatAssignments)
-        .where(and(eq(chatAssignments.botAccountId, botAccountId), inArray(chatAssignments.status, [...activeRoomStatuses])));
-      const availableRoomSlots = Math.max(0, bot.maxJoinedRooms - roomReservations);
-      const joinCommandLimit = Math.min(availableRoomSlots, bot.joinRatePer10Seconds);
-      const desiredAssignments =
-        joinCommandLimit <= 0
-          ? []
-          : await context.db
-              .select({
-                assignmentId: chatAssignments.id,
-                broadcasterUserId: chatAssignments.broadcasterUserId,
-                channelLogin: twitchUsers.login
-              })
-              .from(chatAssignments)
-              .leftJoin(twitchUsers, eq(chatAssignments.broadcasterUserId, twitchUsers.twitchUserId))
-              .leftJoin(streamSessions, eq(chatAssignments.twitchStreamId, streamSessions.twitchStreamId))
-              .where(and(eq(chatAssignments.botAccountId, botAccountId), eq(chatAssignments.status, "desired"), isNull(streamSessions.endedAt)))
-              .orderBy(desc(chatAssignments.priorityScore), desc(chatAssignments.updatedAt))
-              .limit(joinCommandLimit);
-
       let joined = 0;
-      for (const assignment of desiredAssignments) {
+      for (const assignment of commandPlan.join) {
         if (assignment.channelLogin == null) {
           continue;
         }
 
         await adapter.join(assignment.channelLogin);
-        await context.db
-          .update(chatAssignments)
-          .set({
-            status: "joining",
-            updatedAt: new Date()
-          })
-          .where(eq(chatAssignments.id, assignment.assignmentId));
+        await assignments.record({
+          type: "join_command_sent",
+          assignmentId: assignment.assignmentId,
+          observedAt: new Date()
+        });
         joined += 1;
       }
 
@@ -157,9 +129,9 @@ export const runIrcLoop = (context: WorkerContext) => {
         activeConnections: connected ? 1 : 0,
         joinCommandsSent: joined,
         partCommandsSent: parted,
-        roomReservations,
-        availableRoomSlots,
-        staleJoiningRequeued,
+        roomReservations: commandPlan.roomReservations,
+        availableRoomSlots: commandPlan.availableRoomSlots,
+        staleJoiningRequeued: commandPlan.staleJoiningRequeued,
         botLogin,
         botTokenSource: bot.source
       };
@@ -292,8 +264,7 @@ const persistChatMessage = async (
     .onConflictDoNothing();
 
   await touchAssignmentActivity(db, botAccountId, broadcaster.twitchUserId, {
-    lastMessageAt: sentAt ?? receivedAt,
-    promoteObservedRoom: true
+    lastMessageAt: sentAt ?? receivedAt
   });
 };
 
@@ -333,8 +304,7 @@ const persistMembershipEvent = async (
   });
 
   await touchAssignmentActivity(db, botAccountId, broadcaster.twitchUserId, {
-    lastMembershipEventAt: eventAt,
-    promoteObservedRoom: true
+    lastMembershipEventAt: eventAt
   });
 };
 
@@ -344,10 +314,11 @@ const markAssignmentJoined = async (db: DbClient, botAccountId: string, channelL
     return;
   }
 
-  const now = new Date();
-  await touchAssignmentActivity(db, botAccountId, broadcaster.twitchUserId, {
-    joinedAt: now,
-    promoteObservedRoom: true
+  await createChatAssignmentControl(db).record({
+    type: "room_observed",
+    botAccountId,
+    broadcasterUserId: broadcaster.twitchUserId,
+    observedAt: new Date()
   });
 };
 
@@ -357,21 +328,12 @@ const markAssignmentParted = async (db: DbClient, botAccountId: string, channelL
     return;
   }
 
-  const now = new Date();
-  await db
-    .update(chatAssignments)
-    .set({
-      status: "left",
-      leftAt: now,
-      updatedAt: now
-    })
-    .where(
-      and(
-        eq(chatAssignments.botAccountId, botAccountId),
-        eq(chatAssignments.broadcasterUserId, broadcaster.twitchUserId),
-        inArray(chatAssignments.status, ["joining", "joined", "leaving"])
-      )
-    );
+  await createChatAssignmentControl(db).record({
+    type: "room_parted",
+    botAccountId,
+    broadcasterUserId: broadcaster.twitchUserId,
+    observedAt: new Date()
+  });
 };
 
 const touchAssignmentActivity = async (
@@ -379,84 +341,18 @@ const touchAssignmentActivity = async (
   botAccountId: string,
   broadcasterUserId: string,
   values: {
-    joinedAt?: Date;
     lastMessageAt?: Date;
     lastMembershipEventAt?: Date;
-    promoteObservedRoom?: boolean;
   }
 ) => {
-  const now = new Date();
-  await db
-    .update(chatAssignments)
-    .set({
-      status: values.promoteObservedRoom
-        ? sql`
-            case
-              when ${chatAssignments.status} in ('desired', 'joining', 'leaving', 'left', 'failed') then 'joined'::assignment_status
-              else ${chatAssignments.status}
-            end
-          `
-        : undefined,
-      joinedAt: values.joinedAt ?? (values.promoteObservedRoom ? sql`coalesce(${chatAssignments.joinedAt}, ${now})` : undefined),
-      leftAt: values.promoteObservedRoom ? null : undefined,
-      latestError: values.promoteObservedRoom ? null : undefined,
-      lastMessageAt: values.lastMessageAt,
-      lastMembershipEventAt: values.lastMembershipEventAt,
-      updatedAt: now
-    })
-    .where(
-      and(
-        eq(chatAssignments.botAccountId, botAccountId),
-        eq(chatAssignments.broadcasterUserId, broadcasterUserId),
-        inArray(chatAssignments.status, [...observableAssignmentStatuses])
-      )
-    );
-};
-
-const markAssignmentsForDisconnectedSocket = async (db: DbClient, botAccountId: string, reason: string) => {
-  const now = new Date();
-  await db
-    .update(chatAssignments)
-    .set({
-      status: "desired",
-      joinedAt: null,
-      leftAt: null,
-      latestError: `irc disconnected: ${reason}`,
-      updatedAt: now
-    })
-    .where(and(eq(chatAssignments.botAccountId, botAccountId), inArray(chatAssignments.status, [...activeRoomStatuses])));
-
-  await db
-    .update(chatAssignments)
-    .set({
-      status: "left",
-      leftAt: now,
-      updatedAt: now
-    })
-    .where(and(eq(chatAssignments.botAccountId, botAccountId), eq(chatAssignments.status, "leaving")));
-};
-
-const recoverStaleJoiningAssignments = async (db: DbClient, botAccountId: string): Promise<number> => {
-  const cutoff = new Date(Date.now() - staleJoiningTimeoutMs);
-  const staleAssignments = await db
-    .select({ id: chatAssignments.id })
-    .from(chatAssignments)
-    .where(and(eq(chatAssignments.botAccountId, botAccountId), eq(chatAssignments.status, "joining"), lt(chatAssignments.updatedAt, cutoff)))
-    .limit(100);
-
-  for (const assignment of staleAssignments) {
-    await db
-      .update(chatAssignments)
-      .set({
-        status: "desired",
-        joinedAt: null,
-        latestError: "join acknowledgement timed out; retrying",
-        updatedAt: new Date()
-      })
-      .where(eq(chatAssignments.id, assignment.id));
-  }
-
-  return staleAssignments.length;
+  await createChatAssignmentControl(db).record({
+    type: "room_observed",
+    botAccountId,
+    broadcasterUserId,
+    observedAt: new Date(),
+    ...(values.lastMessageAt == null ? {} : { lastMessageAt: values.lastMessageAt }),
+    ...(values.lastMembershipEventAt == null ? {} : { lastMembershipEventAt: values.lastMembershipEventAt })
+  });
 };
 
 const markDeletedChatMessage = async (db: DbClient, message: ParsedIrcMessage) => {
@@ -561,20 +457,14 @@ const persistNoticeEvent = async (
       });
 
     if (isAssignmentBlockingNotice(msgId)) {
-      await db
-        .update(chatAssignments)
-        .set({
-          status: "failed",
-          latestError: `IRC NOTICE ${msgId}: ${message.trailing ?? ""}`.trim(),
-          updatedAt: new Date()
-        })
-        .where(
-          and(
-            eq(chatAssignments.botAccountId, botAccountId),
-            eq(chatAssignments.broadcasterUserId, broadcaster.twitchUserId),
-            inArray(chatAssignments.status, ["desired", "joining", "joined"])
-          )
-        );
+      const error = `IRC NOTICE ${msgId}: ${message.trailing ?? ""}`.trim();
+      await createChatAssignmentControl(db).record({
+        type: "assignment_failed",
+        botAccountId,
+        broadcasterUserId: broadcaster.twitchUserId,
+        error,
+        observedAt: new Date()
+      });
     }
   }
 };

@@ -1,8 +1,11 @@
+import { createChatAssignmentControl } from "@twitch-tracker/db";
 import { sql } from "drizzle-orm";
 import type { WorkerContext } from "../worker.js";
 import { startIntervalLoop } from "./common.js";
 
 export const runMaintenanceLoop = (context: WorkerContext) => {
+  const assignments = createChatAssignmentControl(context.db);
+
   return startIntervalLoop({
     name: "maintenance",
     intervalMs: context.config.MAINTENANCE_INTERVAL_MS,
@@ -58,39 +61,10 @@ export const runMaintenanceLoop = (context: WorkerContext) => {
           )
       `);
 
-      const closedStaleAssignments = await context.db.execute(sql`
-        with closed as (
-          update chat_assignments ca
-          set status = 'left',
-              left_at = coalesce(ca.left_at, now()),
-              latest_error = null,
-              updated_at = now()
-          from stream_sessions ss
-          where ca.twitch_stream_id = ss.twitch_stream_id
-            and ca.status in ('desired', 'joining', 'joined', 'leaving')
-            and ss.ended_at is not null
-            and ss.ended_at < now() - (${staleAssignmentGraceMinutes} * interval '1 minute')
-          returning ca.id, ss.twitch_stream_id
-        )
-        insert into chat_assignment_events (
-          chat_assignment_id,
-          event_type,
-          reason,
-          details,
-          occurred_at,
-          created_at,
-          updated_at
-        )
-        select
-          id,
-          'left',
-          'stream ended maintenance cleanup',
-          jsonb_build_object('source', 'maintenance', 'twitchStreamId', twitch_stream_id),
-          now(),
-          now(),
-          now()
-        from closed
-      `);
+      const closedStaleAssignments = await assignments.closeEndedStreams({
+        graceMinutes: staleAssignmentGraceMinutes,
+        observedAt: new Date()
+      });
 
       return {
         rawChatRetentionDays,
@@ -100,7 +74,7 @@ export const runMaintenanceLoop = (context: WorkerContext) => {
         redactedRawIrcMessages: rowCount(redactedRawIrcMessages),
         redactedRawEventSubEvents: rowCount(redactedRawEventSubEvents),
         redactedRawHelixResponses: rowCount(redactedRawHelixResponses),
-        closedStaleAssignments: rowCount(closedStaleAssignments)
+        closedStaleAssignments
       };
     }
   });

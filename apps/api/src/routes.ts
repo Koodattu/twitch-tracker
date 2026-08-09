@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { decryptSecret, encryptSecret, hashSessionToken, parseScopeList, type AppConfig } from "@twitch-tracker/config";
 import {
+  activeChatAssignmentStatuses,
   adminUsers,
   appUsers,
   chatAssignments,
@@ -12,6 +13,7 @@ import {
   botAccountTokens,
   channelDailyStats,
   channelEvents,
+  createChatAssignmentControl,
   eventProcessingFailures,
   eventsubSubscriptions,
   ingestionRuns,
@@ -79,8 +81,6 @@ const channelActivityQuerySchema = z.object({
 const sessionCookieName = "twitch_tracker_session";
 const oauthStateCookieName = "twitch_oauth_state";
 const botOauthStateCookieName = "twitch_bot_oauth_state";
-const activeChatAssignmentStatuses = ["desired", "joining", "joined", "leaving"] as const;
-type ActiveChatAssignmentStatus = (typeof activeChatAssignmentStatuses)[number];
 const messageArchivePageSize = 100;
 const twitchTokenValidationIntervalMs = 55 * 60 * 1000;
 const sessionLastSeenUpdateIntervalMs = 5 * 60 * 1000;
@@ -178,27 +178,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
 
     const liveRows = rows;
     const streamIds = liveRows.map((row) => row.streamId);
-    const assignmentRows =
-      streamIds.length === 0
-        ? []
-        : await db
-            .select({
-              twitchStreamId: chatAssignments.twitchStreamId,
-              status: chatAssignments.status
-            })
-            .from(chatAssignments)
-            .where(and(inArray(chatAssignments.twitchStreamId, streamIds), inArray(chatAssignments.status, [...activeChatAssignmentStatuses])));
-    const assignmentStatusByStream = new Map<string, ActiveChatAssignmentStatus>();
-    for (const assignment of assignmentRows) {
-      if (assignment.twitchStreamId == null || !isActiveChatAssignmentStatus(assignment.status)) {
-        continue;
-      }
-
-      const currentStatus = assignmentStatusByStream.get(assignment.twitchStreamId);
-      if (currentStatus == null || rankChatAssignmentStatus(assignment.status) > rankChatAssignmentStatus(currentStatus)) {
-        assignmentStatusByStream.set(assignment.twitchStreamId, assignment.status);
-      }
-    }
+    const assignmentStatusByStream = await createChatAssignmentControl(db).getEffectiveStatuses(streamIds);
 
     return c.json({
       data: liveRows.map((row) => {
@@ -1834,7 +1814,7 @@ const applyPrivacyRequestEffects = async (db: DbClient, request: PrivacyRequestR
       latestRequestId: request.id,
       updatedAt: now
     });
-    await closeSubjectAssignments(db, request.subjectTwitchUserId);
+    await createChatAssignmentControl(db).closeForTrackingOptOut(request.subjectTwitchUserId, now);
     return;
   }
 
@@ -1847,7 +1827,7 @@ const applyPrivacyRequestEffects = async (db: DbClient, request: PrivacyRequestR
     latestRequestId: request.id,
     updatedAt: now
   });
-  await closeSubjectAssignments(db, request.subjectTwitchUserId);
+  await createChatAssignmentControl(db).closeForTrackingOptOut(request.subjectTwitchUserId, now);
 };
 
 const upsertSubjectPrivacyState = async (
@@ -1870,39 +1850,6 @@ const upsertSubjectPrivacyState = async (
       target: subjectPrivacyStates.twitchUserId,
       set
     });
-};
-
-const closeSubjectAssignments = async (db: DbClient, twitchUserId: string) => {
-  await db.execute(sql`
-    with closed as (
-      update chat_assignments
-      set status = 'left',
-          left_at = coalesce(left_at, now()),
-          latest_error = null,
-          updated_at = now()
-      where broadcaster_user_id = ${twitchUserId}
-        and status in ('desired', 'joining', 'joined', 'leaving')
-      returning id
-    )
-    insert into chat_assignment_events (
-      chat_assignment_id,
-      event_type,
-      reason,
-      details,
-      occurred_at,
-      created_at,
-      updated_at
-    )
-    select
-      id,
-      'left',
-      'subject tracking opt-out',
-      jsonb_build_object('source', 'privacy_request'),
-      now(),
-      now(),
-      now()
-    from closed
-  `);
 };
 
 const redactSubjectData = async (db: DbClient, twitchUserId: string) => {
@@ -2309,25 +2256,6 @@ const escapeLikePattern = (value: string): string => {
 
 const toIso = (value: Date | null | undefined): string | null => {
   return value == null ? null : value.toISOString();
-};
-
-const rankChatAssignmentStatus = (status: string): number => {
-  switch (status) {
-    case "joined":
-      return 4;
-    case "joining":
-      return 3;
-    case "desired":
-      return 2;
-    case "leaving":
-      return 1;
-    default:
-      return 0;
-  }
-};
-
-const isActiveChatAssignmentStatus = (status: string): status is ActiveChatAssignmentStatus => {
-  return activeChatAssignmentStatuses.includes(status as ActiveChatAssignmentStatus);
 };
 
 const clearCookie = (c: Parameters<MiddlewareHandler<ApiBindings>>[0], name: string, config: AppConfig) => {

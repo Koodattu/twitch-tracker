@@ -3,6 +3,7 @@ import pg from "pg";
 import * as schema from "./schema.js";
 
 export * from "./schema.js";
+export * from "./chat-assignments.js";
 
 export const createPgPool = (connectionString: string): pg.Pool => {
   return new pg.Pool({ connectionString });

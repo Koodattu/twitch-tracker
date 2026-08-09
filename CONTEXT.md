@@ -29,6 +29,11 @@ One official Twitch interface used to collect observed data: REST, IRC, or
 EventSub.
 _Avoid_: Data source, crawler source
 
+**Twitch Authorization**:
+Permission granted by a Twitch account for the product to act through Twitch on
+that account's behalf. It is distinct from a product login session.
+_Avoid_: OAuth account, credential, token
+
 **Channel Analytics**:
 Public-facing statistics about Twitch channels and streams, such as live state,
 viewer history, categories, stream sessions, and aggregate chat activity.
@@ -59,6 +64,11 @@ _Avoid_: Public profile, full profile
 An authenticated view where a Twitch user can inspect detailed data the product
 has associated with their own Twitch identity.
 _Avoid_: Admin profile, public profile
+
+**Privacy Request**:
+A Twitch user's request to hide their Public Chatter Summary, stop future
+Chatter Data collection, or delete data associated with their Twitch identity.
+_Avoid_: Privacy ticket, deletion job
 
 **Private MVP Profile**:
 A development-only view that exposes detailed observed chatter data without the
