@@ -14,7 +14,7 @@ const twitchTokenResponseSchema = z.object({
 const twitchTokenValidationSchema = z.object({
   client_id: z.string().min(1),
   login: z.string().nullable(),
-  scopes: z.array(z.string()).default([]),
+  scopes: z.array(z.string()).nullish().transform((scopes) => scopes ?? []),
   user_id: z.string().nullable(),
   expires_in: z.number().int().nonnegative()
 });
