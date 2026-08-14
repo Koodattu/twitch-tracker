@@ -974,13 +974,17 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
         ? error.code
         : undefined;
       const statusCode = error instanceof TwitchAuthError ? error.statusCode : undefined;
+      const validationIssues = error instanceof z.ZodError
+        ? error.issues.map((issue) => ({ path: issue.path.map(String).join("."), code: issue.code }))
+        : undefined;
       console.error(JSON.stringify({
         level: "error",
         message: "twitch login callback failed",
         stage: oauthStage,
         errorType,
         errorCode,
-        statusCode
+        statusCode,
+        validationIssues
       }));
       return redirectToOwnData(c, "failed");
     }
