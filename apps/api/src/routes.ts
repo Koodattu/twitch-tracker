@@ -33,7 +33,7 @@ import {
   workerHeartbeats,
   type DbClient
 } from "@twitch-tracker/db";
-import { createEventSubEnvelope, eventSubHeaders, exchangeTwitchAuthorizationCode, FetchHelixAdapter, refreshTwitchUserAccessToken, validateTwitchAccessToken, verifyEventSubSignature } from "@twitch-tracker/twitch";
+import { createEventSubEnvelope, eventSubHeaders, exchangeTwitchAuthorizationCode, FetchHelixAdapter, refreshTwitchUserAccessToken, TwitchAuthError, validateTwitchAccessToken, verifyEventSubSignature } from "@twitch-tracker/twitch";
 import { and, desc, eq, gt, ilike, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
@@ -813,6 +813,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
       return redirectToOwnData(c, "not_configured");
     }
 
+    let oauthStage = "token_exchange";
     try {
       const token = await exchangeTwitchAuthorizationCode({
         clientId: apiConfig.TWITCH_CLIENT_ID,
@@ -820,12 +821,14 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
         code,
         redirectUri: apiConfig.TWITCH_OAUTH_REDIRECT_URI
       });
+      oauthStage = "token_validation";
       const validation = await validateTwitchAccessToken(token.accessToken);
 
       if (validation.clientId !== apiConfig.TWITCH_CLIENT_ID || validation.userId == null) {
         return c.json({ error: { code: "invalid_twitch_token", message: "Twitch returned an invalid login token." } }, 502);
       }
 
+      oauthStage = "user_lookup";
       const helix = new FetchHelixAdapter(apiConfig.TWITCH_CLIENT_ID);
       const usersResponse = await helix.getUsers({
         ids: [validation.userId],
@@ -841,6 +844,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
         return c.json({ error: { code: "twitch_user_not_found", message: "Twitch user lookup did not return a user." } }, 502);
       }
 
+      oauthStage = "twitch_user_persistence";
       const now = new Date();
       await c
         .get("db")
@@ -876,11 +880,13 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
           }
         });
 
+      oauthStage = "admin_grant_persistence";
       await persistConfiguredAdminGrant(c.get("db"), apiConfig, {
         twitchUserId: twitchUser.id,
         login: twitchUser.login
       }, now);
 
+      oauthStage = "app_user_persistence";
       const [appUser] = await c
         .get("db")
         .insert(appUsers)
@@ -905,6 +911,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
         return c.json({ error: { code: "app_user_persistence_failed", message: "Login could not be persisted." } }, 500);
       }
 
+      oauthStage = "oauth_account_persistence";
       const tokenExpiresAt = new Date(now.getTime() + token.expiresInSeconds * 1000);
       await c
         .get("db")
@@ -937,6 +944,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
           }
         });
 
+      oauthStage = "session_persistence";
       const sessionToken = randomBytes(32).toString("base64url");
       const sessionIdHash = hashSessionToken(sessionToken, apiConfig.SESSION_SECRET);
       const sessionMaxAgeSeconds = apiConfig.SESSION_TTL_DAYS * 24 * 60 * 60;
@@ -948,6 +956,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
         updatedAt: now
       });
 
+      oauthStage = "session_cookie";
       setCookie(c, sessionCookieName, sessionToken, {
         httpOnly: true,
         secure: apiConfig.COOKIE_SECURE,
@@ -956,7 +965,23 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
         maxAge: sessionMaxAgeSeconds
       });
       return c.redirect(new URL("/me", apiConfig.PUBLIC_WEB_URL).toString());
-    } catch {
+    } catch (error) {
+      const errorType = error instanceof Error ? error.name : typeof error;
+      const errorCode = typeof error === "object"
+        && error != null
+        && "code" in error
+        && typeof error.code === "string"
+        ? error.code
+        : undefined;
+      const statusCode = error instanceof TwitchAuthError ? error.statusCode : undefined;
+      console.error(JSON.stringify({
+        level: "error",
+        message: "twitch login callback failed",
+        stage: oauthStage,
+        errorType,
+        errorCode,
+        statusCode
+      }));
       return redirectToOwnData(c, "failed");
     }
   });
