@@ -37,7 +37,7 @@ export default async function BotAccountsPage() {
     <>
       <section className="page-title page-title-wide">
         <span className="eyebrow">Admin · Operations</span>
-        <div className="page-heading-row"><div><h1>Bot accounts</h1><p>OAuth health, chat-room capacity, and granted scopes for ingestion identities.</p></div><a className="button" href="/api/internal/bot-accounts/oauth/start">Connect bot account</a></div>
+        <div className="page-heading-row"><div><h1>Bot accounts</h1><p>Twitch will ask you to authorize every connection. Confirm that Twitch shows the dedicated bot account before approving.</p></div><a className="button" href="/api/internal/bot-accounts/oauth/start">Connect bot account</a></div>
       </section>
 
       {accounts == null ? (

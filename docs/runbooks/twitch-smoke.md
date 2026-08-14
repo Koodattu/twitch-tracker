@@ -95,7 +95,7 @@ Operator flow:
 1. Log in through `/me` with a Twitch account listed in
    `ADMIN_TWITCH_USER_IDS` or `ADMIN_TWITCH_LOGINS`.
 2. Open `/internal/bot-accounts`.
-3. Click `Connect bot` and authorize with the dedicated bot Twitch account.
+3. Click `Connect bot`. Twitch always presents its authorization flow; confirm it shows the dedicated bot Twitch account before approving.
 4. Confirm the bot account shows a stored token with `valid` status.
 5. Enable ingestion only after the bot token is present or env bot credentials are set.
 

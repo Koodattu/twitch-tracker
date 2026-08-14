@@ -1219,6 +1219,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
     url.searchParams.set("redirect_uri", apiConfig.TWITCH_BOT_OAUTH_REDIRECT_URI);
     url.searchParams.set("response_type", "code");
     url.searchParams.set("state", state);
+    url.searchParams.set("force_verify", "true");
     const scopes = parseScopeList(apiConfig.TWITCH_BOT_SCOPES);
     if (scopes.length > 0) {
       url.searchParams.set("scope", scopes.join(" "));
