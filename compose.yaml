@@ -19,15 +19,15 @@ x-app-environment: &app-environment
   PUBLIC_WEB_URL: https://${PUBLIC_DOMAIN:?Set PUBLIC_DOMAIN}
   PUBLIC_API_URL: https://${PUBLIC_DOMAIN:?Set PUBLIC_DOMAIN}
   INTERNAL_API_URL: http://api:4000
-  DATABASE_URL_FILE: /run/secrets/database_url
-  SESSION_SECRET_FILE: /run/secrets/session_secret
+  DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
+  SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET}
   SESSION_TTL_DAYS: ${SESSION_TTL_DAYS:-30}
   COOKIE_SECURE: "true"
   TWITCH_CLIENT_ID: ${TWITCH_CLIENT_ID:?Set TWITCH_CLIENT_ID}
-  TWITCH_CLIENT_SECRET_FILE: /run/secrets/twitch_client_secret
+  TWITCH_CLIENT_SECRET: ${TWITCH_CLIENT_SECRET:?Set TWITCH_CLIENT_SECRET}
   TWITCH_OAUTH_REDIRECT_URI: https://${PUBLIC_DOMAIN:?Set PUBLIC_DOMAIN}/api/auth/twitch/callback
   TWITCH_LOGIN_SCOPES: ${TWITCH_LOGIN_SCOPES:-}
-  TWITCH_EVENTSUB_SECRET_FILE: /run/secrets/twitch_eventsub_secret
+  TWITCH_EVENTSUB_SECRET: ${TWITCH_EVENTSUB_SECRET:?Set TWITCH_EVENTSUB_SECRET}
   EVENTSUB_ENABLED: ${EVENTSUB_ENABLED:-false}
   EVENTSUB_MAX_CHANNELS: ${EVENTSUB_MAX_CHANNELS:-25}
   TWITCH_BOT_OAUTH_REDIRECT_URI: https://${PUBLIC_DOMAIN:?Set PUBLIC_DOMAIN}/api/internal/bot-accounts/oauth/callback
@@ -133,11 +133,6 @@ services:
     environment:
       <<: *app-environment
       PORT: 4000
-    secrets:
-      - database_url
-      - session_secret
-      - twitch_client_secret
-      - twitch_eventsub_secret
     tmpfs:
       - /tmp:size=32m,mode=1777
     networks:
@@ -169,11 +164,6 @@ services:
       WORKER_NAME: ${WORKER_NAME:-worker-1}
       WORKER_HEALTH_MAX_AGE_MS: ${WORKER_HEALTH_MAX_AGE_MS:-900000}
       WORKER_EXPECTED_LOOP_COUNT: "8"
-    secrets:
-      - database_url
-      - session_secret
-      - twitch_client_secret
-      - twitch_eventsub_secret
     tmpfs:
       - /tmp:size=32m,mode=1777
     networks:
@@ -196,9 +186,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER}
-      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
-    secrets:
-      - postgres_password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 5s
@@ -224,9 +212,7 @@ services:
         VCS_REF: ${VCS_REF:?Set VCS_REF to the Git commit}
     restart: "no"
     environment:
-      DATABASE_URL_FILE: /run/secrets/database_url
-    secrets:
-      - database_url
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
     tmpfs:
       - /tmp:size=32m,mode=1777
     networks:
@@ -250,11 +236,9 @@ services:
       PGHOST: postgres
       PGDATABASE: ${POSTGRES_DB:?Set POSTGRES_DB}
       PGUSER: ${POSTGRES_USER:?Set POSTGRES_USER}
-      PGPASSWORD_FILE: /run/secrets/postgres_password
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
       BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
-    secrets:
-      - postgres_password
     command: ["/bin/sh", "/scripts/backup.sh"]
     volumes:
       - ./infra/postgres:/scripts:ro
@@ -279,18 +263,6 @@ services:
 networks:
   edge:
   backend:
-
-secrets:
-  postgres_password:
-    file: ${POSTGRES_PASSWORD_FILE:?Set POSTGRES_PASSWORD_FILE}
-  database_url:
-    file: ${DATABASE_URL_FILE:?Set DATABASE_URL_FILE}
-  session_secret:
-    file: ${SESSION_SECRET_FILE:?Set SESSION_SECRET_FILE}
-  twitch_client_secret:
-    file: ${TWITCH_CLIENT_SECRET_FILE:?Set TWITCH_CLIENT_SECRET_FILE}
-  twitch_eventsub_secret:
-    file: ${TWITCH_EVENTSUB_SECRET_FILE:?Set TWITCH_EVENTSUB_SECRET_FILE}
 
 volumes:
   caddy_data:

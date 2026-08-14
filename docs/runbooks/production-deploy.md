@@ -15,17 +15,9 @@ The checked-in database image is PostgreSQL 16.14. Do not point PostgreSQL 18 at
 
 ## 2. Production configuration and secrets
 
-Copy `.env.production.example` to an ignored `.env.production` file and replace every placeholder. Set `IMAGE_TAG` to an immutable release ID and `VCS_REF` to the exact Git commit. Use an immutable Twitch user ID for `ADMIN_TWITCH_USER_IDS`.
+Copy `.env.production.example` to an ignored, mode-`0600` `.env.production` file and replace every placeholder. Set `IMAGE_TAG` to an immutable release ID and `VCS_REF` to the exact Git commit. Use an immutable Twitch user ID for `ADMIN_TWITCH_USER_IDS`.
 
-Create the ignored `secrets` directory and five mode-`0600` files:
-
-- `postgres_password`: a long random PostgreSQL password.
-- `database_url`: the full URL-encoded connection URL using host `postgres`, for example `postgres://USER:PASSWORD@postgres:5432/DATABASE`.
-- `session_secret`: at least 32 cryptographically random characters.
-- `twitch_client_secret`: the Twitch application secret.
-- `twitch_eventsub_secret`: at least 32 cryptographically random characters.
-
-Generate random values with a password manager or `openssl rand -base64 48`. Do not commit, paste into shell history, or put secret values in `.env.production`. Ensure the backup directory exists and is writable by uid/gid `70`, used by the pinned Alpine PostgreSQL image.
+Store the PostgreSQL password, URL-encoded database URL, session secret, Twitch client secret, and EventSub secret directly in `.env.production`. Generate long random values with a password manager or `openssl rand -hex 32`; hexadecimal values are URL-safe. Do not commit the file or paste secret values into shell history. Anyone with root or Docker access can inspect container environment values, so keep host access restricted. Ensure the backup directory exists and is writable by uid/gid `70`, used by the pinned Alpine PostgreSQL image.
 
 Keep `PUBLIC_WEB_URL` and `PUBLIC_API_URL` on the same origin. Compose derives both from `PUBLIC_DOMAIN`. Start with Twitch ingestion and EventSub disabled; enable them only after the base deployment, login, and callback checks pass.
 

@@ -27,6 +27,6 @@ Copy `.env.example` to `.env` for local development. Twitch ingestion and EventS
 
 ## Production
 
-Production Compose is fail-closed: it requires a public hostname, immutable administrator ID, Docker secret files, HTTPS, and an off-host backup mount. It pins Node, Caddy, and the latest PostgreSQL 16 patch by digest; PostgreSQL stays on major 16 because existing volumes require a deliberate major-version migration.
+Production Compose is fail-closed: it requires a public hostname, immutable administrator ID, private environment values, HTTPS, and an off-host backup mount. It pins Node, Caddy, and the latest PostgreSQL 16 patch by digest; PostgreSQL stays on major 16 because existing volumes require a deliberate major-version migration.
 
 Follow [the production deployment runbook](docs/runbooks/production-deploy.md). Public launch still requires the privacy/legal decisions and live Twitch verification listed there.

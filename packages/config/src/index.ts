@@ -1,6 +1,5 @@
 import { appModes } from "@twitch-tracker/shared";
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from "node:crypto";
-import { readFileSync } from "node:fs";
 import { z } from "zod";
 
 const optionalUrl = z.string().url().or(z.literal("")).optional();
@@ -70,38 +69,9 @@ export const baseEnvSchema = z.object({
 export type AppConfig = z.infer<typeof baseEnvSchema>;
 
 export const loadConfig = (env: NodeJS.ProcessEnv = process.env): AppConfig => {
-  const config = baseEnvSchema.parse(resolveSecretFiles(env));
+  const config = baseEnvSchema.parse(env);
   validateAppConfig(config);
   return config;
-};
-
-const secretKeys = [
-  "DATABASE_URL",
-  "SESSION_SECRET",
-  "TWITCH_CLIENT_SECRET",
-  "TWITCH_EVENTSUB_SECRET",
-  "TWITCH_BOT_ACCESS_TOKEN",
-  "TWITCH_BOT_REFRESH_TOKEN"
-] as const;
-
-const resolveSecretFiles = (env: NodeJS.ProcessEnv): NodeJS.ProcessEnv => {
-  const resolved = { ...env };
-
-  for (const key of secretKeys) {
-    const fileKey = `${key}_FILE`;
-    const filePath = env[fileKey];
-    if (filePath == null || filePath === "") {
-      continue;
-    }
-
-    if (env[key] != null && env[key] !== "") {
-      throw new Error(`${key} and ${fileKey} cannot both be set.`);
-    }
-
-    resolved[key] = readFileSync(filePath, "utf8").trimEnd();
-  }
-
-  return resolved;
 };
 
 export const isPrivateDataMode = (mode: AppConfig["APP_MODE"]): boolean => {

@@ -34,9 +34,4 @@ describe("production configuration", () => {
   it("rejects zero-length worker intervals", () => {
     expect(() => loadConfig({ ...productionEnv(), DISCOVERY_INTERVAL_MS: "0" })).toThrow();
   });
-
-  it("rejects a direct secret when a secret file is also configured", () => {
-    expect(() => loadConfig({ ...productionEnv(), SESSION_SECRET_FILE: "ignored" }))
-      .toThrow(/cannot both be set/);
-  });
 });

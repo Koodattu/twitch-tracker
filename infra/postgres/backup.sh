@@ -22,12 +22,10 @@ case "${BACKUP_INTERVAL_SECONDS:-}" in
   ''|*[!0-9]*|0) echo "BACKUP_INTERVAL_SECONDS must be a positive integer." >&2; exit 1 ;;
 esac
 
-if [ ! -s "${PGPASSWORD_FILE:-}" ]; then
-  echo "PGPASSWORD_FILE must reference a non-empty secret." >&2
+if [ -z "${PGPASSWORD:-}" ]; then
+  echo "PGPASSWORD must be set." >&2
   exit 1
 fi
-
-export PGPASSWORD="$(cat "$PGPASSWORD_FILE")"
 
 while true; do
   timestamp="$(date -u +%Y%m%dT%H%M%SZ)"

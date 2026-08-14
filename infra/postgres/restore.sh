@@ -18,8 +18,8 @@ if [ "$RESTORE_DATABASE" = "${PGDATABASE:-}" ]; then
   exit 1
 fi
 
-if [ ! -s "${PGPASSWORD_FILE:-}" ]; then
-  echo "PGPASSWORD_FILE must reference a non-empty secret." >&2
+if [ -z "${PGPASSWORD:-}" ]; then
+  echo "PGPASSWORD must be set." >&2
   exit 1
 fi
 
@@ -31,8 +31,6 @@ if [ ! -s "$backup_file" ] || [ ! -s "$checksum_file" ]; then
   echo "Backup or checksum file is missing." >&2
   exit 1
 fi
-
-export PGPASSWORD="$(cat "$PGPASSWORD_FILE")"
 
 (cd /backups && sha256sum -c "$(basename "$checksum_file")")
 pg_restore --list "$backup_file" >/dev/null

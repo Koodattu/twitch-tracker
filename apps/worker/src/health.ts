@@ -1,8 +1,6 @@
 import { createPgPool } from "@twitch-tracker/db";
-import { readFileSync } from "node:fs";
 
-const databaseUrl = process.env.DATABASE_URL
-  ?? (process.env.DATABASE_URL_FILE == null ? undefined : readFileSync(process.env.DATABASE_URL_FILE, "utf8").trimEnd());
+const databaseUrl = process.env.DATABASE_URL;
 if (databaseUrl == null || databaseUrl === "") {
   throw new Error("DATABASE_URL is required for the worker health check.");
 }
