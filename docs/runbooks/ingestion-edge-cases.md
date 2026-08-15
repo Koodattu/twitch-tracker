@@ -27,6 +27,8 @@ for large channels.
 - Each enabled account with a valid token gets its own IRC connection and its
   configured room and JOIN-rate limits. Accounts without a valid token
   contribute zero effective capacity.
+- Discovery batches a Twitch user lookup for each stream page so broadcaster
+  profile images and other user metadata stay populated alongside stream data.
 - Existing `left`, `failed`, or pending `leaving` assignments are revived when
   they move back into the selected capacity set.
 - Pending PART commands are sent before new JOIN commands to avoid temporary

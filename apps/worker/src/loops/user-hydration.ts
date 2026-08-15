@@ -1,8 +1,9 @@
 import { decryptSecret, encryptSecret } from "@twitch-tracker/config";
-import { oauthAccounts, twitchUsers } from "@twitch-tracker/db";
+import { oauthAccounts } from "@twitch-tracker/db";
 import { FetchHelixAdapter, refreshTwitchUserAccessToken, validateTwitchAccessToken, type TwitchUserToken } from "@twitch-tracker/twitch";
 import { desc, eq } from "drizzle-orm";
 import type { WorkerContext } from "../worker.js";
+import { upsertTwitchUserMetadata } from "../twitch-user-metadata.js";
 import { startIntervalLoop } from "./common.js";
 
 export const runUserHydrationLoop = (context: WorkerContext) => {
@@ -121,38 +122,7 @@ const validateOrRefreshAccount = async (
   }
 
   const now = new Date();
-  await context.db
-    .insert(twitchUsers)
-    .values({
-      twitchUserId: user.id,
-      login: user.login,
-      displayName: user.display_name,
-      accountType: user.type,
-      broadcasterType: user.broadcaster_type,
-      description: user.description,
-      profileImageUrl: user.profile_image_url,
-      offlineImageUrl: user.offline_image_url,
-      twitchCreatedAt: new Date(user.created_at),
-      lastSeenAt: now,
-      lastMetadataRefreshAt: now,
-      updatedAt: now
-    })
-    .onConflictDoUpdate({
-      target: twitchUsers.twitchUserId,
-      set: {
-        login: user.login,
-        displayName: user.display_name,
-        accountType: user.type,
-        broadcasterType: user.broadcaster_type,
-        description: user.description,
-        profileImageUrl: user.profile_image_url,
-        offlineImageUrl: user.offline_image_url,
-        twitchCreatedAt: new Date(user.created_at),
-        lastSeenAt: now,
-        lastMetadataRefreshAt: now,
-        updatedAt: now
-      }
-    });
+  await upsertTwitchUserMetadata(context.db, user, now);
 
   return {
     refreshed: refreshedToken != null,
