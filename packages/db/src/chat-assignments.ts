@@ -26,6 +26,11 @@ export type AssignmentCandidate = {
   trackingPriority: number;
 };
 
+export type AssignmentPoolAccount = {
+  botAccountId: string;
+  capacity: number;
+};
+
 export type ChatAssignmentObservation =
   | {
       type: "join_command_sent";
@@ -79,6 +84,8 @@ type AssignmentRow = Pick<
   typeof chatAssignments.$inferSelect,
   "id" | "status" | "joinedAt" | "twitchStreamId"
 >;
+
+type PoolAssignmentRow = AssignmentRow & { botAccountId: string };
 
 type DbTransaction = Parameters<Parameters<DbClient["transaction"]>[0]>[0];
 
@@ -166,6 +173,75 @@ export const createChatAssignmentControl = (db: DbClient) => {
     }
   };
 
+  const reconcilePool = async (input: {
+    accounts: AssignmentPoolAccount[];
+    observedAt: Date;
+  }) => {
+    const accounts = input.accounts.map((account) => ({
+      ...account,
+      capacity: Math.max(0, account.capacity)
+    }));
+    if (accounts.length === 0) {
+      return {
+        assignmentsDesired: 0,
+        retiredAssignments: 0,
+        topViewerCount: null,
+        accounts: []
+      };
+    }
+
+    const existingAssignments = await db
+      .select({
+        id: chatAssignments.id,
+        botAccountId: chatAssignments.botAccountId,
+        status: chatAssignments.status,
+        joinedAt: chatAssignments.joinedAt,
+        twitchStreamId: chatAssignments.twitchStreamId
+      })
+      .from(chatAssignments)
+      .where(inArray(chatAssignments.botAccountId, accounts.map((account) => account.botAccountId)));
+    const incumbentStreamIdsByAccount = new Map<string, Set<string>>(
+      accounts.map((account) => [account.botAccountId, new Set<string>()])
+    );
+    for (const assignment of existingAssignments) {
+      if (incumbentStatuses.includes(assignment.status) && assignment.twitchStreamId != null) {
+        incumbentStreamIdsByAccount.get(assignment.botAccountId)?.add(assignment.twitchStreamId);
+      }
+    }
+
+    const totalCapacity = accounts.reduce((sum, account) => sum + account.capacity, 0);
+    const candidates = totalCapacity === 0 ? [] : await readCandidates(db, totalCapacity);
+    const allocations = allocatePoolAssignmentCandidates({
+      accounts,
+      candidates,
+      incumbentStreamIdsByAccount
+    });
+    const accountResults = [];
+    for (const account of accounts) {
+      const result = await reconcileAccountSelection({
+        account,
+        selected: allocations.get(account.botAccountId) ?? [],
+        existingAssignments: existingAssignments.filter(
+          (assignment) => assignment.botAccountId === account.botAccountId
+        ),
+        observedAt: input.observedAt
+      });
+      accountResults.push({ botAccountId: account.botAccountId, ...result });
+    }
+
+    return {
+      assignmentsDesired: accountResults.reduce((sum, result) => sum + result.assignmentsDesired, 0),
+      retiredAssignments: accountResults.reduce((sum, result) => sum + result.retiredAssignments, 0),
+      topViewerCount: accountResults.reduce<number | null>((highest, result) => {
+        if (result.topViewerCount == null) {
+          return highest;
+        }
+        return highest == null ? result.topViewerCount : Math.max(highest, result.topViewerCount);
+      }, null),
+      accounts: accountResults
+    };
+  };
+
   const reconcile = async (input: {
     botAccountId: string;
     capacity: number;
@@ -175,28 +251,34 @@ export const createChatAssignmentControl = (db: DbClient) => {
     retiredAssignments: number;
     topViewerCount: number | null;
   }> => {
-    const capacity = Math.max(0, input.capacity);
-    const candidates = capacity === 0 ? [] : await readCandidates(db, capacity);
-    const existingAssignments = await db
-      .select({
-        id: chatAssignments.id,
-        status: chatAssignments.status,
-        joinedAt: chatAssignments.joinedAt,
-        twitchStreamId: chatAssignments.twitchStreamId
-      })
-      .from(chatAssignments)
-      .where(eq(chatAssignments.botAccountId, input.botAccountId));
-    const incumbentStreamIds = new Set(
-      existingAssignments
-        .filter((assignment) => incumbentStatuses.includes(assignment.status) && assignment.twitchStreamId != null)
-        .map((assignment) => assignment.twitchStreamId as string)
-    );
-    const selected = selectStableAssignmentCandidates({ candidates, incumbentStreamIds, capacity });
+    const result = await reconcilePool({
+      accounts: [{ botAccountId: input.botAccountId, capacity: input.capacity }],
+      observedAt: input.observedAt
+    });
+    const [accountResult] = result.accounts;
+    return accountResult ?? {
+      assignmentsDesired: 0,
+      retiredAssignments: 0,
+      topViewerCount: null
+    };
+  };
+
+  const reconcileAccountSelection = async (input: {
+    account: AssignmentPoolAccount;
+    selected: AssignmentCandidate[];
+    existingAssignments: PoolAssignmentRow[];
+    observedAt: Date;
+  }): Promise<{
+    assignmentsDesired: number;
+    retiredAssignments: number;
+    topViewerCount: number | null;
+  }> => {
+    const { selected } = input;
     const selectedStreamIds = new Set(selected.map((candidate) => candidate.twitchStreamId));
 
     for (const [index, candidate] of selected.entries()) {
       await ensureSelectedAssignment(db, {
-        botAccountId: input.botAccountId,
+        botAccountId: input.account.botAccountId,
         candidate,
         priorityScore: selected.length - index,
         reason: candidateReason(candidate),
@@ -205,7 +287,7 @@ export const createChatAssignmentControl = (db: DbClient) => {
     }
 
     let retiredAssignments = 0;
-    for (const assignment of existingAssignments) {
+    for (const assignment of input.existingAssignments) {
       if (
         assignment.twitchStreamId != null &&
         selectedStreamIds.has(assignment.twitchStreamId)
@@ -296,7 +378,7 @@ export const createChatAssignmentControl = (db: DbClient) => {
         )
       )
       .orderBy(desc(chatAssignments.updatedAt))
-      .limit(Math.max(0, input.capacity));
+      .limit(500);
 
     const [{ value: roomReservations } = { value: 0 }] = await db
       .select({ value: count() })
@@ -422,6 +504,7 @@ export const createChatAssignmentControl = (db: DbClient) => {
 
   return {
     reconcile,
+    reconcilePool,
     planIrcCommands,
     record,
     closeEndedStreams,
@@ -469,6 +552,69 @@ export const selectStableAssignmentCandidates = (input: {
   return selected.sort(compareCandidates);
 };
 
+export const allocatePoolAssignmentCandidates = (input: {
+  accounts: AssignmentPoolAccount[];
+  candidates: AssignmentCandidate[];
+  incumbentStreamIdsByAccount: Map<string, Set<string>>;
+}): Map<string, AssignmentCandidate[]> => {
+  const accounts = input.accounts.map((account) => ({
+    ...account,
+    capacity: Math.max(0, account.capacity)
+  }));
+  const incumbentStreamIds = new Set<string>();
+  for (const streamIds of input.incumbentStreamIdsByAccount.values()) {
+    for (const streamId of streamIds) {
+      incumbentStreamIds.add(streamId);
+    }
+  }
+
+  const selected = selectStableAssignmentCandidates({
+    candidates: input.candidates,
+    incumbentStreamIds,
+    capacity: accounts.reduce((sum, account) => sum + account.capacity, 0)
+  });
+  const unassignedStreamIds = new Set(selected.map((candidate) => candidate.twitchStreamId));
+  const allocations = new Map<string, AssignmentCandidate[]>(
+    accounts.map((account) => [account.botAccountId, []])
+  );
+
+  for (const account of accounts) {
+    const allocation = allocations.get(account.botAccountId) ?? [];
+    const accountIncumbents = input.incumbentStreamIdsByAccount.get(account.botAccountId) ?? new Set<string>();
+    for (const candidate of selected) {
+      if (
+        allocation.length >= account.capacity ||
+        !unassignedStreamIds.has(candidate.twitchStreamId) ||
+        !accountIncumbents.has(candidate.twitchStreamId)
+      ) {
+        continue;
+      }
+
+      allocation.push(candidate);
+      unassignedStreamIds.delete(candidate.twitchStreamId);
+    }
+    allocations.set(account.botAccountId, allocation);
+  }
+
+  for (const account of accounts) {
+    const allocation = allocations.get(account.botAccountId) ?? [];
+    for (const candidate of selected) {
+      if (allocation.length >= account.capacity) {
+        break;
+      }
+      if (!unassignedStreamIds.has(candidate.twitchStreamId)) {
+        continue;
+      }
+
+      allocation.push(candidate);
+      unassignedStreamIds.delete(candidate.twitchStreamId);
+    }
+    allocations.set(account.botAccountId, allocation);
+  }
+
+  return allocations;
+};
+
 export const reduceEffectiveAssignmentStatuses = (
   rows: Array<{ twitchStreamId: string | null; status: ChatAssignmentStatus }>
 ): Map<string, ActiveChatAssignmentStatus> => {
@@ -495,7 +641,7 @@ const readCandidates = async (db: DbClient, capacity: number): Promise<Assignmen
     .from(streamSnapshots)
     .groupBy(streamSnapshots.twitchStreamId)
     .as("latest_snapshot_times");
-  const candidateLimit = Math.max(capacity, Math.min(capacity * 3, 500));
+  const candidateLimit = Math.max(capacity, capacity * 3);
   const rows = await db
     .select({
       twitchStreamId: streamSessions.twitchStreamId,

@@ -1,5 +1,5 @@
 import { createChatAssignmentControl } from "@twitch-tracker/db";
-import { resolvePrimaryBotCredentials } from "../bot-auth.js";
+import { resolveBotCredentialsPool } from "../bot-auth.js";
 import type { WorkerContext } from "../worker.js";
 import { startIntervalLoop } from "./common.js";
 
@@ -15,29 +15,36 @@ export const runAssignmentLoop = (context: WorkerContext) => {
         return { assignmentsDesired: 0, skipped: "ENABLE_TWITCH_INGESTION is false." };
       }
 
-      const bot = await resolvePrimaryBotCredentials(context.db, context.config);
-      if (bot.botAccountId == null || bot.login == null) {
+      const bots = await resolveBotCredentialsPool(context.db, context.config);
+      if (bots.length === 0) {
         return { assignmentsDesired: 0, skipped: "No enabled bot account is configured." };
       }
 
-      if (bot.accessToken == null) {
-        return { assignmentsDesired: 0, skipped: "No valid bot access token is configured.", botLogin: bot.login };
-      }
-
-      if (bot.maxJoinedRooms <= 0) {
-        return { assignmentsDesired: 0, skipped: "Bot join capacity is 0.", botLogin: bot.login };
-      }
-
-      const result = await assignments.reconcile({
-        botAccountId: bot.botAccountId,
-        capacity: bot.maxJoinedRooms,
+      const result = await assignments.reconcilePool({
+        accounts: bots.map((bot) => ({
+          botAccountId: bot.botAccountId,
+          capacity: bot.accessToken == null ? 0 : bot.maxJoinedRooms
+        })),
         observedAt: new Date()
       });
+      const resultByAccount = new Map(result.accounts.map((account) => [account.botAccountId, account]));
+      const usableBots = bots.filter((bot) => bot.accessToken != null && bot.maxJoinedRooms > 0);
 
       return {
-        ...result,
-        botLogin: bot.login,
-        botTokenSource: bot.source
+        assignmentsDesired: result.assignmentsDesired,
+        retiredAssignments: result.retiredAssignments,
+        topViewerCount: result.topViewerCount,
+        enabledBotAccounts: bots.length,
+        usableBotAccounts: usableBots.length,
+        totalJoinCapacity: usableBots.reduce((sum, bot) => sum + bot.maxJoinedRooms, 0),
+        accounts: bots.map((bot) => ({
+          botLogin: bot.login,
+          botTokenSource: bot.source,
+          configuredCapacity: bot.maxJoinedRooms,
+          effectiveCapacity: bot.accessToken == null ? 0 : bot.maxJoinedRooms,
+          assignmentsDesired: resultByAccount.get(bot.botAccountId)?.assignmentsDesired ?? 0,
+          retiredAssignments: resultByAccount.get(bot.botAccountId)?.retiredAssignments ?? 0
+        }))
       };
     }
   });

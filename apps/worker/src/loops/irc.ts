@@ -10,18 +10,90 @@ import {
 } from "@twitch-tracker/db";
 import { parseIrcLine, SocketIrcAdapter, type ParsedIrcMessage, type TwitchIrcAdapter } from "@twitch-tracker/twitch";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
-import { resolvePrimaryBotCredentials } from "../bot-auth.js";
+import { resolveBotCredentialsPool, type ResolvedBotAccountCredentials } from "../bot-auth.js";
 import type { WorkerContext } from "../worker.js";
 import { startIntervalLoop } from "./common.js";
 
 const staleJoiningTimeoutMs = 2 * 60 * 1000;
 
+type BotConnection = {
+  adapter: TwitchIrcAdapter;
+  connected: boolean;
+  login: string;
+};
+
 export const runIrcLoop = (context: WorkerContext) => {
   const assignments = createChatAssignmentControl(context.db);
-  let adapter: TwitchIrcAdapter | null = null;
-  let connected = false;
-  let connectedBotAccountId: string | null = null;
-  let connectedLogin: string | null = null;
+  const connections = new Map<string, BotConnection>();
+
+  const disconnectConnection = async (botAccountId: string, reason: string) => {
+    const connection = connections.get(botAccountId);
+    if (connection == null) {
+      return;
+    }
+
+    connections.delete(botAccountId);
+    await connection.adapter.disconnect(reason);
+  };
+
+  const ensureConnection = async (bot: ResolvedBotAccountCredentials & { accessToken: string }) => {
+    const existing = connections.get(bot.botAccountId);
+    if (existing != null && existing.login === bot.login && existing.connected) {
+      return existing;
+    }
+    if (existing != null) {
+      await disconnectConnection(bot.botAccountId, "bot_account_changed");
+    }
+
+    const adapter = new SocketIrcAdapter({
+      login: bot.login,
+      oauthToken: bot.accessToken,
+      events: {
+        connected: () => {
+          connection.connected = true;
+        },
+        disconnected: async (reason) => {
+          connection.connected = false;
+          if (connections.get(bot.botAccountId) === connection) {
+            connections.delete(bot.botAccountId);
+          }
+          await assignments.record({
+            type: "socket_disconnected",
+            botAccountId: bot.botAccountId,
+            reason,
+            observedAt: new Date()
+          });
+        },
+        rawMessage: async (message) => {
+          await persistRawIrcMessage(context.db, bot.botAccountId, bot.login, message);
+          if (message.command === "RECONNECT") {
+            await disconnectConnection(bot.botAccountId, "twitch_reconnect");
+          }
+        },
+        error: (error) => {
+          console.error(JSON.stringify({
+            level: "error",
+            loop: "irc",
+            botLogin: bot.login,
+            message: error.message
+          }));
+        }
+      }
+    });
+    const connection: BotConnection = { adapter, connected: false, login: bot.login };
+    connections.set(bot.botAccountId, connection);
+
+    try {
+      await adapter.connect();
+      return connection;
+    } catch (error) {
+      if (connections.get(bot.botAccountId) === connection) {
+        connections.delete(bot.botAccountId);
+      }
+      await adapter.disconnect("connect_failed").catch(() => undefined);
+      throw error;
+    }
+  };
 
   const completion = startIntervalLoop({
     name: "irc",
@@ -32,116 +104,112 @@ export const runIrcLoop = (context: WorkerContext) => {
         return { activeConnections: 0, skipped: "ENABLE_TWITCH_INGESTION is false." };
       }
 
-      const bot = await resolvePrimaryBotCredentials(context.db, context.config);
-      if (bot.botAccountId == null || bot.login == null) {
-        return { activeConnections: 0, skipped: "No enabled bot account is configured." };
+      const bots = await resolveBotCredentialsPool(context.db, context.config);
+      const usableBots = bots.filter(
+        (bot): bot is ResolvedBotAccountCredentials & { accessToken: string } => bot.accessToken != null
+      );
+      const usableBotById = new Map(usableBots.map((bot) => [bot.botAccountId, bot]));
+      for (const [botAccountId, connection] of connections) {
+        const bot = usableBotById.get(botAccountId);
+        if (bot == null || bot.login !== connection.login) {
+          await disconnectConnection(botAccountId, "bot_account_unavailable");
+        }
       }
-
-      const botAccountId = bot.botAccountId;
-      const botLogin = bot.login;
-      const botAccessToken = bot.accessToken;
-      if (botAccessToken == null) {
-        return { activeConnections: 0, skipped: "No valid bot access token is configured.", botLogin };
-      }
-
-      if (adapter != null && (connectedBotAccountId !== botAccountId || connectedLogin !== botLogin)) {
-        await adapter.disconnect("bot_account_changed");
-        adapter = null;
-        connected = false;
-        connectedBotAccountId = null;
-        connectedLogin = null;
-      }
-
-      if (adapter == null || !connected) {
-        adapter = new SocketIrcAdapter({
-          login: botLogin,
-          oauthToken: botAccessToken,
-          events: {
-            connected: () => {
-              connected = true;
-              connectedBotAccountId = botAccountId;
-              connectedLogin = botLogin;
-            },
-            disconnected: async (reason) => {
-              connected = false;
-              adapter = null;
-              connectedBotAccountId = null;
-              connectedLogin = null;
-              await assignments.record({
-                type: "socket_disconnected",
-                botAccountId,
-                reason,
-                observedAt: new Date()
-              });
-            },
-            rawMessage: async (message) => {
-              await persistRawIrcMessage(context.db, botAccountId, botLogin, message);
-              if (message.command === "RECONNECT") {
-                await adapter?.disconnect("twitch_reconnect");
-              }
-            },
-            error: (error) => {
-              console.error(JSON.stringify({ level: "error", loop: "irc", message: error.message }));
-            }
-          }
-        });
-        await adapter.connect();
-      }
-
-      const commandPlan = await assignments.planIrcCommands({
-        botAccountId,
-        capacity: bot.maxJoinedRooms,
-        joinRatePer10Seconds: bot.joinRatePer10Seconds,
-        staleJoiningTimeoutMs,
-        observedAt: new Date()
-      });
 
       let parted = 0;
-      for (const assignment of commandPlan.leave) {
-        if (assignment.channelLogin != null) {
-          await adapter.part(assignment.channelLogin);
-        }
-
-        await assignments.record({
-          type: "leave_processed",
-          assignmentId: assignment.assignmentId,
-          observedAt: new Date()
-        });
-        parted += 1;
-      }
-
       let joined = 0;
-      for (const assignment of commandPlan.join) {
-        if (assignment.channelLogin == null) {
-          continue;
-        }
+      let roomReservations = 0;
+      let availableRoomSlots = 0;
+      let staleJoiningRequeued = 0;
+      let failedBotAccounts = 0;
+      const accountResults: Array<Record<string, unknown>> = [];
 
-        await adapter.join(assignment.channelLogin);
-        await assignments.record({
-          type: "join_command_sent",
-          assignmentId: assignment.assignmentId,
-          observedAt: new Date()
-        });
-        joined += 1;
+      for (const bot of usableBots) {
+        try {
+          const connection = await ensureConnection(bot);
+          const commandPlan = await assignments.planIrcCommands({
+            botAccountId: bot.botAccountId,
+            capacity: bot.maxJoinedRooms,
+            joinRatePer10Seconds: bot.joinRatePer10Seconds,
+            staleJoiningTimeoutMs,
+            observedAt: new Date()
+          });
+
+          let accountParted = 0;
+          for (const assignment of commandPlan.leave) {
+            if (assignment.channelLogin != null) {
+              await connection.adapter.part(assignment.channelLogin);
+            }
+
+            await assignments.record({
+              type: "leave_processed",
+              assignmentId: assignment.assignmentId,
+              observedAt: new Date()
+            });
+            accountParted += 1;
+          }
+
+          let accountJoined = 0;
+          for (const assignment of commandPlan.join) {
+            if (assignment.channelLogin == null) {
+              continue;
+            }
+
+            await connection.adapter.join(assignment.channelLogin);
+            await assignments.record({
+              type: "join_command_sent",
+              assignmentId: assignment.assignmentId,
+              observedAt: new Date()
+            });
+            accountJoined += 1;
+          }
+
+          parted += accountParted;
+          joined += accountJoined;
+          roomReservations += commandPlan.roomReservations;
+          availableRoomSlots += commandPlan.availableRoomSlots;
+          staleJoiningRequeued += commandPlan.staleJoiningRequeued;
+          accountResults.push({
+            botLogin: bot.login,
+            botTokenSource: bot.source,
+            connected: connection.connected,
+            joinCommandsSent: accountJoined,
+            partCommandsSent: accountParted,
+            roomReservations: commandPlan.roomReservations,
+            availableRoomSlots: commandPlan.availableRoomSlots,
+            staleJoiningRequeued: commandPlan.staleJoiningRequeued
+          });
+        } catch (error) {
+          failedBotAccounts += 1;
+          console.error(JSON.stringify({
+            level: "error",
+            loop: "irc",
+            botLogin: bot.login,
+            message: error instanceof Error ? error.message : String(error)
+          }));
+        }
       }
 
       return {
-        activeConnections: connected ? 1 : 0,
+        activeConnections: [...connections.values()].filter((connection) => connection.connected).length,
+        enabledBotAccounts: bots.length,
+        usableBotAccounts: usableBots.length,
+        failedBotAccounts,
         joinCommandsSent: joined,
         partCommandsSent: parted,
-        roomReservations: commandPlan.roomReservations,
-        availableRoomSlots: commandPlan.availableRoomSlots,
-        staleJoiningRequeued: commandPlan.staleJoiningRequeued,
-        botLogin,
-        botTokenSource: bot.source
+        roomReservations,
+        availableRoomSlots,
+        staleJoiningRequeued,
+        accounts: accountResults
       };
     }
   });
 
   return completion.then(async () => {
-    if (adapter != null) {
-      await adapter.disconnect("worker_shutdown");
-    }
+    const botAccountIds = [...connections.keys()];
+    await Promise.allSettled(
+      botAccountIds.map((botAccountId) => disconnectConnection(botAccountId, "worker_shutdown"))
+    );
   });
 };
 

@@ -333,7 +333,7 @@ Default assumptions for one normal bot account:
 - broadcaster-authorized or moderator cases can have different behavior and
   must be modeled separately
 
-The system starts with one bot account but models a future account pool.
+The system supports a pool of bot accounts while remaining valid with one account.
 
 Account pool requirements:
 

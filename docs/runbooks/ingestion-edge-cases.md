@@ -21,8 +21,12 @@ for large channels.
 
 ## Current Worker Behavior
 
-- Assignment selection keeps the top configured Finnish live streams active for
-  each bot account.
+- Assignment selection ranks one candidate set against the pool's combined
+  capacity, preserves incumbents where possible, and partitions streams into
+  disjoint per-account assignments.
+- Each enabled account with a valid token gets its own IRC connection and its
+  configured room and JOIN-rate limits. Accounts without a valid token
+  contribute zero effective capacity.
 - Existing `left`, `failed`, or pending `leaving` assignments are revived when
   they move back into the selected capacity set.
 - Pending PART commands are sent before new JOIN commands to avoid temporary

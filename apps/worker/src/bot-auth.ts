@@ -14,10 +14,36 @@ export type ResolvedBotCredentials = {
   joinRatePer10Seconds: number;
 };
 
+export type ResolvedBotAccountCredentials = ResolvedBotCredentials & {
+  botAccountId: string;
+  login: string;
+};
+
 export const resolvePrimaryBotCredentials = async (
   db: DbClient,
   config: AppConfig
 ): Promise<ResolvedBotCredentials> => {
+  const [primary] = await resolveBotCredentialsPool(db, config);
+  if (primary != null) {
+    return primary;
+  }
+
+  return {
+    botAccountId: null,
+    twitchUserId: null,
+    login: null,
+    accessToken: null,
+    scopes: [],
+    source: "none",
+    maxJoinedRooms: config.DEFAULT_BOT_JOIN_CAPACITY,
+    joinRatePer10Seconds: config.DEFAULT_BOT_JOIN_RATE_PER_10_SECONDS
+  };
+};
+
+export const resolveBotCredentialsPool = async (
+  db: DbClient,
+  config: AppConfig
+): Promise<ResolvedBotAccountCredentials[]> => {
   const envLogin = config.TWITCH_BOT_LOGIN.trim().toLowerCase();
   if (envLogin !== "") {
     if (config.TWITCH_BOT_USER_ID !== "") {
@@ -70,34 +96,9 @@ export const resolvePrimaryBotCredentials = async (
     if (bot == null) {
       throw new Error("Failed to upsert env bot account.");
     }
-
-    if (config.TWITCH_BOT_ACCESS_TOKEN !== "") {
-      return {
-        botAccountId: bot.id,
-        twitchUserId: config.TWITCH_BOT_USER_ID || null,
-        login: envLogin,
-        accessToken: config.TWITCH_BOT_ACCESS_TOKEN,
-        scopes: config.TWITCH_BOT_SCOPES.split(/\s+/).filter(Boolean),
-        source: "env",
-        maxJoinedRooms: bot.maxJoinedRooms,
-        joinRatePer10Seconds: bot.joinRatePer10Seconds
-      };
-    }
-
-    const dbToken = await findLatestValidToken(db, config, bot.id);
-    return {
-      botAccountId: bot.id,
-      twitchUserId: config.TWITCH_BOT_USER_ID || null,
-      login: envLogin,
-      accessToken: dbToken?.accessToken ?? null,
-      scopes: dbToken?.scopes ?? [],
-      source: dbToken == null ? "none" : "database",
-      maxJoinedRooms: bot.maxJoinedRooms,
-      joinRatePer10Seconds: bot.joinRatePer10Seconds
-    };
   }
 
-  const [bot] = await db
+  const bots = await db
     .select({
       id: botAccounts.id,
       twitchUserId: botAccounts.twitchUserId,
@@ -107,33 +108,27 @@ export const resolvePrimaryBotCredentials = async (
     })
     .from(botAccounts)
     .where(eq(botAccounts.enabled, true))
-    .orderBy(desc(botAccounts.priority), desc(botAccounts.updatedAt))
-    .limit(1);
+    .orderBy(desc(botAccounts.priority), desc(botAccounts.updatedAt));
 
-  if (bot == null) {
-    return {
-      botAccountId: null,
-      twitchUserId: null,
-      login: null,
-      accessToken: null,
-      scopes: [],
-      source: "none",
-      maxJoinedRooms: config.DEFAULT_BOT_JOIN_CAPACITY,
-      joinRatePer10Seconds: config.DEFAULT_BOT_JOIN_RATE_PER_10_SECONDS
-    };
+  const credentials: ResolvedBotAccountCredentials[] = [];
+  for (const bot of bots) {
+    const usesEnvToken = bot.login === envLogin && config.TWITCH_BOT_ACCESS_TOKEN !== "";
+    const dbToken = usesEnvToken ? null : await findLatestValidToken(db, config, bot.id);
+    credentials.push({
+      botAccountId: bot.id,
+      twitchUserId: bot.twitchUserId,
+      login: bot.login,
+      accessToken: usesEnvToken ? config.TWITCH_BOT_ACCESS_TOKEN : dbToken?.accessToken ?? null,
+      scopes: usesEnvToken
+        ? config.TWITCH_BOT_SCOPES.split(/\s+/).filter(Boolean)
+        : dbToken?.scopes ?? [],
+      source: usesEnvToken ? "env" : dbToken == null ? "none" : "database",
+      maxJoinedRooms: bot.maxJoinedRooms,
+      joinRatePer10Seconds: bot.joinRatePer10Seconds
+    });
   }
 
-  const dbToken = await findLatestValidToken(db, config, bot.id);
-  return {
-    botAccountId: bot.id,
-    twitchUserId: bot.twitchUserId,
-    login: bot.login,
-    accessToken: dbToken?.accessToken ?? null,
-    scopes: dbToken?.scopes ?? [],
-    source: dbToken == null ? "none" : "database",
-    maxJoinedRooms: bot.maxJoinedRooms,
-    joinRatePer10Seconds: bot.joinRatePer10Seconds
-  };
+  return credentials;
 };
 
 const findLatestValidToken = async (
