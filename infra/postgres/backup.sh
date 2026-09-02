@@ -34,6 +34,12 @@ if [ -z "${PGPASSWORD:-}" ]; then
   exit 1
 fi
 
+initial_delay="$(backup_seconds_until_due "$BACKUP_INTERVAL_SECONDS")"
+if [ "$initial_delay" -gt 0 ]; then
+  backup_log "backup_scheduled reason=current_backup_still_fresh delay_seconds=$initial_delay"
+  sleep "$initial_delay"
+fi
+
 create_backup() {
   if ! backup_preflight; then
     return 1

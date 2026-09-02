@@ -57,7 +57,7 @@ export const baseEnvSchema = z.object({
   CHATTERS_RECONCILIATION_INTERVAL_MS: positiveIntFromString(300_000),
   CHATTERS_RECONCILIATION_MAX_CHANNELS: intFromString(25),
   CHATTERS_RECONCILIATION_MAX_PAGES_PER_CHANNEL: intFromString(5),
-  AGGREGATION_INTERVAL_MS: positiveIntFromString(60_000),
+  AGGREGATION_INTERVAL_MS: positiveIntFromString(300_000),
   AGGREGATION_BUCKET_MINUTES: positiveIntFromString(5),
   AGGREGATION_LOOKBACK_HOURS: positiveIntFromString(48),
   MAINTENANCE_INTERVAL_MS: positiveIntFromString(300_000),

@@ -17,6 +17,10 @@ assert_missing() {
   [ ! -e "$1" ] || fail "expected $1 to be absent"
 }
 
+assert_equal() {
+  [ "$1" = "$2" ] || fail "expected $1 to equal $2"
+}
+
 create_complete_backup() {
   filename="$1"
   size="$2"
@@ -144,5 +148,12 @@ export BACKUP_MAX_COUNT BACKUP_RETENTION_DRY_RUN
 prune_backups "$(date -u +%s)" >/dev/null
 assert_exists "$BACKUP_DIR/twitch_tracker_20260102T000000Z.dump"
 assert_exists "$BACKUP_DIR/twitch_tracker_20260101T000000Z.dump"
+
+reset_case backup_schedule
+create_complete_backup twitch_tracker_20260101T000000Z.dump 4
+mark_known_good twitch_tracker_20260101T000000Z.dump
+backup_mtime="$(backup_file_mtime "$BACKUP_DIR/twitch_tracker_20260101T000000Z.dump")"
+assert_equal "$(backup_seconds_until_due 86400 "$((backup_mtime + 3600))")" 82800
+assert_equal "$(backup_seconds_until_due 86400 "$((backup_mtime + 86400))")" 0
 
 printf 'backup retention tests passed\n'

@@ -21,6 +21,7 @@ describe("production configuration", () => {
     const config = loadConfig(productionEnv());
     expect(config.APP_MODE).toBe("production");
     expect(config.BROADCASTER_METADATA_REFRESH_INTERVAL_MS).toBe(86_400_000);
+    expect(config.AGGREGATION_INTERVAL_MS).toBe(300_000);
   });
 
   it("rejects different public origins", () => {

@@ -120,6 +120,24 @@ known_good_backup() {
   printf '%s\n' "$dump"
 }
 
+backup_seconds_until_due() {
+  interval_seconds="$1"
+  now_epoch="${2:-$(date -u +%s)}"
+  if ! previous="$(known_good_backup)"; then
+    printf '0\n'
+    return 0
+  fi
+
+  age_seconds=$((now_epoch - $(backup_file_mtime "$previous")))
+  if [ "$age_seconds" -lt 0 ]; then
+    printf '%s\n' "$interval_seconds"
+  elif [ "$age_seconds" -ge "$interval_seconds" ]; then
+    printf '0\n'
+  else
+    printf '%s\n' "$((interval_seconds - age_seconds))"
+  fi
+}
+
 complete_backup_files() {
   find "$BACKUP_DIR" -maxdepth 1 -type f -name 'twitch_tracker_????????T??????Z.dump' -size +0c -print | sort -r
 }

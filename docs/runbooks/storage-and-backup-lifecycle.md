@@ -34,6 +34,11 @@ before the preceding dump is removed, so normal rotation never intentionally
 leaves zero recovery copies. These are safety ceilings for the local recovery
 cache, not a disaster-recovery retention policy.
 
+On service restart, the backup process waits for the remainder of the configured
+interval when the protected backup is still fresh. Application deployments
+therefore do not create another full dump merely because the container was
+recreated.
+
 `BACKUP_OFF_HOST_CONFIRMED=true` is an operator attestation. When it is false,
 backup creation continues but emits a warning. Set it to true only after
 `BACKUP_HOST_PATH` is verified as a remote mount or as a directory copied by an
@@ -123,6 +128,9 @@ Future writes avoid redundancy without lowering observation frequency:
   latest complete summary remain in `worker_heartbeats`.
 - Permanent IRC assignment failures are remembered per bot and broadcaster so
   the scheduler does not retry a known ban every 30 seconds.
+- Five-minute aggregate buckets are rebuilt every five minutes rather than
+  rescanning the 48-hour reconciliation window every minute. Source events and
+  viewer observations keep their original collection cadence.
 
 Keep the three-minute discovery interval unless the product explicitly accepts
 missing short streams and coarser viewer series. The five-minute aggregate size
