@@ -78,6 +78,13 @@
       "when": 1788381110053,
       "tag": "0010_repair_stream_end_order",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1788382000000,
+      "tag": "0011_eventsub_reconciliation_state",
+      "breakpoints": true
     }
   ]
 }

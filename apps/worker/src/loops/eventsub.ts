@@ -8,21 +8,31 @@ import {
   rawEventsubEvents,
   streamSessions,
   streamSnapshots,
+  subjectPrivacyStates,
   twitchUsers
 } from "@twitch-tracker/db";
-import { FetchEventSubAdapter, getTwitchAppAccessToken, type EventSubSubscription } from "@twitch-tracker/twitch";
-import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
+import {
+  FetchEventSubAdapter,
+  getTwitchAppAccessToken,
+  TwitchEventSubApiError,
+  type EventSubSubscription
+} from "@twitch-tracker/twitch";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
+import {
+  hasEquivalentEventSubSubscription,
+  planEventSubReconciliation,
+  selectDesiredEventSubChannelIds,
+  type DesiredEventSubSubscription
+} from "../eventsub-reconciliation.js";
 import { getFinnishStreamMatchReason } from "../finnish-stream.js";
 import type { WorkerContext } from "../worker.js";
 import { startIntervalLoop } from "./common.js";
 
-type DesiredSubscription = {
-  localId: string;
+type DesiredSubscription = DesiredEventSubSubscription & {
   type: string;
   version: string;
   condition: Record<string, string>;
-  conditionKey: string;
   broadcasterUserId: string;
   callbackUrl: string;
 };
@@ -77,20 +87,28 @@ const genericEventSubPayloadSchema = z.object({
   event: z.record(z.string(), z.unknown())
 });
 
-export const runEventSubLoop = (context: WorkerContext) => {
+const eventSubRevocationPayloadSchema = z.object({
+  subscription: z.object({
+    id: z.string().min(1),
+    status: z.string().min(1)
+  })
+});
+
+export const runEventSubProcessingLoop = (context: WorkerContext) => {
   return startIntervalLoop({
     name: "eventsub",
-    intervalMs: context.config.MAINTENANCE_INTERVAL_MS,
+    intervalMs: context.config.EVENTSUB_PROCESSING_INTERVAL_MS,
     context,
-    run: async () => {
-      const processing = await processPendingEventSubEvents(context);
-      const reconciliation = await reconcileSubscriptions(context);
+    run: () => processPendingEventSubEvents(context)
+  });
+};
 
-      return {
-        ...processing,
-        ...reconciliation
-      };
-    }
+export const runEventSubReconciliationLoop = (context: WorkerContext) => {
+  return startIntervalLoop({
+    name: "eventsub-reconciliation",
+    intervalMs: context.config.EVENTSUB_RECONCILIATION_INTERVAL_MS,
+    context,
+    run: () => reconcileSubscriptions(context)
   });
 };
 
@@ -129,6 +147,34 @@ const processPendingEventSubEvents = async (context: WorkerContext) => {
 };
 
 const processRawEventSubEvent = async (context: WorkerContext, row: RawEventSubRow): Promise<"processed" | "ignored"> => {
+  if (row.messageType === "revocation") {
+    const parsed = eventSubRevocationPayloadSchema.parse(row.payload);
+    await context.db
+      .update(eventsubSubscriptions)
+      .set({
+        twitchSubscriptionId: null,
+        status: parsed.subscription.status,
+        cost: null,
+        lastSyncedAt: row.receivedAt,
+        latestError: `Revoked by Twitch: ${parsed.subscription.status}`,
+        updatedAt: row.receivedAt
+      })
+      .where(eq(eventsubSubscriptions.twitchSubscriptionId, parsed.subscription.id));
+    await markEventSubProcessed(context, row);
+    return "processed";
+  }
+  if (row.messageType != null && row.messageType !== "notification") {
+    await context.db
+      .update(rawEventsubEvents)
+      .set({
+        processingStatus: "ignored",
+        errorMessage: `Unsupported EventSub message type: ${row.messageType}`,
+        updatedAt: new Date()
+      })
+      .where(eq(rawEventsubEvents.id, row.id));
+    return "ignored";
+  }
+
   switch (row.eventType) {
     case "stream.online":
       await processStreamOnline(context, row);
@@ -182,7 +228,7 @@ const processUserUpdate = async (context: WorkerContext, row: RawEventSubRow) =>
     login: readEventString(event, "user_login"),
     displayName: readEventString(event, "user_name")
   });
-  await upsertTrackedChannel(context, userId);
+  await ensureTrackedChannel(context, userId);
 
   await insertChannelEvent(context, {
     eventType: "user.update",
@@ -208,7 +254,7 @@ const processGenericChannelEvent = async (context: WorkerContext, row: RawEventS
     login: readEventString(event, "broadcaster_user_login"),
     displayName: readEventString(event, "broadcaster_user_name")
   });
-  await upsertTrackedChannel(context, broadcasterUserId);
+  await ensureTrackedChannel(context, broadcasterUserId);
 
   await insertChannelEvent(context, {
     eventType: row.eventType,
@@ -232,7 +278,7 @@ const processStreamOnline = async (context: WorkerContext, row: RawEventSubRow) 
     login: event.broadcaster_user_login,
     displayName: event.broadcaster_user_name
   });
-  await upsertTrackedChannel(context, event.broadcaster_user_id);
+  await ensureTrackedChannel(context, event.broadcaster_user_id);
 
   await closeSupersededLiveStreamSessions(context.db, {
     broadcasterUserId: event.broadcaster_user_id,
@@ -284,7 +330,7 @@ const processStreamOffline = async (context: WorkerContext, row: RawEventSubRow)
     login: event.broadcaster_user_login,
     displayName: event.broadcaster_user_name
   });
-  await upsertTrackedChannel(context, event.broadcaster_user_id);
+  await ensureTrackedChannel(context, event.broadcaster_user_id);
 
   const twitchStreamId = await findStreamForOfflineEvent(context, event.id, event.broadcaster_user_id);
   if (twitchStreamId != null) {
@@ -319,7 +365,7 @@ const processChannelUpdate = async (context: WorkerContext, row: RawEventSubRow)
     login: event.broadcaster_user_login,
     displayName: event.broadcaster_user_name
   });
-  await upsertTrackedChannel(context, event.broadcaster_user_id);
+  await ensureTrackedChannel(context, event.broadcaster_user_id);
 
   const liveStreamId = await findLiveStreamId(context, event.broadcaster_user_id);
   if (liveStreamId != null) {
@@ -386,34 +432,49 @@ const processChannelRaid = async (context: WorkerContext, row: RawEventSubRow) =
     login: event.to_broadcaster_user_login,
     displayName: event.to_broadcaster_user_name
   });
-  await upsertTrackedChannel(context, event.to_broadcaster_user_id);
+  await ensureTrackedChannel(context, event.to_broadcaster_user_id);
 
   const sourceStreamId = await findLiveStreamId(context, event.from_broadcaster_user_id);
   const targetStreamId = await findLiveStreamId(context, event.to_broadcaster_user_id);
-  await context.db
-    .insert(raids)
-    .values({
-      sourceBroadcasterUserId: event.from_broadcaster_user_id,
-      targetBroadcasterUserId: event.to_broadcaster_user_id,
-      viewerCount: event.viewers ?? null,
-      occurredAt,
-      sourceStreamId,
-      targetStreamId,
-      rawEventsubEventId: row.id
-    })
-    .onConflictDoNothing({
-      target: raids.rawEventsubEventId
-    });
+  const duplicateWindowMs = 60_000;
+  const [nearbyRaid] = await context.db
+    .select({ rawEventsubEventId: raids.rawEventsubEventId })
+    .from(raids)
+    .where(and(
+      eq(raids.sourceBroadcasterUserId, event.from_broadcaster_user_id),
+      eq(raids.targetBroadcasterUserId, event.to_broadcaster_user_id),
+      gte(raids.occurredAt, new Date(occurredAt.getTime() - duplicateWindowMs)),
+      lte(raids.occurredAt, new Date(occurredAt.getTime() + duplicateWindowMs))
+    ))
+    .orderBy(raids.occurredAt)
+    .limit(1);
+  const duplicateDelivery = nearbyRaid != null && nearbyRaid.rawEventsubEventId !== row.id;
+  if (!duplicateDelivery) {
+    await context.db
+      .insert(raids)
+      .values({
+        sourceBroadcasterUserId: event.from_broadcaster_user_id,
+        targetBroadcasterUserId: event.to_broadcaster_user_id,
+        viewerCount: event.viewers ?? null,
+        occurredAt,
+        sourceStreamId,
+        targetStreamId,
+        rawEventsubEventId: row.id
+      })
+      .onConflictDoNothing({
+        target: raids.rawEventsubEventId
+      });
 
-  await insertChannelEvent(context, {
-    eventType: "channel.raid",
-    broadcasterUserId: event.to_broadcaster_user_id,
-    twitchStreamId: targetStreamId,
-    actorUserId: event.from_broadcaster_user_id,
-    occurredAt,
-    sourceEventId: sourceEventId(row),
-    rawEventsubEventId: row.id
-  });
+    await insertChannelEvent(context, {
+      eventType: "channel.raid",
+      broadcasterUserId: event.to_broadcaster_user_id,
+      twitchStreamId: targetStreamId,
+      actorUserId: event.from_broadcaster_user_id,
+      occurredAt,
+      sourceEventId: sourceEventId(row),
+      rawEventsubEventId: row.id
+    });
+  }
 };
 
 const reconcileSubscriptions = async (context: WorkerContext) => {
@@ -440,84 +501,184 @@ const reconcileSubscriptions = async (context: WorkerContext) => {
     };
   }
 
-  const desired = await upsertDesiredSubscriptions(context, callbackUrl.toString());
-  if (desired.length === 0) {
-    return {
-      reconciledSubscriptions: 0,
-      desiredSubscriptions: 0
-    };
-  }
+  const callback = callbackUrl.toString();
+  const desiredChannelIds = await readDesiredChannelIds(context, callback);
+  const desired = await upsertDesiredSubscriptions(context, callback, desiredChannelIds);
 
   const appToken = await getTwitchAppAccessToken({
     clientId: context.config.TWITCH_CLIENT_ID,
     clientSecret: context.config.TWITCH_CLIENT_SECRET
   });
   const eventsub = new FetchEventSubAdapter(context.config.TWITCH_CLIENT_ID);
-  const twitchSubscriptions = await listAllSubscriptions(eventsub, appToken.accessToken);
-  const existingByKey = new Map(
-    twitchSubscriptions
-      .filter((subscription) => subscription.transport.method === "webhook" && subscription.transport.callback === callbackUrl.toString())
-      .map((subscription) => [subscriptionKey(subscription.type, subscription.version, subscription.condition), subscription])
+  const locallyOwnedRemoteIds = new Set(
+    (await context.db
+      .select({ twitchSubscriptionId: eventsubSubscriptions.twitchSubscriptionId })
+      .from(eventsubSubscriptions)
+      .where(isNotNull(eventsubSubscriptions.twitchSubscriptionId)))
+      .map((row) => row.twitchSubscriptionId)
+      .filter((id): id is string => id != null)
   );
+  const snapshot = await listActiveSubscriptions(eventsub, appToken.accessToken);
+  const plan = planEventSubReconciliation({
+    desired,
+    remote: snapshot.subscriptions,
+    callbackUrl: callback,
+    locallyOwnedRemoteIds
+  });
 
-  let matched = 0;
-  let created = 0;
-  let failed = 0;
-  for (const desiredSubscription of desired) {
-    const existing = existingByKey.get(subscriptionKey(desiredSubscription.type, desiredSubscription.version, desiredSubscription.condition));
-    if (existing != null) {
-      await markSynced(context, desiredSubscription.localId, existing);
-      matched += 1;
-      continue;
-    }
+  for (const match of plan.matches) {
+    await markSynced(context, match.desired.localId, match.remote);
+  }
 
+  const activeRemoteIds = new Set(snapshot.subscriptions.map((subscription) => subscription.id));
+  const deletedOrphanedLocalRows = await deleteOrphanedLocalSubscriptions(context, activeRemoteIds);
+  const deletedRemoteIds = new Set<string>();
+  let deletedSubscriptions = 0;
+  let failedDeletions = 0;
+  let deletionRateLimited = false;
+  const deletions = plan.stale.slice(0, context.config.EVENTSUB_MAX_DELETIONS_PER_RUN);
+  for (const subscription of deletions) {
     try {
-      const createdSubscription = await eventsub.createWebhookSubscription({
+      await eventsub.deleteSubscription({
         accessToken: appToken.accessToken,
-        type: desiredSubscription.type,
-        version: desiredSubscription.version,
-        condition: desiredSubscription.condition,
-        callback: desiredSubscription.callbackUrl,
-        secret: context.config.TWITCH_EVENTSUB_SECRET
+        subscriptionId: subscription.id
       });
-      await markSynced(context, desiredSubscription.localId, createdSubscription);
-      created += 1;
+      deletedRemoteIds.add(subscription.id);
+      await clearDeletedLocalSubscription(context, subscription.id);
+      deletedSubscriptions += 1;
     } catch (error) {
-      failed += 1;
+      failedDeletions += 1;
+      if (error instanceof TwitchEventSubApiError && error.statusCode === 429) {
+        deletionRateLimited = true;
+        break;
+      }
+    }
+  }
+
+  const remainingRemote = snapshot.subscriptions.filter((subscription) => !deletedRemoteIds.has(subscription.id));
+  const creatable = plan.missing.filter((subscription) => !hasEquivalentEventSubSubscription(subscription, remainingRemote));
+  const blockedCreations = plan.missing.length - creatable.length;
+  let createdSubscriptions = 0;
+  let failedCreations = 0;
+  let creationRateLimited = false;
+  if (!deletionRateLimited) {
+    for (const desiredSubscription of creatable.slice(0, context.config.EVENTSUB_MAX_CREATIONS_PER_RUN)) {
       await context.db
         .update(eventsubSubscriptions)
         .set({
-          status: "failed",
-          latestError: error instanceof Error ? error.message : String(error),
-          lastSyncedAt: new Date(),
+          twitchSubscriptionId: null,
+          status: "desired",
+          cost: null,
+          latestError: null,
           updatedAt: new Date()
         })
         .where(eq(eventsubSubscriptions.id, desiredSubscription.localId));
+      try {
+        const createdSubscription = await eventsub.createWebhookSubscription({
+          accessToken: appToken.accessToken,
+          type: desiredSubscription.type,
+          version: desiredSubscription.version,
+          condition: desiredSubscription.condition,
+          callback: callback,
+          secret: context.config.TWITCH_EVENTSUB_SECRET
+        });
+        await markSynced(context, desiredSubscription.localId, createdSubscription);
+        createdSubscriptions += 1;
+      } catch (error) {
+        failedCreations += 1;
+        await markSubscriptionFailure(context, desiredSubscription.localId, error);
+        if (error instanceof TwitchEventSubApiError && error.statusCode === 429) {
+          creationRateLimited = true;
+          break;
+        }
+      }
     }
   }
 
   return {
+    desiredChannels: desiredChannelIds.length,
     desiredSubscriptions: desired.length,
-    twitchSubscriptions: twitchSubscriptions.length,
-    matchedSubscriptions: matched,
-    createdSubscriptions: created,
-    failedSubscriptions: failed
+    activeTwitchSubscriptions: snapshot.subscriptions.length,
+    twitchTotalCost: snapshot.totalCost,
+    twitchMaxTotalCost: snapshot.maxTotalCost,
+    matchedSubscriptions: plan.matches.length,
+    staleSubscriptions: plan.stale.length,
+    deletedSubscriptions,
+    failedDeletions,
+    deferredDeletions: plan.stale.length - deletedSubscriptions - failedDeletions,
+    deletionRateLimited,
+    deletedOrphanedLocalRows,
+    missingSubscriptions: plan.missing.length,
+    createdSubscriptions,
+    failedCreations,
+    blockedCreations,
+    deferredCreations: Math.max(0, creatable.length - createdSubscriptions - failedCreations),
+    creationRateLimited,
+    unmanagedRemoteSubscriptions: plan.unmanagedRemoteSubscriptions
   };
 };
 
-const upsertDesiredSubscriptions = async (context: WorkerContext, callbackUrl: string): Promise<DesiredSubscription[]> => {
-  const trackedChannels = await context.db
+const readDesiredChannelIds = async (context: WorkerContext, callbackUrl: string): Promise<string[]> => {
+  const maxChannels = context.config.EVENTSUB_MAX_CHANNELS;
+  if (maxChannels === 0) {
+    return [];
+  }
+
+  const recentCutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1_000);
+  const candidates = await context.db
     .select({
-      twitchUserId: channels.twitchUserId
+      twitchUserId: channels.twitchUserId,
+      isManuallyPinned: channels.isManuallyPinned,
+      lastSeenFinnishAt: channels.lastSeenFinnishAt
     })
     .from(channels)
-    .where(eq(channels.hasBeenSeenFinnish, true))
-    .orderBy(desc(channels.lastSeenFinnishAt))
-    .limit(context.config.EVENTSUB_MAX_CHANNELS);
+    .leftJoin(subjectPrivacyStates, eq(channels.twitchUserId, subjectPrivacyStates.twitchUserId))
+    .where(and(
+      or(eq(channels.isManuallyPinned, true), eq(channels.hasBeenSeenFinnish, true)),
+      or(isNull(subjectPrivacyStates.twitchUserId), eq(subjectPrivacyStates.trackingOptedOut, false))
+    ))
+    .orderBy(desc(channels.isManuallyPinned), desc(channels.trackingPriority), desc(channels.lastSeenFinnishAt), asc(channels.twitchUserId));
+  const previousDesiredRows = await context.db
+    .select({ broadcasterUserId: eventsubSubscriptions.broadcasterUserId })
+    .from(eventsubSubscriptions)
+    .where(and(eq(eventsubSubscriptions.isDesired, true), eq(eventsubSubscriptions.callbackUrl, callbackUrl)))
+    .orderBy(sql`${eventsubSubscriptions.lastSyncedAt} desc nulls last`, desc(eventsubSubscriptions.updatedAt));
+  let previousChannelIds = previousDesiredRows.map((row) => row.broadcasterUserId);
+  if (previousDesiredRows.length === 0) {
+    const recentlySyncedRows = await context.db
+      .select({ broadcasterUserId: eventsubSubscriptions.broadcasterUserId })
+      .from(eventsubSubscriptions)
+      .where(and(
+        eq(eventsubSubscriptions.callbackUrl, callbackUrl),
+        isNotNull(eventsubSubscriptions.broadcasterUserId),
+        isNotNull(eventsubSubscriptions.twitchSubscriptionId)
+      ))
+      .orderBy(sql`${eventsubSubscriptions.lastSyncedAt} desc nulls last`, desc(eventsubSubscriptions.updatedAt))
+      .limit(maxChannels * desiredDefinitions("placeholder").length * 2);
+    previousChannelIds = recentlySyncedRows.map((row) => row.broadcasterUserId);
+  }
+
+  return selectDesiredEventSubChannelIds({
+    candidates,
+    previousChannelIds,
+    maxChannels,
+    recentCutoff
+  });
+};
+
+const upsertDesiredSubscriptions = async (
+  context: WorkerContext,
+  callbackUrl: string,
+  desiredChannelIds: string[]
+): Promise<DesiredSubscription[]> => {
+  await context.db
+    .update(eventsubSubscriptions)
+    .set({ isDesired: false, updatedAt: new Date() })
+    .where(eq(eventsubSubscriptions.isDesired, true));
 
   const desired: DesiredSubscription[] = [];
-  for (const channel of trackedChannels) {
-    for (const definition of desiredDefinitions(channel.twitchUserId)) {
+  for (const twitchUserId of desiredChannelIds) {
+    for (const definition of desiredDefinitions(twitchUserId)) {
       const conditionKey = stableConditionKey(definition.condition);
       const [row] = await context.db
         .insert(eventsubSubscriptions)
@@ -526,10 +687,11 @@ const upsertDesiredSubscriptions = async (context: WorkerContext, callbackUrl: s
           eventVersion: definition.version,
           condition: definition.condition,
           conditionKey,
-          broadcasterUserId: channel.twitchUserId,
+          broadcasterUserId: twitchUserId,
           transportMethod: "webhook",
           callbackUrl,
-          status: "desired"
+          status: "desired",
+          isDesired: true
         })
         .onConflictDoUpdate({
           target: [
@@ -540,14 +702,18 @@ const upsertDesiredSubscriptions = async (context: WorkerContext, callbackUrl: s
           ],
           set: {
             condition: definition.condition,
-            broadcasterUserId: channel.twitchUserId,
+            broadcasterUserId: twitchUserId,
             transportMethod: "webhook",
             status: sql`case when ${eventsubSubscriptions.status} in ('enabled', 'webhook_callback_verification_pending') then ${eventsubSubscriptions.status} else 'desired' end`,
+            isDesired: true,
             latestError: null,
             updatedAt: new Date()
           }
         })
-        .returning({ id: eventsubSubscriptions.id });
+        .returning({
+          id: eventsubSubscriptions.id,
+          twitchSubscriptionId: eventsubSubscriptions.twitchSubscriptionId
+        });
 
       if (row == null) {
         throw new Error("Failed to upsert desired EventSub subscription.");
@@ -555,11 +721,11 @@ const upsertDesiredSubscriptions = async (context: WorkerContext, callbackUrl: s
 
       desired.push({
         localId: row.id,
+        twitchSubscriptionId: row.twitchSubscriptionId,
         type: definition.type,
         version: definition.version,
         condition: definition.condition,
-        conditionKey,
-        broadcasterUserId: channel.twitchUserId,
+        broadcasterUserId: twitchUserId,
         callbackUrl
       });
     }
@@ -616,16 +782,90 @@ const desiredDefinitions = (broadcasterUserId: string) => [
   }
 ];
 
-const listAllSubscriptions = async (eventsub: FetchEventSubAdapter, accessToken: string): Promise<EventSubSubscription[]> => {
-  const subscriptions: EventSubSubscription[] = [];
-  let cursor: string | null = null;
-  do {
-    const page = await eventsub.listSubscriptions(cursor == null ? { accessToken } : { accessToken, after: cursor });
-    subscriptions.push(...page.data);
-    cursor = page.cursor;
-  } while (cursor != null);
+const listActiveSubscriptions = async (eventsub: FetchEventSubAdapter, accessToken: string) => {
+  const subscriptionsById = new Map<string, EventSubSubscription>();
+  let totalCost = 0;
+  let maxTotalCost = 0;
+  for (const status of ["webhook_callback_verification_pending", "enabled"]) {
+    let cursor: string | null = null;
+    let firstPage = true;
+    do {
+      const page = await eventsub.listSubscriptions({
+        accessToken,
+        status,
+        ...(cursor == null ? {} : { after: cursor })
+      });
+      for (const subscription of page.data) {
+        subscriptionsById.set(subscription.id, subscription);
+      }
+      if (firstPage) {
+        totalCost = Math.max(totalCost, page.totalCost);
+        maxTotalCost = Math.max(maxTotalCost, page.maxTotalCost);
+        firstPage = false;
+      }
+      cursor = page.cursor;
+    } while (cursor != null);
+  }
 
-  return subscriptions;
+  return {
+    subscriptions: [...subscriptionsById.values()],
+    totalCost,
+    maxTotalCost
+  };
+};
+
+const deleteOrphanedLocalSubscriptions = async (context: WorkerContext, activeRemoteIds: Set<string>) => {
+  const rows = await context.db
+    .select({
+      id: eventsubSubscriptions.id,
+      twitchSubscriptionId: eventsubSubscriptions.twitchSubscriptionId
+    })
+    .from(eventsubSubscriptions)
+    .where(eq(eventsubSubscriptions.isDesired, false));
+  const orphanedIds = rows
+    .filter((row) => row.twitchSubscriptionId == null || !activeRemoteIds.has(row.twitchSubscriptionId))
+    .map((row) => row.id);
+  for (let index = 0; index < orphanedIds.length; index += 500) {
+    await context.db
+      .delete(eventsubSubscriptions)
+      .where(inArray(eventsubSubscriptions.id, orphanedIds.slice(index, index + 500)));
+  }
+  return orphanedIds.length;
+};
+
+const clearDeletedLocalSubscription = async (context: WorkerContext, twitchSubscriptionId: string) => {
+  await context.db
+    .update(eventsubSubscriptions)
+    .set({
+      twitchSubscriptionId: null,
+      status: "desired",
+      cost: null,
+      latestError: null,
+      lastSyncedAt: new Date(),
+      updatedAt: new Date()
+    })
+    .where(and(
+      eq(eventsubSubscriptions.twitchSubscriptionId, twitchSubscriptionId),
+      eq(eventsubSubscriptions.isDesired, true)
+    ));
+  await context.db
+    .delete(eventsubSubscriptions)
+    .where(and(
+      eq(eventsubSubscriptions.twitchSubscriptionId, twitchSubscriptionId),
+      eq(eventsubSubscriptions.isDesired, false)
+    ));
+};
+
+const markSubscriptionFailure = async (context: WorkerContext, localId: string, error: unknown) => {
+  await context.db
+    .update(eventsubSubscriptions)
+    .set({
+      status: "failed",
+      latestError: error instanceof Error ? error.message : String(error),
+      lastSyncedAt: new Date(),
+      updatedAt: new Date()
+    })
+    .where(eq(eventsubSubscriptions.id, localId));
 };
 
 const markSynced = async (context: WorkerContext, localId: string, subscription: EventSubSubscription) => {
@@ -674,22 +914,17 @@ const upsertTwitchUser = async (
     });
 };
 
-const upsertTrackedChannel = async (context: WorkerContext, twitchUserId: string) => {
+const ensureTrackedChannel = async (context: WorkerContext, twitchUserId: string) => {
   const now = new Date();
   await context.db
     .insert(channels)
     .values({
       twitchUserId,
-      hasBeenSeenFinnish: true,
-      firstSeenFinnishAt: now,
-      lastSeenFinnishAt: now,
       updatedAt: now
     })
     .onConflictDoUpdate({
       target: channels.twitchUserId,
       set: {
-        hasBeenSeenFinnish: true,
-        lastSeenFinnishAt: now,
         updatedAt: now
       }
     });
@@ -790,12 +1025,12 @@ const sourceEventId = (row: RawEventSubRow) => {
   return row.twitchEventId ?? row.twitchMessageId ?? row.id;
 };
 
-const subscriptionKey = (type: string, version: string, condition: Record<string, string>) => {
-  return `${type}:${version}:${stableConditionKey(condition)}`;
-};
-
 const stableConditionKey = (condition: Record<string, string>) => {
-  return JSON.stringify(Object.fromEntries(Object.entries(condition).sort(([left], [right]) => left.localeCompare(right))));
+  return JSON.stringify(Object.fromEntries(
+    Object.entries(condition)
+      .filter(([, value]) => value !== "")
+      .sort(([left], [right]) => left.localeCompare(right))
+  ));
 };
 
 const readEventString = (event: Record<string, unknown>, key: string): string | null => {

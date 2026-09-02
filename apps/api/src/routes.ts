@@ -35,7 +35,7 @@ import {
   workerHeartbeats,
   type DbClient
 } from "@twitch-tracker/db";
-import { createEventSubEnvelope, eventSubHeaders, exchangeTwitchAuthorizationCode, FetchHelixAdapter, refreshTwitchUserAccessToken, TwitchAuthError, validateTwitchAccessToken, verifyEventSubSignature } from "@twitch-tracker/twitch";
+import { createEventSubEnvelope, eventSubHeaders, exchangeTwitchAuthorizationCode, FetchHelixAdapter, isEventSubMessageTimestampFresh, refreshTwitchUserAccessToken, TwitchAuthError, validateTwitchAccessToken, verifyEventSubSignature } from "@twitch-tracker/twitch";
 import { and, desc, eq, gt, ilike, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
@@ -1203,10 +1203,11 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
       .get("db")
       .select({
         status: eventsubSubscriptions.status,
+        desired: eventsubSubscriptions.isDesired,
         count: sql<number>`count(*)::int`
       })
       .from(eventsubSubscriptions)
-      .groupBy(eventsubSubscriptions.status);
+      .groupBy(eventsubSubscriptions.status, eventsubSubscriptions.isDesired);
 
     return c.json({
       data: {
@@ -1852,7 +1853,6 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
 
   app.post("/api/webhooks/twitch/eventsub", async (c) => {
     const rawBody = await c.req.text();
-    const payload = JSON.parse(rawBody) as unknown;
     const headers = c.req.raw.headers;
     const signature = headers.get(eventSubHeaders.messageSignature);
     const messageId = headers.get(eventSubHeaders.messageId);
@@ -1872,6 +1872,16 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
     if (!verified) {
       return c.json({ error: { code: "invalid_signature", message: "EventSub signature validation failed." } }, 403);
     }
+    if (!isEventSubMessageTimestampFresh(messageTimestamp)) {
+      return c.json({ error: { code: "stale_message", message: "EventSub message timestamp is outside the accepted window." } }, 403);
+    }
+
+    let payload: unknown;
+    try {
+      payload = JSON.parse(rawBody) as unknown;
+    } catch {
+      return c.json({ error: { code: "invalid_payload", message: "EventSub payload must be valid JSON." } }, 400);
+    }
 
     const envelope = createEventSubEnvelope(headers, payload);
     await c
@@ -1883,6 +1893,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
         subscriptionId: extractSubscriptionId(payload),
         eventType: envelope.subscriptionType ?? "unknown",
         eventVersion: envelope.subscriptionVersion,
+        messageType: envelope.messageType,
         payload,
         receivedAt: envelope.receivedAt,
         processingStatus: envelope.messageType === "webhook_callback_verification" ? "ignored" : "pending"
@@ -1895,7 +1906,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
       return c.text(payload.challenge);
     }
 
-    return c.json({ data: { accepted: true, messageId: envelope.messageId } }, 202);
+    return c.body(null, 204);
   });
 
   return app;

@@ -96,6 +96,9 @@ Important constraints:
   not replayed after a dropped connection.
 - WebSocket subscriptions have per-user-token limits. Plan for reconciliation,
   not a fire-and-forget setup.
+- Webhook subscriptions also need explicit desired state and stale deletion.
+  Reconcile a stable bounded channel cohort, normalize Twitch's empty condition
+  fields, and delete only subscriptions owned by this callback/deployment.
 
 EventSub is probably the right long-term API for chat messages, but it does not
 provide every signal we want.

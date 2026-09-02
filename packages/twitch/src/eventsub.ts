@@ -33,6 +33,16 @@ export const verifyEventSubSignature = (input: {
   return timingSafeEqual(actualBuffer, expectedBuffer);
 };
 
+export const isEventSubMessageTimestampFresh = (
+  messageTimestamp: string,
+  now = new Date(),
+  maxAgeMs = 10 * 60 * 1_000
+) => {
+  const timestamp = new Date(messageTimestamp);
+  return !Number.isNaN(timestamp.getTime())
+    && Math.abs(now.getTime() - timestamp.getTime()) <= maxAgeMs;
+};
+
 export const createEventSubEnvelope = (headers: Headers, payload: unknown): EventSubEnvelope => {
   return {
     messageId: headers.get(eventSubHeaders.messageId),
@@ -92,16 +102,30 @@ export type EventSubSubscriptionsPage = {
   cursor: string | null;
 };
 
+export class TwitchEventSubApiError extends Error {
+  constructor(
+    public readonly operation: "list" | "create" | "delete",
+    public readonly statusCode: number
+  ) {
+    super(`Twitch EventSub ${operation} failed with HTTP ${statusCode}.`);
+    this.name = "TwitchEventSubApiError";
+  }
+}
+
 export class FetchEventSubAdapter {
   constructor(private readonly clientId: string) {}
 
   async listSubscriptions(input: {
     accessToken: string;
     after?: string;
+    status?: string;
   }): Promise<EventSubSubscriptionsPage> {
     const url = new URL(eventSubBaseUrl);
     if (input.after != null && input.after !== "") {
       url.searchParams.set("after", input.after);
+    }
+    if (input.status != null && input.status !== "") {
+      url.searchParams.set("status", input.status);
     }
 
     const response = await fetchWithTimeout(url, {
@@ -109,7 +133,7 @@ export class FetchEventSubAdapter {
     });
     const body = await readJsonResponse(response);
     if (!response.ok) {
-      throw new Error(`Twitch EventSub list failed with HTTP ${response.status}.`);
+      throw new TwitchEventSubApiError("list", response.status);
     }
 
     return parseSubscriptionsPage(body);
@@ -142,7 +166,7 @@ export class FetchEventSubAdapter {
     });
     const body = await readJsonResponse(response);
     if (!response.ok) {
-      throw new Error(`Twitch EventSub create failed with HTTP ${response.status}.`);
+      throw new TwitchEventSubApiError("create", response.status);
     }
 
     const page = parseSubscriptionsPage(body);
@@ -151,6 +175,25 @@ export class FetchEventSubAdapter {
       throw new Error("Twitch EventSub create response did not include a subscription.");
     }
     return subscription;
+  }
+
+  async deleteSubscription(input: {
+    accessToken: string;
+    subscriptionId: string;
+  }): Promise<"deleted" | "not_found"> {
+    const url = new URL(eventSubBaseUrl);
+    url.searchParams.set("id", input.subscriptionId);
+    const response = await fetchWithTimeout(url, {
+      method: "DELETE",
+      headers: this.headers(input.accessToken)
+    });
+    if (response.status === 204) {
+      return "deleted";
+    }
+    if (response.status === 404) {
+      return "not_found";
+    }
+    throw new TwitchEventSubApiError("delete", response.status);
   }
 
   private headers(accessToken: string) {

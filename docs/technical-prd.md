@@ -312,6 +312,8 @@ Later target events where scopes and product value justify them:
 
 Production should prefer EventSub webhooks behind Caddy. Local development can
 skip EventSub, use a small WebSocket test set, or use a tunnel when needed.
+Webhook subscription management uses a stable bounded desired cohort, removes
+only tracker-owned stale subscriptions, and applies per-run API-operation caps.
 
 ### Source Conflict Rule
 
@@ -412,7 +414,8 @@ Loops:
 - `user-hydration`: batch `Get Users`, user metadata and name history
 - `assignment`: chat capacity, priority scoring, join/leave desired state
 - `irc`: IRC connections, raw lines, messages, JOIN/PART, reconnects
-- `eventsub`: subscription reconciliation and webhook/event processing support
+- `eventsub`: webhook/event processing on a short interval
+- `eventsub-reconciliation`: bounded remote desired-state reconciliation
 - `aggregation`: minute/hour/day buckets and derived stats
 - `maintenance`: raw text/payload retention, stale assignment cleanup, token
   validation, operational housekeeping
@@ -544,16 +547,19 @@ following table groups are required.
 `raw_eventsub_events`
 
 - raw EventSub event ledger
-- stores Twitch message/event IDs, subscription ID, event type/version,
-  payload JSON, received timestamp, processing status, and error metadata
-- payload JSON is redacted after the configured raw payload retention window
+- stores Twitch message/event IDs and message type, subscription ID, event
+  type/version, payload JSON, received timestamp, processing status, and error
+  metadata
+- payload JSON follows the preservation-first policy and is redacted only by
+  an explicit privacy workflow
 
 `eventsub_subscriptions`
 
 - durable EventSub subscription state
 - stores Twitch subscription ID if known, event type/version, condition JSON,
   stable condition key, broadcaster, transport method, callback URL, Twitch
-  status, cost, last sync timestamp, and latest reconciliation error
+  status, desired-state flag, cost, last sync timestamp, and latest
+  reconciliation error
 
 ### Chat Tables
 

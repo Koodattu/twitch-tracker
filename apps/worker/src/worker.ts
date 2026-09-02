@@ -5,7 +5,7 @@ import { runAggregationLoop } from "./loops/aggregation.js";
 import { runAssignmentLoop } from "./loops/assignment.js";
 import { runChattersReconciliationLoop } from "./loops/chatters-reconciliation.js";
 import { runDiscoveryLoop } from "./loops/discovery.js";
-import { runEventSubLoop } from "./loops/eventsub.js";
+import { runEventSubProcessingLoop, runEventSubReconciliationLoop } from "./loops/eventsub.js";
 import { runIrcLoop } from "./loops/irc.js";
 import { runMaintenanceLoop } from "./loops/maintenance.js";
 import { runUserHydrationLoop } from "./loops/user-hydration.js";
@@ -44,7 +44,8 @@ export const createWorker = ({ config, db }: CreateWorkerInput) => {
         runAssignmentLoop(context),
         runIrcLoop(context),
         runChattersReconciliationLoop(context),
-        runEventSubLoop(context),
+        runEventSubProcessingLoop(context),
+        runEventSubReconciliationLoop(context),
         runAggregationLoop(context),
         runMaintenanceLoop(context)
       ];

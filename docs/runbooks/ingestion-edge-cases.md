@@ -104,6 +104,24 @@ Chat-message EventSub is different: it is authorization-gated and should not be
 treated as a replacement for IRC across arbitrary Finnish channels. Use it later
 for opted-in or moderator-authorized channels.
 
+The webhook worker keeps a stable, bounded desired channel cohort and reconciles
+it once per minute. It deletes only subscriptions tied to the current callback
+or remote IDs already recorded locally. A large stale backlog is expected to
+shrink over multiple runs because each run has deletion and creation limits.
+Use the `eventsub-reconciliation` heartbeat details to check active, desired,
+stale, deleted, deferred, failed, blocked, and unmanaged counts. A non-zero
+unmanaged count means another callback shares the Twitch application; those
+subscriptions are deliberately not changed.
+
+Twitch may return raid conditions with an empty `from_broadcaster_user_id` or
+`to_broadcaster_user_id`. Empty condition values are ignored when matching so
+these subscriptions are not recreated as duplicates.
+
+When both sides of a raid belong to the desired cohort, the inbound and
+outbound subscriptions may each deliver it. Deliveries with the same source and
+target within one minute are one normalized raid; both raw webhook rows remain
+available for provenance.
+
 ## Remaining Known Gaps
 
 - IRC `353` NAMES replies are stored raw but not normalized into membership
@@ -114,3 +132,5 @@ for opted-in or moderator-authorized channels.
   port 443 is configured.
 - EventSub is not exercised locally unless a public HTTPS callback on port 443
   is available.
+- Failed raw EventSub events are recorded for diagnosis, but there is not yet an
+  automated replay loop for them.

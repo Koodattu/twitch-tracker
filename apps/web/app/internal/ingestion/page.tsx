@@ -26,7 +26,11 @@ export default async function IngestionPage() {
             <MetricCard label="Deployment mode" value={formatStatus(status.mode)} />
             <MetricCard label="Active assignments" value={formatCount(status.activeAssignments)} />
             <MetricCard label="Worker loops" value={formatCount(status.workerHeartbeats.length)} detail="Latest heartbeat per recorded loop" />
-            <MetricCard label="EventSub subscriptions" value={formatCount(status.eventSubSubscriptions.reduce((total, item) => total + item.count, 0))} />
+            <MetricCard
+              label="Desired EventSub subscriptions"
+              value={formatCount(status.eventSubSubscriptions.filter((item) => item.desired).reduce((total, item) => total + item.count, 0))}
+              detail={`${formatCount(status.eventSubSubscriptions.reduce((total, item) => total + item.count, 0))} local rows`}
+            />
           </section>
 
           <section className="panel">
@@ -48,10 +52,10 @@ export default async function IngestionPage() {
           </section>
 
           <section className="panel">
-            <div className="panel-header"><div className="panel-heading"><h2>EventSub subscriptions</h2><p>Counts grouped by current status</p></div></div>
+            <div className="panel-header"><div className="panel-heading"><h2>EventSub subscriptions</h2><p>Desired state and current status for local reconciliation rows</p></div></div>
             {status.eventSubSubscriptions.length === 0 ? <EmptyState title="No EventSub state" description="No subscription state has been recorded." /> : (
-              <div className="table-scroll" role="region" aria-label="EventSub subscription states" tabIndex={0}><table className="table table-compact"><thead><tr><th scope="col">Status</th><th scope="col">Count</th></tr></thead><tbody>
-                {status.eventSubSubscriptions.map((subscription) => <tr key={subscription.status}><td><StatusPill tone={subscription.status === "enabled" ? "success" : "neutral"}>{formatStatus(subscription.status)}</StatusPill></td><td className="number-cell">{formatCount(subscription.count)}</td></tr>)}
+              <div className="table-scroll" role="region" aria-label="EventSub subscription states" tabIndex={0}><table className="table table-compact"><thead><tr><th scope="col">Desired</th><th scope="col">Status</th><th scope="col">Count</th></tr></thead><tbody>
+                {status.eventSubSubscriptions.map((subscription) => <tr key={`${subscription.desired}:${subscription.status}`}><td><StatusPill tone={subscription.desired ? "accent" : "neutral"}>{subscription.desired ? "Yes" : "No"}</StatusPill></td><td><StatusPill tone={subscription.status === "enabled" ? "success" : "neutral"}>{formatStatus(subscription.status)}</StatusPill></td><td className="number-cell">{formatCount(subscription.count)}</td></tr>)}
               </tbody></table></div>
             )}
           </section>

@@ -74,6 +74,7 @@ export type InternalIngestionStatus = {
   }>;
   eventSubSubscriptions: Array<{
     status: string;
+    desired: boolean;
     count: number;
   }>;
 };
