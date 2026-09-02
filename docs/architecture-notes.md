@@ -51,7 +51,8 @@ lookups.
 
 Useful endpoints:
 
-- `Get Streams`: discover live streams, including `language=fi`.
+- `Get Streams`: discover `language=fi` streams and recheck known channels by
+  user ID for Finnish tags and lifecycle reconciliation.
 - `Get Users`: hydrate Twitch user/channel metadata in batches of up to 100.
 - `Get Moderated Channels`: ask which channels the bot account moderates.
 - `Get Chatters`: get a snapshot of connected chat users, but only where the
@@ -62,8 +63,13 @@ Important constraints:
 
 - `Get Streams` is a dynamic paginated list. Duplicate or missing streams are
   possible while paging because viewer counts change.
-- Stream language is not the same as streamer nationality. "Finnish streams"
-  should initially mean streams currently broadcasting with language `fi`.
+- Stream language is not the same as streamer nationality. A stream is eligible
+  when its language is `fi`, it has a case-insensitive exact `Suomi` or
+  `Finnish` tag, or its channel is manually pinned. Store the match reason
+  separately from Twitch's actual language.
+- Do not close a session after one omission from paginated directory results.
+  Explicit known-channel checks and a missing grace period own fallback end
+  detection; observing the same stream ID live always reopens it.
 - API rate limits must be tracked from response headers and persisted in worker
   state or logs.
 
@@ -136,13 +142,13 @@ With one normal bot account:
 - IRC does not bypass this.
 - EventSub chat subscriptions do not bypass this.
 
-If more than 100 Finnish-language channels are live, the worker needs a channel
+If more than 100 eligible Finnish channels are live, the worker needs a channel
 selection policy.
 
 Possible MVP policy:
 
 1. Always track a manually curated allowlist.
-2. Fill remaining capacity with currently live `language=fi` streams sorted by
+2. Fill remaining capacity with currently eligible Finnish streams sorted by
    viewer count.
 3. Prefer channels where the bot is moderator or has app authorization.
 4. Rotate low-priority channels slowly; do not churn joins.

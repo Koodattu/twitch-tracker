@@ -90,6 +90,10 @@ export type TwitchRestAdapter = {
     after?: string;
     accessToken: string;
   }): Promise<RawTwitchResponse<HelixStreamsResponse>>;
+  getLiveStreamsByUserIds(input: {
+    userIds: string[];
+    accessToken: string;
+  }): Promise<RawTwitchResponse<HelixStreamsResponse>>;
   getUsers(input: {
     ids?: string[];
     logins?: string[];

@@ -1,21 +1,27 @@
 import {
   channels,
+  closeSupersededLiveStreamSessions,
   rateLimitObservations,
   rawHelixResponses,
   streamSessions,
   streamSnapshots,
+  subjectPrivacyStates,
   twitchUsers
 } from "@twitch-tracker/db";
 import type { HelixStream, HelixUsersResponse, RawTwitchResponse } from "@twitch-tracker/twitch";
-import { and, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
 import { resolvePrimaryBotCredentials } from "../bot-auth.js";
+import { getFinnishStreamMatchReason, type FinnishStreamMatchReason } from "../finnish-stream.js";
 import { upsertTwitchUserMetadata } from "../twitch-user-metadata.js";
 import type { WorkerContext } from "../worker.js";
 import { startIntervalLoop } from "./common.js";
 
 const maxDiscoveryPages = 20;
+const twitchUserBatchSize = 100;
 
 export const runDiscoveryLoop = (context: WorkerContext) => {
+  let nextKnownChannelDiscoveryAt = 0;
+
   return startIntervalLoop({
     name: "discovery",
     intervalMs: context.config.DISCOVERY_INTERVAL_MS,
@@ -36,10 +42,9 @@ export const runDiscoveryLoop = (context: WorkerContext) => {
 
       const seenStreamIds = new Set<string>();
       let after: string | undefined;
-      let discoveredStreams = 0;
+      let responseStreamRows = 0;
       let pages = 0;
       let lastStatusCode = 0;
-      let successful = true;
       let paginationTruncated = false;
       let hydratedBroadcasters = 0;
       let userMetadataFailures = 0;
@@ -68,12 +73,11 @@ export const runDiscoveryLoop = (context: WorkerContext) => {
         await recordRateLimitObservation(context, raw, bot.botAccountId);
 
         if (raw.statusCode < 200 || raw.statusCode >= 300) {
-          successful = false;
           break;
         }
 
         const streams = Array.isArray(raw.responseJson.data) ? raw.responseJson.data : [];
-        discoveredStreams += streams.length;
+        responseStreamRows += streams.length;
         const hydration = await hydrateBroadcasterMetadata(
           context,
           streams,
@@ -83,8 +87,11 @@ export const runDiscoveryLoop = (context: WorkerContext) => {
         hydratedBroadcasters += hydration.hydratedBroadcasters;
         userMetadataFailures += hydration.failed ? 1 : 0;
         for (const stream of streams) {
+          if (seenStreamIds.has(stream.id)) {
+            continue;
+          }
           seenStreamIds.add(stream.id);
-          await upsertStream(context, stream, rawRowId);
+          await upsertStream(context, stream, rawRowId, "language");
         }
 
         after = getPaginationCursor(raw.pagination);
@@ -94,19 +101,27 @@ export const runDiscoveryLoop = (context: WorkerContext) => {
         }
       } while (after != null);
 
-      const closedStreams = successful && !paginationTruncated
-        ? await closeFinnishStreamsMissingFromSuccessfulPoll(context, seenStreamIds, startedAt)
-        : 0;
+      let knownChannelDiscovery: KnownChannelDiscoveryResult | null = null;
+      if (Date.now() >= nextKnownChannelDiscoveryAt) {
+        knownChannelDiscovery = await scanKnownChannels(context, {
+          accessToken: bot.accessToken,
+          botAccountId: bot.botAccountId,
+          languageStreamIds: seenStreamIds,
+          observedAt: startedAt
+        });
+        nextKnownChannelDiscoveryAt = Date.now() + context.config.KNOWN_CHANNEL_DISCOVERY_INTERVAL_MS;
+      }
 
       return {
-        discoveredStreams,
-        closedStreams,
+        discoveredStreams: seenStreamIds.size,
+        duplicateStreamRows: responseStreamRows - seenStreamIds.size,
         pages,
         statusCode: lastStatusCode,
         disabled: lastStatusCode === 0,
         paginationTruncated,
         hydratedBroadcasters,
         userMetadataFailures,
+        knownChannelDiscovery,
         botLogin: bot.login,
         botTokenSource: bot.source
       };
@@ -210,36 +225,143 @@ const hydrateBroadcasterMetadata = async (
   return { hydratedBroadcasters: raw.responseJson.data.length, failed: false };
 };
 
-const closeFinnishStreamsMissingFromSuccessfulPoll = async (
+const scanKnownChannels = async (
   context: WorkerContext,
-  seenStreamIds: Set<string>,
-  endedAt: Date
-): Promise<number> => {
-  const liveStreams = await context.db
+  input: {
+    accessToken: string;
+    botAccountId: string | null;
+    languageStreamIds: Set<string>;
+    observedAt: Date;
+  }
+): Promise<KnownChannelDiscoveryResult> => {
+  const knownChannels = await context.db
     .select({
-      twitchStreamId: streamSessions.twitchStreamId
+      twitchUserId: channels.twitchUserId,
+      isManuallyPinned: channels.isManuallyPinned
     })
-    .from(streamSessions)
-    .where(and(isNull(streamSessions.endedAt), eq(streamSessions.language, "fi")));
+    .from(channels)
+    .leftJoin(subjectPrivacyStates, eq(channels.twitchUserId, subjectPrivacyStates.twitchUserId))
+    .where(and(
+      or(eq(channels.hasBeenSeenFinnish, true), eq(channels.isManuallyPinned, true)),
+      or(isNull(subjectPrivacyStates.twitchUserId), eq(subjectPrivacyStates.trackingOptedOut, false))
+    ))
+    .orderBy(channels.twitchUserId);
+  const result: KnownChannelDiscoveryResult = {
+    checkedChannels: knownChannels.length,
+    successfulBatches: 0,
+    failedBatches: 0,
+    liveStreams: 0,
+    recoveredLanguageStreams: 0,
+    tagMatchedStreams: 0,
+    manuallyMatchedStreams: 0,
+    ineligibleLiveStreams: 0,
+    closedStreams: 0
+  };
+  let rateLimitSample: RawTwitchResponse<unknown> | null = null;
 
-  let closedStreams = 0;
-  for (const stream of liveStreams) {
-    if (seenStreamIds.has(stream.twitchStreamId)) {
+  for (let offset = 0; offset < knownChannels.length; offset += twitchUserBatchSize) {
+    const batch = knownChannels.slice(offset, offset + twitchUserBatchSize);
+    let raw: RawTwitchResponse<{ data: HelixStream[] }>;
+    try {
+      raw = await context.rest.getLiveStreamsByUserIds({
+        userIds: batch.map((channel) => channel.twitchUserId),
+        accessToken: input.accessToken
+      });
+    } catch (error) {
+      result.failedBatches += 1;
+      console.error(JSON.stringify({
+        level: "error",
+        loop: "discovery",
+        operation: "scan_known_channels",
+        message: error instanceof Error ? error.message : String(error)
+      }));
+      continue;
+    }
+    if (
+      rateLimitSample == null
+      || (raw.rateLimit.remaining != null
+        && (rateLimitSample.rateLimit.remaining == null || raw.rateLimit.remaining < rateLimitSample.rateLimit.remaining))
+    ) {
+      rateLimitSample = raw;
+    }
+    if (raw.statusCode < 200 || raw.statusCode >= 300) {
+      result.failedBatches += 1;
+      if (raw.statusCode === 401 || raw.statusCode === 403) {
+        result.failedBatches += Math.ceil((knownChannels.length - offset - batch.length) / twitchUserBatchSize);
+        break;
+      }
       continue;
     }
 
-    await context.db
-      .update(streamSessions)
-      .set({
-        endedAt,
-        endDetectionSource: "rest.discovery.missing",
-        updatedAt: new Date()
-      })
-      .where(eq(streamSessions.twitchStreamId, stream.twitchStreamId));
-    closedStreams += 1;
+    result.successfulBatches += 1;
+    const streams = Array.isArray(raw.responseJson.data) ? raw.responseJson.data : [];
+    result.liveStreams += streams.length;
+    const channelById = new Map(batch.map((channel) => [channel.twitchUserId, channel]));
+    const returnedChannelIds = new Set<string>();
+    for (const stream of streams) {
+      returnedChannelIds.add(stream.user_id);
+      const matchReason = getFinnishStreamMatchReason({
+        language: stream.language,
+        tags: stream.tags,
+        manuallyPinned: channelById.get(stream.user_id)?.isManuallyPinned ?? false
+      });
+      if (matchReason == null) {
+        result.ineligibleLiveStreams += 1;
+        await markKnownStreamLiveButIneligible(context, stream, input.observedAt);
+        continue;
+      }
+      if (matchReason === "language" && input.languageStreamIds.has(stream.id)) {
+        continue;
+      }
+
+      if (matchReason === "language") {
+        result.recoveredLanguageStreams += 1;
+      } else if (matchReason === "tag") {
+        result.tagMatchedStreams += 1;
+      } else {
+        result.manuallyMatchedStreams += 1;
+      }
+      await upsertStream(context, stream, null, matchReason);
+    }
+
+    result.closedStreams += await closeKnownStreamsMissingFromBatch(
+      context,
+      batch.map((channel) => channel.twitchUserId).filter((userId) => !returnedChannelIds.has(userId)),
+      input.observedAt
+    );
   }
 
-  return closedStreams;
+  if (rateLimitSample != null) {
+    await recordRateLimitObservation(context, rateLimitSample, input.botAccountId);
+  }
+  return result;
+};
+
+const closeKnownStreamsMissingFromBatch = async (
+  context: WorkerContext,
+  broadcasterUserIds: string[],
+  observedAt: Date
+): Promise<number> => {
+  if (broadcasterUserIds.length === 0) {
+    return 0;
+  }
+  const staleBefore = new Date(
+    observedAt.getTime() - context.config.STREAM_END_GRACE_MINUTES * 60_000
+  );
+  const closed = await context.db
+    .update(streamSessions)
+    .set({
+      endedAt: observedAt,
+      endDetectionSource: "rest.known_channels.missing",
+      updatedAt: new Date()
+    })
+    .where(and(
+      inArray(streamSessions.broadcasterUserId, broadcasterUserIds),
+      isNull(streamSessions.endedAt),
+      lte(streamSessions.lastSeenLiveAt, staleBefore)
+    ))
+    .returning({ twitchStreamId: streamSessions.twitchStreamId });
+  return closed.length;
 };
 
 const getPaginationCursor = (pagination: Record<string, unknown>): string | undefined => {
@@ -247,10 +369,22 @@ const getPaginationCursor = (pagination: Record<string, unknown>): string | unde
   return typeof cursor === "string" && cursor.length > 0 ? cursor : undefined;
 };
 
-const upsertStream = async (context: WorkerContext, stream: HelixStream, rawHelixResponseId: string) => {
+const upsertStream = async (
+  context: WorkerContext,
+  stream: HelixStream,
+  rawHelixResponseId: string | null,
+  finnishMatchReason: FinnishStreamMatchReason
+) => {
   const now = new Date();
   const startedAt = new Date(stream.started_at);
   const tags = stream.tags ?? stream.tag_ids ?? [];
+
+  await closeSupersededLiveStreamSessions(context.db, {
+    broadcasterUserId: stream.user_id,
+    currentStreamId: stream.id,
+    observedAt: now,
+    source: "rest.stream.superseded"
+  });
 
   await context.db
     .insert(twitchUsers)
@@ -297,6 +431,8 @@ const upsertStream = async (context: WorkerContext, stream: HelixStream, rawHeli
       firstSeenAt: now,
       lastSeenLiveAt: now,
       language: stream.language,
+      finnishMatchReason,
+      isFinnishEligible: true,
       initialTitle: stream.title,
       latestTitle: stream.title,
       initialCategoryId: stream.game_id,
@@ -308,8 +444,12 @@ const upsertStream = async (context: WorkerContext, stream: HelixStream, rawHeli
     .onConflictDoUpdate({
       target: streamSessions.twitchStreamId,
       set: {
+        endedAt: null,
         lastSeenLiveAt: now,
+        endDetectionSource: null,
         language: stream.language,
+        finnishMatchReason,
+        isFinnishEligible: true,
         latestTitle: stream.title,
         latestCategoryId: stream.game_id,
         latestCategoryName: stream.game_name,
@@ -355,6 +495,47 @@ const upsertStream = async (context: WorkerContext, stream: HelixStream, rawHeli
     thumbnailUrl: metadataChanged ? stream.thumbnail_url : null,
     sourceRunId: rawHelixResponseId
   });
+};
+
+const markKnownStreamLiveButIneligible = async (
+  context: WorkerContext,
+  stream: HelixStream,
+  observedAt: Date
+) => {
+  await closeSupersededLiveStreamSessions(context.db, {
+    broadcasterUserId: stream.user_id,
+    currentStreamId: stream.id,
+    observedAt,
+    source: "rest.stream.superseded"
+  });
+
+  await context.db
+    .update(streamSessions)
+    .set({
+      endedAt: null,
+      lastSeenLiveAt: observedAt,
+      endDetectionSource: null,
+      language: stream.language,
+      isFinnishEligible: false,
+      latestTitle: stream.title,
+      latestCategoryId: stream.game_id,
+      latestCategoryName: stream.game_name,
+      mature: stream.is_mature ?? null,
+      updatedAt: observedAt
+    })
+    .where(eq(streamSessions.twitchStreamId, stream.id));
+};
+
+type KnownChannelDiscoveryResult = {
+  checkedChannels: number;
+  successfulBatches: number;
+  failedBatches: number;
+  liveStreams: number;
+  recoveredLanguageStreams: number;
+  tagMatchedStreams: number;
+  manuallyMatchedStreams: number;
+  ineligibleLiveStreams: number;
+  closedStreams: number;
 };
 
 const sameStringArray = (left: string[], right: string[]) => {

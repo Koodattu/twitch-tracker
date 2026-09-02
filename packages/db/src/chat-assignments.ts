@@ -819,7 +819,7 @@ const readCandidates = async (db: DbClient): Promise<AssignmentCandidate[]> => {
     .where(
       and(
         isNull(streamSessions.endedAt),
-        eq(streamSessions.language, "fi"),
+        eq(streamSessions.isFinnishEligible, true),
         or(isNull(subjectPrivacyStates.twitchUserId), eq(subjectPrivacyStates.trackingOptedOut, false))
       )
     )

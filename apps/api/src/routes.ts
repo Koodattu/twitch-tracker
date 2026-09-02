@@ -72,7 +72,8 @@ const messageArchiveQuerySchema = z.object({
 const recentStreamsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(50),
   status: z.enum(["all", "ended"]).default("all"),
-  language: z.string().trim().min(1).max(10).optional()
+  language: z.string().trim().min(1).max(10).optional(),
+  finnish: z.enum(["true", "false"]).optional().transform((value) => value === "true")
 });
 const channelStreamsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(50)
@@ -172,6 +173,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
         title: streamSessions.latestTitle,
         categoryName: streamSessions.latestCategoryName,
         language: streamSessions.language,
+        finnishMatchReason: streamSessions.finnishMatchReason,
         viewerCount: latestSnapshot.viewerCount,
         viewerObservedAt: latestSnapshot.observedAt,
         thumbnailUrl: latestSnapshot.thumbnailUrl,
@@ -184,10 +186,10 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
       .leftJoinLateral(latestSnapshot, sql`true`)
       .leftJoin(subjectPrivacyStates, eq(streamSessions.broadcasterUserId, subjectPrivacyStates.twitchUserId))
       .where(canSeeSuppressed
-        ? and(isNull(streamSessions.endedAt), eq(streamSessions.language, "fi"))
+        ? and(isNull(streamSessions.endedAt), eq(streamSessions.isFinnishEligible, true))
         : and(
             isNull(streamSessions.endedAt),
-            eq(streamSessions.language, "fi"),
+            eq(streamSessions.isFinnishEligible, true),
             publicSubjectVisibilityCondition
           ))
       .orderBy(desc(sql<number>`coalesce(${latestSnapshot.viewerCount}, -1)`), desc(streamSessions.lastSeenLiveAt))
@@ -217,7 +219,8 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
     const query = recentStreamsQuerySchema.parse({
       limit: c.req.query("limit"),
       status: c.req.query("status"),
-      language: c.req.query("language")
+      language: c.req.query("language"),
+      finnish: c.req.query("finnish")
     });
     const db = c.get("db");
     const canSeeSuppressed = await hasAdminAccess(c);
@@ -230,6 +233,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
         broadcasterProfileImageUrl: twitchUsers.profileImageUrl,
         title: streamSessions.latestTitle,
         categoryName: streamSessions.latestCategoryName,
+        finnishMatchReason: streamSessions.finnishMatchReason,
         startedAt: streamSessions.startedAt,
         endedAt: streamSessions.endedAt
       })
@@ -238,6 +242,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
       .leftJoin(subjectPrivacyStates, eq(streamSessions.broadcasterUserId, subjectPrivacyStates.twitchUserId))
       .where(and(
         query.status === "ended" ? isNotNull(streamSessions.endedAt) : undefined,
+        query.finnish ? isNotNull(streamSessions.finnishMatchReason) : undefined,
         query.language == null ? undefined : eq(streamSessions.language, query.language),
         canSeeSuppressed ? undefined : publicSubjectVisibilityCondition
       ))

@@ -5,6 +5,7 @@ export const appModeEnum = pgEnum("app_mode", ["local", "private_mvp", "producti
 export const assignmentStatusEnum = pgEnum("assignment_status", ["desired", "joining", "joined", "leaving", "left", "failed"]);
 export const chatMembershipEventTypeEnum = pgEnum("chat_membership_event_type", ["join", "part"]);
 export const ingestionRunStatusEnum = pgEnum("ingestion_run_status", ["running", "succeeded", "failed", "skipped"]);
+export const finnishStreamMatchReasonEnum = pgEnum("finnish_stream_match_reason", ["language", "tag", "manual"]);
 export const privacyRequestStatusEnum = pgEnum("privacy_request_status", ["pending", "completed", "rejected"]);
 export const privacyRequestTypeEnum = pgEnum("privacy_request_type", ["public_profile_opt_out", "tracking_opt_out", "data_deletion"]);
 export const rawProcessingStatusEnum = pgEnum("raw_processing_status", ["pending", "processed", "failed", "ignored"]);
@@ -68,6 +69,8 @@ export const streamSessions = pgTable("stream_sessions", {
   lastSeenLiveAt: timestamp("last_seen_live_at", { withTimezone: true }).defaultNow().notNull(),
   endDetectionSource: text("end_detection_source"),
   language: text("language"),
+  finnishMatchReason: finnishStreamMatchReasonEnum("finnish_match_reason"),
+  isFinnishEligible: boolean("is_finnish_eligible").default(false).notNull(),
   initialTitle: text("initial_title"),
   latestTitle: text("latest_title"),
   initialCategoryId: text("initial_category_id"),
@@ -80,7 +83,9 @@ export const streamSessions = pgTable("stream_sessions", {
   broadcasterLiveIdx: index("stream_sessions_broadcaster_live_idx").on(table.broadcasterUserId, table.endedAt),
   broadcasterStartedIdx: index("stream_sessions_broadcaster_started_idx").on(table.broadcasterUserId, table.startedAt),
   liveLanguageIdx: index("stream_sessions_live_language_idx").on(table.language, table.lastSeenLiveAt).where(sql`${table.endedAt} is null`),
+  liveFinnishIdx: index("stream_sessions_live_finnish_idx").on(table.lastSeenLiveAt).where(sql`${table.endedAt} is null and ${table.isFinnishEligible} = true`),
   recentEndedIdx: index("stream_sessions_recent_ended_idx").on(table.language, table.endedAt).where(sql`${table.endedAt} is not null`),
+  recentFinnishEndedIdx: index("stream_sessions_recent_finnish_ended_idx").on(table.endedAt).where(sql`${table.endedAt} is not null and ${table.finnishMatchReason} is not null`),
   startedAtIdx: index("stream_sessions_started_at_idx").on(table.startedAt)
 }));
 

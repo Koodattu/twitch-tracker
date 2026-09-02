@@ -1,16 +1,19 @@
 import {
   channelEvents,
   channels,
+  closeSupersededLiveStreamSessions,
   eventProcessingFailures,
   eventsubSubscriptions,
   raids,
   rawEventsubEvents,
   streamSessions,
+  streamSnapshots,
   twitchUsers
 } from "@twitch-tracker/db";
 import { FetchEventSubAdapter, getTwitchAppAccessToken, type EventSubSubscription } from "@twitch-tracker/twitch";
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
+import { getFinnishStreamMatchReason } from "../finnish-stream.js";
 import type { WorkerContext } from "../worker.js";
 import { startIntervalLoop } from "./common.js";
 
@@ -231,6 +234,13 @@ const processStreamOnline = async (context: WorkerContext, row: RawEventSubRow) 
   });
   await upsertTrackedChannel(context, event.broadcaster_user_id);
 
+  await closeSupersededLiveStreamSessions(context.db, {
+    broadcasterUserId: event.broadcaster_user_id,
+    currentStreamId: event.id,
+    observedAt: receivedAt,
+    source: "eventsub.stream.online.superseded"
+  });
+
   await context.db
     .insert(streamSessions)
     .values({
@@ -313,11 +323,36 @@ const processChannelUpdate = async (context: WorkerContext, row: RawEventSubRow)
 
   const liveStreamId = await findLiveStreamId(context, event.broadcaster_user_id);
   if (liveStreamId != null) {
+    const [eligibility] = await context.db
+      .select({
+        existingMatchReason: streamSessions.finnishMatchReason,
+        isManuallyPinned: channels.isManuallyPinned
+      })
+      .from(streamSessions)
+      .leftJoin(channels, eq(streamSessions.broadcasterUserId, channels.twitchUserId))
+      .where(eq(streamSessions.twitchStreamId, liveStreamId))
+      .limit(1);
+    const [latestMetadata] = await context.db
+      .select({ tags: streamSnapshots.tags })
+      .from(streamSnapshots)
+      .where(and(
+        eq(streamSnapshots.twitchStreamId, liveStreamId),
+        isNotNull(streamSnapshots.title)
+      ))
+      .orderBy(desc(streamSnapshots.observedAt), desc(streamSnapshots.id))
+      .limit(1);
+    const finnishMatchReason = getFinnishStreamMatchReason({
+      language: event.language,
+      tags: latestMetadata?.tags,
+      manuallyPinned: eligibility?.isManuallyPinned ?? false
+    });
     await context.db
       .update(streamSessions)
       .set({
         latestTitle: event.title ?? null,
         language: event.language ?? null,
+        finnishMatchReason: finnishMatchReason ?? eligibility?.existingMatchReason ?? null,
+        isFinnishEligible: finnishMatchReason != null,
         latestCategoryId: event.category_id ?? null,
         latestCategoryName: event.category_name ?? null,
         updatedAt: new Date()

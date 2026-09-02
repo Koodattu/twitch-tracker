@@ -51,6 +51,8 @@ export const baseEnvSchema = z.object({
   DEFAULT_BOT_JOIN_CAPACITY: intFromString(100),
   DEFAULT_BOT_JOIN_RATE_PER_10_SECONDS: intFromString(20),
   DISCOVERY_INTERVAL_MS: positiveIntFromString(180_000),
+  KNOWN_CHANNEL_DISCOVERY_INTERVAL_MS: positiveIntFromString(900_000),
+  STREAM_END_GRACE_MINUTES: positiveIntFromString(20),
   BROADCASTER_METADATA_REFRESH_INTERVAL_MS: positiveIntFromString(86_400_000),
   USER_HYDRATION_INTERVAL_MS: positiveIntFromString(300_000),
   ASSIGNMENT_INTERVAL_MS: positiveIntFromString(30_000),

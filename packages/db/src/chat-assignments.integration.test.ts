@@ -4,6 +4,7 @@ import {
   channels,
   chatAssignmentEvents,
   chatAssignments,
+  closeSupersededLiveStreamSessions,
   createChatAssignmentControl,
   createDb,
   streamSnapshots,
@@ -71,6 +72,8 @@ describe.skipIf(database == null)("Chat Assignment control with PostgreSQL", () 
       firstSeenAt: observedAt,
       lastSeenLiveAt: observedAt,
       language: "fi",
+      finnishMatchReason: "language",
+      isFinnishEligible: true,
       updatedAt: observedAt
     });
     const [bot] = await db.insert(botAccounts).values({
@@ -210,5 +213,24 @@ describe.skipIf(database == null)("Chat Assignment control with PostgreSQL", () 
     expect(result.assignmentsDesired).toBe(1);
     expect(result.topViewerCount).toBe(20);
     expect(assignment?.status).toBe("desired");
+  });
+
+  it("closes an older open session when a new stream ID is observed", async () => {
+    await createFixture();
+    const supersededAt = new Date(observedAt.getTime() + 1_000);
+
+    await closeSupersededLiveStreamSessions(db, {
+      broadcasterUserId: "broadcaster-1",
+      currentStreamId: "stream-2",
+      observedAt: supersededAt,
+      source: "test.stream.superseded"
+    });
+
+    const [stream] = await db
+      .select()
+      .from(streamSessions)
+      .where(eq(streamSessions.twitchStreamId, "stream-1"));
+    expect(stream?.endedAt).toEqual(supersededAt);
+    expect(stream?.endDetectionSource).toBe("test.stream.superseded");
   });
 });

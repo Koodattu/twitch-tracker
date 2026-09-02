@@ -20,6 +20,8 @@ describe("production configuration", () => {
   it("accepts a secure same-origin configuration", () => {
     const config = loadConfig(productionEnv());
     expect(config.APP_MODE).toBe("production");
+    expect(config.KNOWN_CHANNEL_DISCOVERY_INTERVAL_MS).toBe(900_000);
+    expect(config.STREAM_END_GRACE_MINUTES).toBe(20);
     expect(config.BROADCASTER_METADATA_REFRESH_INTERVAL_MS).toBe(86_400_000);
     expect(config.AGGREGATION_INTERVAL_MS).toBe(300_000);
   });

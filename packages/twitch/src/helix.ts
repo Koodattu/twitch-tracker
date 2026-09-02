@@ -79,6 +79,23 @@ export class FetchHelixAdapter implements TwitchRestAdapter {
     });
   }
 
+  async getLiveStreamsByUserIds(input: {
+    userIds: string[];
+    accessToken: string;
+  }): Promise<RawTwitchResponse<HelixStreamsResponse>> {
+    const params = new URLSearchParams({ first: "100" });
+    for (const userId of input.userIds) {
+      params.append("user_id", userId);
+    }
+
+    return callHelix<HelixStreamsResponse>({
+      endpoint: "/streams",
+      params,
+      clientId: this.clientId,
+      accessToken: input.accessToken
+    });
+  }
+
   async getUsers(input: {
     ids?: string[];
     logins?: string[];
@@ -149,6 +166,18 @@ export class FetchHelixAdapter implements TwitchRestAdapter {
 
 export class DisabledHelixAdapter implements TwitchRestAdapter {
   async getLiveStreamsByLanguage(): Promise<RawTwitchResponse<HelixStreamsResponse>> {
+    return {
+      endpoint: "/streams",
+      requestParams: { disabled: true },
+      statusCode: 0,
+      responseJson: { data: [] },
+      pagination: {},
+      rateLimit: { limit: null, remaining: null, resetAt: null, raw: {} },
+      observedAt: new Date()
+    };
+  }
+
+  async getLiveStreamsByUserIds(): Promise<RawTwitchResponse<HelixStreamsResponse>> {
     return {
       endpoint: "/streams",
       requestParams: { disabled: true },

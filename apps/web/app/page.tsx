@@ -11,7 +11,7 @@ export default async function HomePage() {
   const apiInit = await getPublicApiInit();
   const [streamResponse, recentResponse] = await Promise.all([
     getApiData<LiveStreamSummary[]>("/api/streams/live", apiInit),
-    getApiData<RecentStreamSummary[]>("/api/streams/recent?limit=6&status=ended&language=fi", apiInit)
+    getApiData<RecentStreamSummary[]>("/api/streams/recent?limit=6&status=ended&finnish=true", apiInit)
   ]);
   const streams = streamResponse ?? [];
   const recentStreams = recentResponse ?? [];
@@ -33,7 +33,7 @@ export default async function HomePage() {
         <div className="page-heading-row">
           <div>
             <h1>What’s live right now</h1>
-            <p>Finnish-language streams ranked by the latest viewer snapshot, with chat coverage shown separately.</p>
+            <p>Finnish-language and Finnish-tagged streams ranked by the latest viewer snapshot, with chat coverage shown separately.</p>
           </div>
           <StatusPill tone={!streamsAvailable ? "danger" : streams.length > 0 ? "success" : "neutral"}>{!streamsAvailable ? "Unavailable" : streams.length > 0 ? "Live data" : "Waiting for data"}</StatusPill>
         </div>
@@ -111,7 +111,10 @@ export default async function HomePage() {
                         </div>
                       </td>
                       <td className="message-cell">
-                        <Link href={`/streams/${stream.streamId}`}><strong>{stream.title ?? "Untitled stream"}</strong></Link>
+                        <div className="cell-stack">
+                          <Link href={`/streams/${stream.streamId}`}><strong>{stream.title ?? "Untitled stream"}</strong></Link>
+                          <span>{formatFinnishMatchReason(stream.finnishMatchReason)}</span>
+                        </div>
                       </td>
                       <td>{stream.categoryName ?? <span className="muted">Unknown</span>}</td>
                       <td className="number-cell"><strong>{formatCount(stream.viewerCount)}</strong></td>
@@ -178,6 +181,7 @@ function LiveStreamCard({ stream, rank, now, priority }: { stream: LiveStreamSum
         <Link className="live-card-title" href={`/streams/${stream.streamId}`}>{stream.title ?? "Untitled stream"}</Link>
         <div className="live-card-meta">
           <span className="number-cell">Live for {formatDuration(liveSeconds)}</span>
+          <span>{formatFinnishMatchReason(stream.finnishMatchReason)}</span>
           <ChatCoverage stream={stream} />
         </div>
       </div>
@@ -213,6 +217,16 @@ function RecentStreamCard({ stream, now }: { stream: RecentStreamSummary; now: D
 function StreamPreviewPlaceholder() {
   return <span className="stream-preview-placeholder" aria-hidden="true"><span /><span /><span /></span>;
 }
+
+const formatFinnishMatchReason = (reason: LiveStreamSummary["finnishMatchReason"]) => {
+  if (reason === "tag") {
+    return "Finnish tag";
+  }
+  if (reason === "manual") {
+    return "Manually included";
+  }
+  return "Finnish language";
+};
 
 function ChatCoverage({ stream }: { stream: LiveStreamSummary }) {
   if (stream.chatAssignmentStatus == null) {

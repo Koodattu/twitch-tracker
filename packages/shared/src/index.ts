@@ -22,6 +22,7 @@ export type LiveStreamSummary = {
   title: string | null;
   categoryName: string | null;
   language: string | null;
+  finnishMatchReason: "language" | "tag" | "manual";
   viewerCount: number | null;
   viewerObservedAt: string | null;
   thumbnailUrl: string | null;
@@ -40,6 +41,7 @@ export type RecentStreamSummary = {
   broadcasterProfileImageUrl: string | null;
   title: string | null;
   categoryName: string | null;
+  finnishMatchReason: "language" | "tag" | "manual";
   startedAt: string;
   endedAt: string | null;
 };

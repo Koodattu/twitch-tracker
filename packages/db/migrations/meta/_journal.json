@@ -64,6 +64,13 @@
       "when": 1783958400000,
       "tag": "0008_message_archive_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1788372000000,
+      "tag": "0009_finnish_stream_eligibility",
+      "breakpoints": true
     }
   ]
 }

@@ -63,7 +63,7 @@ The first implementation is successful when it can:
 
 - run on one machine through Docker Compose
 - start PostgreSQL, API, worker, web, Caddy, migration, and backup services
-- discover live `language=fi` Twitch streams through Helix REST
+- discover live Twitch streams through `language=fi` plus normalized `Suomi`/`Finnish` tags on known channels
 - persist stream sessions and periodic stream snapshots
 - hydrate Twitch users/channels through Helix REST
 - manage one bot account and model future multi-account capacity
@@ -262,6 +262,9 @@ Important REST constraints:
 - `Get Streams` is dynamic and paginated; duplicate or missing streams can occur
   during paging.
 - `language=fi` is a stream-language classification, not nationality.
+- Free-form tags cannot be used as a `Get Streams` directory filter. Recheck
+  known Finnish and manually pinned channels by user ID, and require a grace
+  period before treating a missing stream as ended.
 - REST polling remains required even if EventSub is enabled.
 
 ### IRC
