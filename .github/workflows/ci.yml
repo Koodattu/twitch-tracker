@@ -44,8 +44,8 @@ jobs:
           pnpm audit --prod
           pnpm audit
           docker compose --env-file .env.production.example config --quiet
-          sh -n infra/postgres/backup.sh
-          sh -n infra/postgres/restore.sh
+          for script in infra/postgres/*.sh; do sh -n "$script"; done
+          sh infra/postgres/backup-retention.test.sh
 
   containers:
     runs-on: ubuntu-latest

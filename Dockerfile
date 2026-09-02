@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1@sha256:87999aa3d42bdc6bea60565083ee17e86d1f3339802f543c0d03998580f9cb89
 
 ARG NODE_IMAGE=node:24.19.0-bookworm-slim@sha256:3638d9a6fe4030bd716be989438248074489337ba3275657f93595428be4fc03
+ARG POSTGRES_IMAGE=postgres:16.14-alpine3.24@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
 
 FROM ${NODE_IMAGE} AS base
 ENV PNPM_HOME=/pnpm
@@ -82,3 +83,16 @@ COPY --from=build --chown=node:node /workspace/apps/web/.next/static ./apps/web/
 USER node
 EXPOSE 3000
 CMD ["node", "apps/web/server.js"]
+
+FROM ${POSTGRES_IMAGE} AS backup
+ARG VCS_REF=unknown
+LABEL org.opencontainers.image.source="https://github.com/Koodattu/twitch-tracker" \
+      org.opencontainers.image.revision=$VCS_REF
+COPY --chown=70:70 --chmod=0555 \
+    infra/postgres/backup.sh \
+    infra/postgres/backup-health.sh \
+    infra/postgres/backup-lib.sh \
+    infra/postgres/backup-retention.sh \
+    /opt/twitch-tracker-backup/
+USER 70:70
+CMD ["/bin/sh", "/opt/twitch-tracker-backup/backup.sh"]

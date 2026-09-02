@@ -222,8 +222,13 @@ services:
         condition: service_healthy
 
   backup:
-    image: postgres:16.14-alpine3.24@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
-    pull_policy: always
+    image: twitch-tracker-backup:${IMAGE_TAG:?Set IMAGE_TAG to an immutable release ID}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: backup
+      args:
+        VCS_REF: ${VCS_REF:?Set VCS_REF to the Git commit}
     restart: unless-stopped
     init: true
     user: "70:70"
@@ -247,9 +252,7 @@ services:
       BACKUP_COMPRESSION: ${BACKUP_COMPRESSION:-gzip:6}
       BACKUP_OFF_HOST_CONFIRMED: ${BACKUP_OFF_HOST_CONFIRMED:-false}
       BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
-    command: ["/bin/sh", "/scripts/backup.sh"]
     volumes:
-      - ./infra/postgres:/scripts:ro
       - type: bind
         source: ${BACKUP_HOST_PATH:?Set BACKUP_HOST_PATH}
         target: /backups
@@ -261,7 +264,7 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "/bin/sh", "/scripts/backup-health.sh"]
+      test: ["CMD", "/bin/sh", "/opt/twitch-tracker-backup/backup-health.sh"]
       interval: 5m
       timeout: 5s
       retries: 3

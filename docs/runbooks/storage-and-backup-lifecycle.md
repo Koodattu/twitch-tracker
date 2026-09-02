@@ -63,7 +63,7 @@ same inventory manually:
 
 ```sh
 docker compose --env-file .env.production exec backup \
-  /bin/sh /scripts/backup-health.sh
+  /bin/sh /opt/twitch-tracker-backup/backup-health.sh
 ```
 
 Preview retention selection without deleting files:
@@ -71,7 +71,7 @@ Preview retention selection without deleting files:
 ```sh
 docker compose --env-file .env.production exec \
   -e BACKUP_RETENTION_DRY_RUN=true \
-  backup /bin/sh /scripts/backup-retention.sh
+  backup /bin/sh /opt/twitch-tracker-backup/backup-retention.sh
 ```
 
 Review every selected filename and reason. Run the command without the dry-run
