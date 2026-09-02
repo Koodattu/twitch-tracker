@@ -23,12 +23,12 @@ export const runAssignmentLoop = (context: WorkerContext) => {
       const result = await assignments.reconcilePool({
         accounts: bots.map((bot) => ({
           botAccountId: bot.botAccountId,
-          capacity: bot.accessToken == null ? 0 : bot.maxJoinedRooms
+          capacity: effectiveBotCapacity(bot)
         })),
         observedAt: new Date()
       });
       const resultByAccount = new Map(result.accounts.map((account) => [account.botAccountId, account]));
-      const usableBots = bots.filter((bot) => bot.accessToken != null && bot.maxJoinedRooms > 0);
+      const usableBots = bots.filter((bot) => effectiveBotCapacity(bot) > 0);
 
       return {
         assignmentsDesired: result.assignmentsDesired,
@@ -40,8 +40,9 @@ export const runAssignmentLoop = (context: WorkerContext) => {
         accounts: bots.map((bot) => ({
           botLogin: bot.login,
           botTokenSource: bot.source,
+          healthStatus: bot.healthStatus,
           configuredCapacity: bot.maxJoinedRooms,
-          effectiveCapacity: bot.accessToken == null ? 0 : bot.maxJoinedRooms,
+          effectiveCapacity: effectiveBotCapacity(bot),
           assignmentsDesired: resultByAccount.get(bot.botAccountId)?.assignmentsDesired ?? 0,
           retiredAssignments: resultByAccount.get(bot.botAccountId)?.retiredAssignments ?? 0
         }))
@@ -49,3 +50,9 @@ export const runAssignmentLoop = (context: WorkerContext) => {
     }
   });
 };
+
+const effectiveBotCapacity = (bot: {
+  accessToken: string | null;
+  healthStatus: string;
+  maxJoinedRooms: number;
+}) => bot.accessToken == null || bot.healthStatus === "irc_unavailable" ? 0 : bot.maxJoinedRooms;

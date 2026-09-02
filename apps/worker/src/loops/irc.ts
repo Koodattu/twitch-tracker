@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import {
+  botAccounts,
   chatMembershipEvents,
   chatMessages,
   channelEvents,
@@ -16,6 +17,7 @@ import type { WorkerContext } from "../worker.js";
 import { startIntervalLoop } from "./common.js";
 
 const staleJoiningTimeoutMs = 2 * 60 * 1000;
+const unavailableAfterConsecutiveDisconnects = 3;
 
 type BotConnection = {
   adapter: TwitchIrcAdapter;
@@ -26,6 +28,20 @@ type BotConnection = {
 export const runIrcLoop = (context: WorkerContext) => {
   const assignments = createChatAssignmentControl(context.db);
   const connections = new Map<string, BotConnection>();
+  const consecutiveDisconnects = new Map<string, number>();
+
+  const markConnectionHealthy = async (botAccountId: string) => {
+    consecutiveDisconnects.delete(botAccountId);
+    await setBotHealthStatus(context.db, botAccountId, "ok");
+  };
+
+  const recordUnexpectedDisconnect = async (botAccountId: string) => {
+    const count = (consecutiveDisconnects.get(botAccountId) ?? 0) + 1;
+    consecutiveDisconnects.set(botAccountId, count);
+    if (count >= unavailableAfterConsecutiveDisconnects) {
+      await setBotHealthStatus(context.db, botAccountId, "irc_unavailable");
+    }
+  };
 
   const disconnectConnection = async (botAccountId: string, reason: string) => {
     const connection = connections.get(botAccountId);
@@ -58,6 +74,9 @@ export const runIrcLoop = (context: WorkerContext) => {
           if (connections.get(bot.botAccountId) === connection) {
             connections.delete(bot.botAccountId);
           }
+          if (reason === "socket_closed" || reason === "connect_failed") {
+            await recordUnexpectedDisconnect(bot.botAccountId);
+          }
           await assignments.record({
             type: "socket_disconnected",
             botAccountId: bot.botAccountId,
@@ -66,7 +85,16 @@ export const runIrcLoop = (context: WorkerContext) => {
           });
         },
         rawMessage: async (message) => {
+          if (message.command === "001") {
+            await markConnectionHealthy(bot.botAccountId);
+          }
           await persistRawIrcMessage(context.db, bot.botAccountId, bot.login, message);
+          if (isAuthenticationFailureNotice(message)) {
+            consecutiveDisconnects.set(bot.botAccountId, unavailableAfterConsecutiveDisconnects);
+            await setBotHealthStatus(context.db, bot.botAccountId, "irc_unavailable");
+            await disconnectConnection(bot.botAccountId, "authentication_failed");
+            return;
+          }
           if (message.command === "RECONNECT") {
             await disconnectConnection(bot.botAccountId, "twitch_reconnect");
           }
@@ -173,6 +201,7 @@ export const runIrcLoop = (context: WorkerContext) => {
           accountResults.push({
             botLogin: bot.login,
             botTokenSource: bot.source,
+            healthStatus: bot.healthStatus,
             connected: connection.connected,
             joinCommandsSent: accountJoined,
             partCommandsSent: accountParted,
@@ -213,6 +242,20 @@ export const runIrcLoop = (context: WorkerContext) => {
     );
   });
 };
+
+const setBotHealthStatus = async (db: DbClient, botAccountId: string, healthStatus: string) => {
+  await db
+    .update(botAccounts)
+    .set({ healthStatus, updatedAt: new Date() })
+    .where(and(
+      eq(botAccounts.id, botAccountId),
+      sql`${botAccounts.healthStatus} is distinct from ${healthStatus}`
+    ));
+};
+
+const isAuthenticationFailureNotice = (message: ParsedIrcMessage) =>
+  message.command === "NOTICE"
+    && (message.trailing ?? "").toLowerCase().includes("authentication failed");
 
 const persistRawIrcMessage = async (db: DbClient, botAccountId: string, botLogin: string, message: ParsedIrcMessage) => {
   const channelLogin = getChannelLogin(message);

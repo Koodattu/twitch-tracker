@@ -93,12 +93,13 @@ const incumbentStatuses: ChatAssignmentStatus[] = ["desired", "joining", "joined
 const roomReservationStatuses: ChatAssignmentStatus[] = ["joining", "joined"];
 const promotableStatuses: ChatAssignmentStatus[] = ["desired", "joining", "joined"];
 const terminalRetryStatuses: ChatAssignmentStatus[] = ["left"];
-const permanentAssignmentErrorPrefixes = [
-  "IRC NOTICE msg_banned:",
-  "IRC NOTICE msg_channel_blocked:",
-  "IRC NOTICE msg_channel_suspended:",
-  "IRC NOTICE tos_ban:"
+const permanentAssignmentErrors = [
+  { prefix: "IRC NOTICE msg_banned:", scope: "account" },
+  { prefix: "IRC NOTICE msg_channel_blocked:", scope: "account" },
+  { prefix: "IRC NOTICE msg_channel_suspended:", scope: "global" },
+  { prefix: "IRC NOTICE tos_ban:", scope: "global" }
 ] as const;
+export type PermanentAssignmentErrorScope = (typeof permanentAssignmentErrors)[number]["scope"];
 const viewerHysteresisRatio = 1.25;
 const viewerHysteresisMinimum = 10;
 
@@ -216,15 +217,16 @@ export const createChatAssignmentControl = (db: DbClient) => {
         latestError: chatAssignments.latestError
       })
       .from(chatAssignments)
-      .where(and(
-        inArray(chatAssignments.botAccountId, accounts.map((account) => account.botAccountId)),
-        eq(chatAssignments.status, "failed")
-      ));
+      .where(eq(chatAssignments.status, "failed"));
     const blockedBroadcasterIdsByAccount = new Map<string, Set<string>>(
       accounts.map((account) => [account.botAccountId, new Set<string>()])
     );
+    const globallyBlockedBroadcasterIds = new Set<string>();
     for (const assignment of failedAssignments) {
-      if (isPermanentAssignmentError(assignment.latestError)) {
+      const scope = getPermanentAssignmentErrorScope(assignment.latestError);
+      if (scope === "global") {
+        globallyBlockedBroadcasterIds.add(assignment.broadcasterUserId);
+      } else if (scope === "account") {
         blockedBroadcasterIdsByAccount.get(assignment.botAccountId)?.add(assignment.broadcasterUserId);
       }
     }
@@ -238,12 +240,13 @@ export const createChatAssignmentControl = (db: DbClient) => {
     }
 
     const totalCapacity = accounts.reduce((sum, account) => sum + account.capacity, 0);
-    const candidates = totalCapacity === 0 ? [] : await readCandidates(db, totalCapacity);
+    const candidates = totalCapacity === 0 ? [] : await readCandidates(db);
     const allocations = allocatePoolAssignmentCandidates({
       accounts,
       candidates,
       incumbentStreamIdsByAccount,
-      blockedBroadcasterIdsByAccount
+      blockedBroadcasterIdsByAccount,
+      globallyBlockedBroadcasterIds
     });
     const accountResults = [];
     for (const account of accounts) {
@@ -508,6 +511,61 @@ export const createChatAssignmentControl = (db: DbClient) => {
     });
   };
 
+  const retryPermanentBlock = async (input: {
+    botAccountId: string;
+    broadcasterUserId: string;
+    observedAt: Date;
+  }): Promise<number> => {
+    return db.transaction(async (tx) => {
+      const rows = await tx
+        .select({
+          id: chatAssignments.id,
+          botAccountId: chatAssignments.botAccountId,
+          status: chatAssignments.status,
+          joinedAt: chatAssignments.joinedAt,
+          twitchStreamId: chatAssignments.twitchStreamId,
+          latestError: chatAssignments.latestError
+        })
+        .from(chatAssignments)
+        .where(and(
+          eq(chatAssignments.broadcasterUserId, input.broadcasterUserId),
+          eq(chatAssignments.status, "failed")
+        ))
+        .orderBy(desc(chatAssignments.updatedAt))
+        .for("update");
+      const requestedRows = rows.filter((row) => row.botAccountId === input.botAccountId);
+      const requestedScope = requestedRows
+        .map((row) => getPermanentAssignmentErrorScope(row.latestError))
+        .find((scope) => scope != null);
+      if (requestedScope == null) {
+        return 0;
+      }
+
+      const retryRows = rows.filter((row) => {
+        const scope = getPermanentAssignmentErrorScope(row.latestError);
+        return requestedScope === "global"
+          ? scope === "global"
+          : row.botAccountId === input.botAccountId && scope === "account";
+      });
+
+      let retried = 0;
+      for (const row of retryRows) {
+        retried += await updateAssignment(tx, row, {
+          nextStatus: "left",
+          reason: "permanent IRC restriction cleared for manual retry",
+          details: { source: "admin" },
+          observedAt: input.observedAt,
+          set: {
+            joinedAt: null,
+            leftAt: input.observedAt,
+            latestError: null
+          }
+        });
+      }
+      return retried;
+    });
+  };
+
   const getEffectiveStatuses = async (
     twitchStreamIds: string[]
   ): Promise<Map<string, ActiveChatAssignmentStatus>> => {
@@ -538,6 +596,7 @@ export const createChatAssignmentControl = (db: DbClient) => {
     record,
     closeEndedStreams,
     closeForTrackingOptOut,
+    retryPermanentBlock,
     getEffectiveStatuses
   };
 };
@@ -586,6 +645,7 @@ export const allocatePoolAssignmentCandidates = (input: {
   candidates: AssignmentCandidate[];
   incumbentStreamIdsByAccount: Map<string, Set<string>>;
   blockedBroadcasterIdsByAccount?: Map<string, Set<string>>;
+  globallyBlockedBroadcasterIds?: Set<string>;
 }): Map<string, AssignmentCandidate[]> => {
   const accounts = input.accounts.map((account) => ({
     ...account,
@@ -598,17 +658,30 @@ export const allocatePoolAssignmentCandidates = (input: {
     }
   }
 
+  const eligibleCandidates = input.candidates.filter((candidate) =>
+    !(input.globallyBlockedBroadcasterIds?.has(candidate.broadcasterUserId) ?? false)
+      && accounts.some(
+        (account) => !(input.blockedBroadcasterIdsByAccount?.get(account.botAccountId)?.has(candidate.broadcasterUserId) ?? false)
+      )
+  );
+  const totalCapacity = accounts.reduce((sum, account) => sum + account.capacity, 0);
   const selected = selectStableAssignmentCandidates({
-    candidates: input.candidates.filter((candidate) => accounts.some(
-      (account) => !(input.blockedBroadcasterIdsByAccount?.get(account.botAccountId)?.has(candidate.broadcasterUserId) ?? false)
-    )),
+    candidates: eligibleCandidates,
     incumbentStreamIds,
-    capacity: accounts.reduce((sum, account) => sum + account.capacity, 0)
+    capacity: totalCapacity
   });
-  const unassignedStreamIds = new Set(selected.map((candidate) => candidate.twitchStreamId));
+  const selectedStreamIds = new Set(selected.map((candidate) => candidate.twitchStreamId));
+  const rankedFallbacks = selectStableAssignmentCandidates({
+    candidates: eligibleCandidates,
+    incumbentStreamIds: new Set(),
+    capacity: eligibleCandidates.length
+  }).filter((candidate) => !selectedStreamIds.has(candidate.twitchStreamId));
+  const allocationOrder = [...selected, ...rankedFallbacks];
   const allocations = new Map<string, AssignmentCandidate[]>(
     accounts.map((account) => [account.botAccountId, []])
   );
+  const assignedStreamIds = new Set<string>();
+  const fixedIncumbentStreamIds = new Set<string>();
 
   for (const account of accounts) {
     const allocation = allocations.get(account.botAccountId) ?? [];
@@ -616,7 +689,7 @@ export const allocatePoolAssignmentCandidates = (input: {
     for (const candidate of selected) {
       if (
         allocation.length >= account.capacity ||
-        !unassignedStreamIds.has(candidate.twitchStreamId) ||
+        assignedStreamIds.has(candidate.twitchStreamId) ||
         !accountIncumbents.has(candidate.twitchStreamId) ||
         (input.blockedBroadcasterIdsByAccount?.get(account.botAccountId)?.has(candidate.broadcasterUserId) ?? false)
       ) {
@@ -624,35 +697,81 @@ export const allocatePoolAssignmentCandidates = (input: {
       }
 
       allocation.push(candidate);
-      unassignedStreamIds.delete(candidate.twitchStreamId);
+      assignedStreamIds.add(candidate.twitchStreamId);
+      fixedIncumbentStreamIds.add(candidate.twitchStreamId);
     }
     allocations.set(account.botAccountId, allocation);
   }
 
-  for (const account of accounts) {
-    const allocation = allocations.get(account.botAccountId) ?? [];
-    for (const candidate of selected) {
-      if (allocation.length >= account.capacity) {
-        break;
-      }
-      if (!unassignedStreamIds.has(candidate.twitchStreamId)) {
+  const tryAssign = (candidate: AssignmentCandidate, visitedAccountIds: Set<string>): boolean => {
+    for (const account of accounts) {
+      if (
+        visitedAccountIds.has(account.botAccountId)
+        || (input.blockedBroadcasterIdsByAccount?.get(account.botAccountId)?.has(candidate.broadcasterUserId) ?? false)
+      ) {
         continue;
       }
-      if (input.blockedBroadcasterIdsByAccount?.get(account.botAccountId)?.has(candidate.broadcasterUserId) ?? false) {
-        continue;
+      const allocation = allocations.get(account.botAccountId) ?? [];
+      if (allocation.length < account.capacity) {
+        allocation.push(candidate);
+        allocations.set(account.botAccountId, allocation);
+        return true;
       }
-
-      allocation.push(candidate);
-      unassignedStreamIds.delete(candidate.twitchStreamId);
     }
-    allocations.set(account.botAccountId, allocation);
+
+    for (const account of accounts) {
+      if (
+        visitedAccountIds.has(account.botAccountId)
+        || (input.blockedBroadcasterIdsByAccount?.get(account.botAccountId)?.has(candidate.broadcasterUserId) ?? false)
+      ) {
+        continue;
+      }
+      visitedAccountIds.add(account.botAccountId);
+      const allocation = allocations.get(account.botAccountId) ?? [];
+      for (const [index, occupant] of allocation.entries()) {
+        if (fixedIncumbentStreamIds.has(occupant.twitchStreamId)) {
+          continue;
+        }
+        if (tryAssign(occupant, visitedAccountIds)) {
+          allocation[index] = candidate;
+          allocations.set(account.botAccountId, allocation);
+          return true;
+        }
+      }
+    }
+    return false;
+  };
+
+  for (const candidate of allocationOrder) {
+    if (assignedStreamIds.size >= totalCapacity) {
+      break;
+    }
+    if (assignedStreamIds.has(candidate.twitchStreamId)) {
+      continue;
+    }
+    if (tryAssign(candidate, new Set())) {
+      assignedStreamIds.add(candidate.twitchStreamId);
+    }
+  }
+
+  for (const account of accounts) {
+    allocations.get(account.botAccountId)?.sort(compareCandidates);
   }
 
   return allocations;
 };
 
 export const isPermanentAssignmentError = (error: string | null) => {
-  return error != null && permanentAssignmentErrorPrefixes.some((prefix) => error.startsWith(prefix));
+  return getPermanentAssignmentErrorScope(error) != null;
+};
+
+export const getPermanentAssignmentErrorScope = (
+  error: string | null
+): PermanentAssignmentErrorScope | null => {
+  if (error == null) {
+    return null;
+  }
+  return permanentAssignmentErrors.find(({ prefix }) => error.startsWith(prefix))?.scope ?? null;
 };
 
 export const reduceEffectiveAssignmentStatuses = (
@@ -672,21 +791,21 @@ export const reduceEffectiveAssignmentStatuses = (
   return result;
 };
 
-const readCandidates = async (db: DbClient, capacity: number): Promise<AssignmentCandidate[]> => {
-  const latestSnapshotTimes = db
+const readCandidates = async (db: DbClient): Promise<AssignmentCandidate[]> => {
+  const latestSnapshot = db
     .select({
-      twitchStreamId: streamSnapshots.twitchStreamId,
-      observedAt: sql<Date>`max(${streamSnapshots.observedAt})`.as("latest_observed_at")
+      viewerCount: streamSnapshots.viewerCount
     })
     .from(streamSnapshots)
-    .groupBy(streamSnapshots.twitchStreamId)
-    .as("latest_snapshot_times");
-  const candidateLimit = Math.max(capacity, capacity * 3);
+    .where(eq(streamSnapshots.twitchStreamId, streamSessions.twitchStreamId))
+    .orderBy(desc(streamSnapshots.observedAt), desc(streamSnapshots.id))
+    .limit(1)
+    .as("latest_snapshot");
   const rows = await db
     .select({
       twitchStreamId: streamSessions.twitchStreamId,
       broadcasterUserId: streamSessions.broadcasterUserId,
-      viewerCount: streamSnapshots.viewerCount,
+      viewerCount: latestSnapshot.viewerCount,
       lastSeenLiveAt: streamSessions.lastSeenLiveAt,
       isManuallyPinned: channels.isManuallyPinned,
       isOptedIn: channels.isOptedIn,
@@ -694,14 +813,7 @@ const readCandidates = async (db: DbClient, capacity: number): Promise<Assignmen
       trackingPriority: channels.trackingPriority
     })
     .from(streamSessions)
-    .leftJoin(latestSnapshotTimes, eq(streamSessions.twitchStreamId, latestSnapshotTimes.twitchStreamId))
-    .leftJoin(
-      streamSnapshots,
-      and(
-        eq(streamSnapshots.twitchStreamId, latestSnapshotTimes.twitchStreamId),
-        eq(streamSnapshots.observedAt, latestSnapshotTimes.observedAt)
-      )
-    )
+    .leftJoinLateral(latestSnapshot, sql`true`)
     .leftJoin(channels, eq(streamSessions.broadcasterUserId, channels.twitchUserId))
     .leftJoin(subjectPrivacyStates, eq(streamSessions.broadcasterUserId, subjectPrivacyStates.twitchUserId))
     .where(
@@ -714,10 +826,9 @@ const readCandidates = async (db: DbClient, capacity: number): Promise<Assignmen
     .orderBy(
       desc(sql<number>`case when ${channels.isManuallyPinned} then 2 when ${channels.isOptedIn} or ${channels.isKnownModerator} then 1 else 0 end`),
       desc(sql<number>`coalesce(${channels.trackingPriority}, 0)`),
-      desc(sql<number>`coalesce(${streamSnapshots.viewerCount}, -1)`),
+      desc(sql<number>`coalesce(${latestSnapshot.viewerCount}, -1)`),
       desc(streamSessions.lastSeenLiveAt)
-    )
-    .limit(candidateLimit);
+    );
 
   return rows.map((row) => ({
     twitchStreamId: row.twitchStreamId,

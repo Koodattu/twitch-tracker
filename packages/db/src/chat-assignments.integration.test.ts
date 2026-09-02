@@ -6,6 +6,7 @@ import {
   chatAssignments,
   createChatAssignmentControl,
   createDb,
+  streamSnapshots,
   streamSessions,
   subjectPrivacyStates,
   twitchUsers
@@ -155,5 +156,59 @@ describe.skipIf(database == null)("Chat Assignment control with PostgreSQL", () 
     expect(changed).toBe(0);
     expect(assignment?.status).toBe("failed");
     expect(await db.select().from(chatAssignmentEvents)).toEqual([]);
+  });
+
+  it("keeps failure history when an administrator retries a permanent block", async () => {
+    const fixture = await createFixture("failed");
+    await db
+      .update(chatAssignments)
+      .set({ latestError: "IRC NOTICE msg_banned: permanently banned" })
+      .where(eq(chatAssignments.id, fixture.assignmentId));
+
+    const retried = await assignments.retryPermanentBlock({
+      botAccountId: fixture.botAccountId,
+      broadcasterUserId: "broadcaster-1",
+      observedAt: new Date(observedAt.getTime() + 1_000)
+    });
+
+    const [assignment] = await db.select().from(chatAssignments).where(eq(chatAssignments.id, fixture.assignmentId));
+    const events = await db.select().from(chatAssignmentEvents).where(eq(chatAssignmentEvents.chatAssignmentId, fixture.assignmentId));
+    expect(retried).toBe(1);
+    expect(assignment?.status).toBe("left");
+    expect(assignment?.latestError).toBeNull();
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      eventType: "left",
+      reason: "permanent IRC restriction cleared for manual retry",
+      details: { previousStatus: "failed", source: "admin" }
+    });
+  });
+
+  it("selects a live candidate from its latest snapshot", async () => {
+    const fixture = await createFixture("left");
+    await db.insert(streamSnapshots).values([
+      {
+        twitchStreamId: "stream-1",
+        broadcasterUserId: "broadcaster-1",
+        observedAt,
+        viewerCount: 10
+      },
+      {
+        twitchStreamId: "stream-1",
+        broadcasterUserId: "broadcaster-1",
+        observedAt: new Date(observedAt.getTime() + 1_000),
+        viewerCount: 20
+      }
+    ]);
+
+    const result = await assignments.reconcilePool({
+      accounts: [{ botAccountId: fixture.botAccountId, capacity: 1 }],
+      observedAt: new Date(observedAt.getTime() + 2_000)
+    });
+
+    const [assignment] = await db.select().from(chatAssignments).where(eq(chatAssignments.id, fixture.assignmentId));
+    expect(result.assignmentsDesired).toBe(1);
+    expect(result.topViewerCount).toBe(20);
+    expect(assignment?.status).toBe("desired");
   });
 });

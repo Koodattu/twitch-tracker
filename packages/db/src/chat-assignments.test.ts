@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   allocatePoolAssignmentCandidates,
+  getPermanentAssignmentErrorScope,
   isPermanentAssignmentError,
   reduceEffectiveAssignmentStatuses,
   selectStableAssignmentCandidates,
@@ -133,6 +134,56 @@ describe("Chat Assignment selection", () => {
 
     expect(allocations.get("bot-1")?.map((item) => item.twitchStreamId)).toEqual(["first", "second"]);
   });
+
+  it("reassigns flexible candidates so account-specific blocks do not strand capacity", () => {
+    const allocations = allocatePoolAssignmentCandidates({
+      accounts: [
+        { botAccountId: "bot-1", capacity: 1 },
+        { botAccountId: "bot-2", capacity: 1 }
+      ],
+      candidates: [candidate("shared", 100), candidate("bot-1-only", 90)],
+      incumbentStreamIdsByAccount: new Map(),
+      blockedBroadcasterIdsByAccount: new Map([
+        ["bot-2", new Set(["user-bot-1-only"])]
+      ])
+    });
+
+    expect(allocations.get("bot-1")?.map((item) => item.twitchStreamId)).toEqual(["bot-1-only"]);
+    expect(allocations.get("bot-2")?.map((item) => item.twitchStreamId)).toEqual(["shared"]);
+  });
+
+  it("uses lower-ranked candidates when the top set cannot fill every account", () => {
+    const allocations = allocatePoolAssignmentCandidates({
+      accounts: [
+        { botAccountId: "bot-1", capacity: 1 },
+        { botAccountId: "bot-2", capacity: 1 }
+      ],
+      candidates: [candidate("restricted-1", 100), candidate("restricted-2", 90), candidate("fallback", 80)],
+      incumbentStreamIdsByAccount: new Map(),
+      blockedBroadcasterIdsByAccount: new Map([
+        ["bot-2", new Set(["user-restricted-1", "user-restricted-2"])]
+      ])
+    });
+
+    expect([...allocations.values()].flat().map((item) => item.twitchStreamId).sort()).toEqual([
+      "fallback",
+      "restricted-1"
+    ]);
+  });
+
+  it("does not allocate globally unavailable channels to any bot", () => {
+    const allocations = allocatePoolAssignmentCandidates({
+      accounts: [
+        { botAccountId: "bot-1", capacity: 1 },
+        { botAccountId: "bot-2", capacity: 1 }
+      ],
+      candidates: [candidate("suspended", 100), candidate("available", 90)],
+      incumbentStreamIdsByAccount: new Map(),
+      globallyBlockedBroadcasterIds: new Set(["user-suspended"])
+    });
+
+    expect([...allocations.values()].flat().map((item) => item.twitchStreamId)).toEqual(["available"]);
+  });
 });
 
 describe("effective Chat Assignment status", () => {
@@ -155,5 +206,13 @@ describe("permanent Chat Assignment errors", () => {
     expect(isPermanentAssignmentError("IRC NOTICE msg_channel_suspended: unavailable")).toBe(true);
     expect(isPermanentAssignmentError("join acknowledgement timed out; retrying")).toBe(false);
     expect(isPermanentAssignmentError(null)).toBe(false);
+  });
+
+  it("distinguishes account restrictions from channel-wide failures", () => {
+    expect(getPermanentAssignmentErrorScope("IRC NOTICE msg_banned: permanently banned")).toBe("account");
+    expect(getPermanentAssignmentErrorScope("IRC NOTICE msg_channel_blocked: account restricted")).toBe("account");
+    expect(getPermanentAssignmentErrorScope("IRC NOTICE msg_channel_suspended: unavailable")).toBe("global");
+    expect(getPermanentAssignmentErrorScope("IRC NOTICE tos_ban: unavailable")).toBe("global");
+    expect(getPermanentAssignmentErrorScope("join acknowledgement timed out; retrying")).toBeNull();
   });
 });

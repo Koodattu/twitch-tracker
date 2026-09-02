@@ -16,6 +16,7 @@ import {
   createChatAssignmentControl,
   eventProcessingFailures,
   eventsubSubscriptions,
+  getPermanentAssignmentErrorScope,
   ingestionRuns,
   isPermanentAssignmentError,
   oauthAccounts,
@@ -56,6 +57,10 @@ type CreateApiAppInput = {
 const loginParamSchema = z.object({ login: z.string().min(1).max(100) });
 const streamParamSchema = z.object({ streamId: z.string().min(1).max(100) });
 const privacyRequestParamSchema = z.object({ requestId: z.string().uuid() });
+const botChannelBlockParamSchema = z.object({
+  botAccountId: z.string().uuid(),
+  broadcasterUserId: z.string().min(1).max(100)
+});
 const privacyRequestBodySchema = z.object({
   requestType: z.enum(["public_profile_opt_out", "tracking_opt_out", "data_deletion"]),
   note: z.string().max(1000).optional()
@@ -1220,6 +1225,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
   });
 
   app.get("/api/internal/bot-accounts", requireAdmin, async (c) => {
+    const apiConfig = c.get("config");
     const accounts = await c.get("db").select().from(botAccounts).orderBy(desc(botAccounts.updatedAt)).limit(100);
     const accountIds = accounts.map((account) => account.id);
     const tokens =
@@ -1287,13 +1293,32 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
     return c.json({
       data: accounts.map((account) => {
         const token = latestTokenByAccount.get(account.id);
+        const usesEnvToken = account.login === apiConfig.TWITCH_BOT_LOGIN.trim().toLowerCase()
+          && apiConfig.TWITCH_BOT_ACCESS_TOKEN !== "";
+        const tokenFailure = token?.refreshStatus === "decrypt_failed" || token?.refreshStatus === "refresh_failed";
+        const tokenCanRefresh = token?.encryptedRefreshToken != null
+          && apiConfig.TWITCH_CLIENT_ID !== ""
+          && apiConfig.TWITCH_CLIENT_SECRET !== "";
+        const tokenIsCurrent = token?.expiresAt == null || token.expiresAt > new Date();
+        const hasUsableCredentials = usesEnvToken || (
+          token?.encryptedAccessToken != null
+          && !tokenFailure
+          && (tokenIsCurrent || tokenCanRefresh)
+        );
+        const effectiveCapacity = account.enabled
+          && hasUsableCredentials
+          && account.healthStatus !== "irc_unavailable"
+          ? account.maxJoinedRooms
+          : 0;
         return {
           ...account,
+          effectiveCapacity,
           blockedChannels: (blockedChannelsByAccount.get(account.id) ?? []).map((assignment) => ({
             broadcasterUserId: assignment.broadcasterUserId,
             broadcasterLogin: assignment.broadcasterLogin,
             broadcasterDisplayName: assignment.broadcasterDisplayName,
             reason: assignment.latestError,
+            scope: getPermanentAssignmentErrorScope(assignment.latestError),
             detectedAt: assignment.detectedAt.toISOString()
           })),
           token:
@@ -1313,6 +1338,24 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
       })
     });
   });
+
+  app.post(
+    "/api/internal/bot-accounts/:botAccountId/blocked-channels/:broadcasterUserId/retry",
+    requireAdmin,
+    async (c) => {
+      const params = botChannelBlockParamSchema.parse(c.req.param());
+      const retriedAssignments = await createChatAssignmentControl(c.get("db")).retryPermanentBlock({
+        botAccountId: params.botAccountId,
+        broadcasterUserId: params.broadcasterUserId,
+        observedAt: new Date()
+      });
+
+      if (c.req.header("accept")?.includes("text/html")) {
+        return c.redirect(new URL("/internal/bot-accounts", c.get("config").PUBLIC_WEB_URL).toString(), 303);
+      }
+      return c.json({ data: { retriedAssignments } });
+    }
+  );
 
   app.get("/api/internal/bot-accounts/oauth/start", requireAdmin, (c) => {
     const apiConfig = c.get("config");

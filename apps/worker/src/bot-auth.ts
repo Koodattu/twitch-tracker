@@ -12,6 +12,7 @@ export type ResolvedBotCredentials = {
   source: "env" | "database" | "none";
   maxJoinedRooms: number;
   joinRatePer10Seconds: number;
+  healthStatus: string;
 };
 
 export type ResolvedBotAccountCredentials = ResolvedBotCredentials & {
@@ -23,7 +24,8 @@ export const resolvePrimaryBotCredentials = async (
   db: DbClient,
   config: AppConfig
 ): Promise<ResolvedBotCredentials> => {
-  const [primary] = await resolveBotCredentialsPool(db, config);
+  const bots = await resolveBotCredentialsPool(db, config);
+  const primary = bots.find((bot) => bot.accessToken != null) ?? bots[0];
   if (primary != null) {
     return primary;
   }
@@ -36,7 +38,8 @@ export const resolvePrimaryBotCredentials = async (
     scopes: [],
     source: "none",
     maxJoinedRooms: config.DEFAULT_BOT_JOIN_CAPACITY,
-    joinRatePer10Seconds: config.DEFAULT_BOT_JOIN_RATE_PER_10_SECONDS
+    joinRatePer10Seconds: config.DEFAULT_BOT_JOIN_RATE_PER_10_SECONDS,
+    healthStatus: "unknown"
   };
 };
 
@@ -104,7 +107,8 @@ export const resolveBotCredentialsPool = async (
       twitchUserId: botAccounts.twitchUserId,
       login: botAccounts.login,
       maxJoinedRooms: botAccounts.maxJoinedRooms,
-      joinRatePer10Seconds: botAccounts.joinRatePer10Seconds
+      joinRatePer10Seconds: botAccounts.joinRatePer10Seconds,
+      healthStatus: botAccounts.healthStatus
     })
     .from(botAccounts)
     .where(eq(botAccounts.enabled, true))
@@ -124,7 +128,8 @@ export const resolveBotCredentialsPool = async (
         : dbToken?.scopes ?? [],
       source: usesEnvToken ? "env" : dbToken == null ? "none" : "database",
       maxJoinedRooms: bot.maxJoinedRooms,
-      joinRatePer10Seconds: bot.joinRatePer10Seconds
+      joinRatePer10Seconds: bot.joinRatePer10Seconds,
+      healthStatus: bot.healthStatus
     });
   }
 
