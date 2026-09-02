@@ -537,22 +537,24 @@ const reconcileSubscriptions = async (context: WorkerContext) => {
   let failedDeletions = 0;
   let deletionRateLimited = false;
   const deletions = plan.stale.slice(0, context.config.EVENTSUB_MAX_DELETIONS_PER_RUN);
-  for (const subscription of deletions) {
-    try {
-      await eventsub.deleteSubscription({
-        accessToken: appToken.accessToken,
-        subscriptionId: subscription.id
-      });
-      deletedRemoteIds.add(subscription.id);
-      await clearDeletedLocalSubscription(context, subscription.id);
-      deletedSubscriptions += 1;
-    } catch (error) {
-      failedDeletions += 1;
-      if (error instanceof TwitchEventSubApiError && error.statusCode === 429) {
-        deletionRateLimited = true;
-        break;
+  const deletionConcurrency = 10;
+  for (let index = 0; index < deletions.length && !deletionRateLimited; index += deletionConcurrency) {
+    await Promise.all(deletions.slice(index, index + deletionConcurrency).map(async (subscription) => {
+      try {
+        await eventsub.deleteSubscription({
+          accessToken: appToken.accessToken,
+          subscriptionId: subscription.id
+        });
+        deletedRemoteIds.add(subscription.id);
+        await clearDeletedLocalSubscription(context, subscription.id);
+        deletedSubscriptions += 1;
+      } catch (error) {
+        failedDeletions += 1;
+        if (error instanceof TwitchEventSubApiError && error.statusCode === 429) {
+          deletionRateLimited = true;
+        }
       }
-    }
+    }));
   }
 
   const remainingRemote = snapshot.subscriptions.filter((subscription) => !deletedRemoteIds.has(subscription.id));

@@ -19,8 +19,10 @@ Stale remote subscriptions are deleted only if they use the current callback or
 their Twitch ID is already recorded locally. This prevents the worker from
 deleting unrelated subscriptions that share the same Twitch application.
 Deletion runs before creation and is bounded to 500 deletes and 100 creates per
-run by default. The one-minute reconciliation interval lets a large backlog
-converge without spending the entire app-token rate-limit budget at once.
+run by default. Deletes use small concurrent batches to avoid turning network
+latency into a multi-minute pass. The one-minute reconciliation interval lets a
+large backlog converge without spending the entire app-token rate-limit budget
+at once.
 
 Webhook receipt stores the Twitch message type. Notifications are processed
 every five seconds in a loop separate from remote reconciliation. Revocations
