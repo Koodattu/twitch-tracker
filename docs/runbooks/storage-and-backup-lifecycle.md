@@ -160,3 +160,22 @@ separate, measured maintenance operation after a verified restore point exists:
 Each transformation needs before/after counts and semantic validation. A
 normal application rollback cannot reconstruct removed redundant encodings, so
 do not compact the legacy rows merely because the new write path is deployed.
+
+The reviewed maintenance operation is
+`packages/db/online-migrations/0011_compact_legacy_redundancy.sql`. It verifies
+wire-format IRC tags, verifies the SQL membership hash against keys produced by
+the application, aborts on collisions or row-count changes, clears repeated
+snapshot metadata while retaining every viewer sample, and then rewrites the
+three affected tables with `VACUUM FULL`. Stop API and worker writes first;
+`VACUUM FULL` takes an exclusive table lock.
+
+To force a fresh verified recovery point immediately before maintenance, run a
+one-shot backup container. This uses the normal validation, checksum, marker,
+and retention path:
+
+```sh
+docker compose --env-file .env.production run --rm --no-deps \
+  -e BACKUP_RUN_ONCE=true \
+  -e BACKUP_FORCE_NOW=true \
+  backup
+```

@@ -24,6 +24,14 @@ load_backup_settings
 case "${BACKUP_INTERVAL_SECONDS:-}" in
   ''|*[!0-9]*|0) echo "BACKUP_INTERVAL_SECONDS must be a positive integer." >&2; exit 1 ;;
 esac
+case "${BACKUP_RUN_ONCE:-false}" in
+  true|false) ;;
+  *) echo "BACKUP_RUN_ONCE must be true or false." >&2; exit 1 ;;
+esac
+case "${BACKUP_FORCE_NOW:-false}" in
+  true|false) ;;
+  *) echo "BACKUP_FORCE_NOW must be true or false." >&2; exit 1 ;;
+esac
 
 if [ "${BACKUP_OFF_HOST_CONFIRMED:-false}" != "true" ]; then
   backup_error "backup_warning reason=no_verified_off_host_copy"
@@ -34,7 +42,10 @@ if [ -z "${PGPASSWORD:-}" ]; then
   exit 1
 fi
 
-initial_delay="$(backup_seconds_until_due "$BACKUP_INTERVAL_SECONDS")"
+initial_delay=0
+if [ "${BACKUP_FORCE_NOW:-false}" != "true" ]; then
+  initial_delay="$(backup_seconds_until_due "$BACKUP_INTERVAL_SECONDS")"
+fi
 if [ "$initial_delay" -gt 0 ]; then
   backup_log "backup_scheduled reason=current_backup_still_fresh delay_seconds=$initial_delay"
   sleep "$initial_delay"
@@ -90,9 +101,15 @@ create_backup() {
 }
 
 while true; do
+  result=0
   if ! create_backup; then
+    result=1
     cleanup
     backup_error "backup_attempt_failed retry_seconds=$BACKUP_INTERVAL_SECONDS"
+  fi
+
+  if [ "${BACKUP_RUN_ONCE:-false}" = "true" ]; then
+    exit "$result"
   fi
 
   sleep "$BACKUP_INTERVAL_SECONDS"
