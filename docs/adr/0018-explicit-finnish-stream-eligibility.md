@@ -19,6 +19,9 @@ known-channel batch may close a missing stream only after it has not been seen
 for 20 minutes. A failed batch never closes its channels.
 When a channel is observed with a new Twitch stream ID, any older open session
 for that channel is closed as superseded.
+Historical inferred end timestamps that predate a later confirmed live
+observation are clamped to that last observation without deleting snapshots or
+changing the original detection source.
 
 ## Consequences
 
