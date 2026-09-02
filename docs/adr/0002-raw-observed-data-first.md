@@ -1,6 +1,6 @@
 # Raw Observed Data First
 
-Status: accepted
+Status: amended by ADR 0017
 
 During the private MVP, the system stores the fullest practical record of
 observed Twitch-derived data before reducing retention and public exposure. This

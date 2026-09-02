@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   chatMembershipEvents,
   chatMessages,
@@ -215,12 +216,27 @@ export const runIrcLoop = (context: WorkerContext) => {
 
 const persistRawIrcMessage = async (db: DbClient, botAccountId: string, botLogin: string, message: ParsedIrcMessage) => {
   const channelLogin = getChannelLogin(message);
+
+  if (message.command === "JOIN" || message.command === "PART") {
+    if (getUserLogin(message) === botLogin) {
+      if (message.command === "JOIN") {
+        await markAssignmentJoined(db, botAccountId, channelLogin);
+      } else {
+        await markAssignmentParted(db, botAccountId, channelLogin);
+      }
+    } else {
+      await persistMembershipEvent(db, botAccountId, message, null, channelLogin);
+    }
+    return;
+  }
+
   const [raw] = await db
     .insert(rawIrcMessages)
     .values({
       rawLine: message.rawLine,
       parsedCommand: message.command,
-      tags: message.tags,
+      // The wire line already contains the IRCv3 tags verbatim.
+      tags: {},
       channelLogin,
       botAccountId,
       receivedAt: new Date(),
@@ -234,16 +250,6 @@ const persistRawIrcMessage = async (db: DbClient, botAccountId: string, botLogin
 
   if (message.command === "PRIVMSG") {
     await persistChatMessage(db, botAccountId, message, raw.id, channelLogin);
-  }
-
-  if (message.command === "JOIN" || message.command === "PART") {
-    if (getUserLogin(message) === botLogin) {
-      if (message.command === "PART") {
-        await markAssignmentParted(db, botAccountId, channelLogin);
-      }
-    } else {
-      await persistMembershipEvent(db, botAccountId, message, raw.id, channelLogin);
-    }
   }
 
   if (message.command === "CLEARMSG") {
@@ -264,8 +270,7 @@ const persistRawIrcMessage = async (db: DbClient, botAccountId: string, botLogin
 
   if (
     message.command === "ROOMSTATE" ||
-    message.command === "USERSTATE" ||
-    (message.command === "JOIN" && getUserLogin(message) === botLogin)
+    message.command === "USERSTATE"
   ) {
     await markAssignmentJoined(db, botAccountId, channelLogin);
   }
@@ -340,7 +345,7 @@ const persistMembershipEvent = async (
   db: DbClient,
   botAccountId: string,
   message: ParsedIrcMessage,
-  rawIrcMessageId: string,
+  rawIrcMessageId: string | null,
   channelLogin: string | null
 ) => {
   const broadcaster = await findUserByLogin(db, channelLogin);
@@ -581,7 +586,7 @@ const membershipDedupeKey = (input: {
   eventAt: Date;
 }) => {
   const eventSecond = new Date(Math.floor(input.eventAt.getTime() / 1000) * 1000).toISOString();
-  return [
+  const identity = [
     "irc_membership",
     input.broadcasterUserId,
     input.twitchStreamId ?? "no-stream",
@@ -589,6 +594,7 @@ const membershipDedupeKey = (input: {
     input.chatterLogin ?? "unknown",
     eventSecond
   ].join(":");
+  return createHash("sha256").update(identity).digest("base64url");
 };
 
 const findUserByLogin = async (db: DbClient, login: string | null) => {

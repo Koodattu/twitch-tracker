@@ -11,39 +11,8 @@ export const runMaintenanceLoop = (context: WorkerContext) => {
     intervalMs: context.config.MAINTENANCE_INTERVAL_MS,
     context,
     run: async () => {
-      const rawChatRetentionDays = context.config.RAW_CHAT_RETENTION_DAYS;
       const rawPayloadRetentionDays = context.config.RAW_PAYLOAD_RETENTION_DAYS;
       const staleAssignmentGraceMinutes = context.config.STALE_ASSIGNMENT_GRACE_MINUTES;
-
-      const redactedChatMessages = await context.db.execute(sql`
-        update chat_messages
-        set raw_text = null,
-            updated_at = now()
-        where raw_text is not null
-          and received_at < now() - (${rawChatRetentionDays} * interval '1 day')
-      `);
-
-      const redactedRawIrcMessages = await context.db.execute(sql`
-        update raw_irc_messages
-        set raw_line = '[redacted by raw chat retention]',
-            tags = '{}'::jsonb,
-            parse_error = null,
-            updated_at = now()
-        where raw_line <> '[redacted by raw chat retention]'
-          and received_at < now() - (${rawChatRetentionDays} * interval '1 day')
-      `);
-
-      const redactedRawEventSubEvents = await context.db.execute(sql`
-        update raw_eventsub_events
-        set payload = jsonb_build_object(
-              'redacted', true,
-              'reason', 'raw_payload_retention',
-              'event_type', event_type
-            ),
-            updated_at = now()
-        where not (payload @> '{"redacted": true}'::jsonb)
-          and received_at < now() - (${rawPayloadRetentionDays} * interval '1 day')
-      `);
 
       const redactedRawHelixResponses = await context.db.execute(sql`
         update raw_helix_responses
@@ -52,7 +21,8 @@ export const runMaintenanceLoop = (context: WorkerContext) => {
             pagination = '{}'::jsonb,
             rate_limit_headers = '{}'::jsonb,
             updated_at = now()
-        where observed_at < now() - (${rawPayloadRetentionDays} * interval '1 day')
+        where status_code between 200 and 299
+          and observed_at < now() - (${rawPayloadRetentionDays} * interval '1 day')
           and (
             request_params <> '{}'::jsonb
             or response_json is not null
@@ -67,12 +37,8 @@ export const runMaintenanceLoop = (context: WorkerContext) => {
       });
 
       return {
-        rawChatRetentionDays,
         rawPayloadRetentionDays,
         staleAssignmentGraceMinutes,
-        redactedChatMessages: rowCount(redactedChatMessages),
-        redactedRawIrcMessages: rowCount(redactedRawIrcMessages),
-        redactedRawEventSubEvents: rowCount(redactedRawEventSubEvents),
         redactedRawHelixResponses: rowCount(redactedRawHelixResponses),
         closedStaleAssignments
       };

@@ -59,6 +59,15 @@ const rollupStreamViewerBuckets = async (context: WorkerContext, bucketMinutes: 
       viewer_count_max = excluded.viewer_count_max,
       viewer_count_avg = excluded.viewer_count_avg,
       updated_at = now()
+    where (
+      stream_activity_buckets.viewer_count_min,
+      stream_activity_buckets.viewer_count_max,
+      stream_activity_buckets.viewer_count_avg
+    ) is distinct from (
+      excluded.viewer_count_min,
+      excluded.viewer_count_max,
+      excluded.viewer_count_avg
+    )
   `);
 };
 
@@ -87,6 +96,13 @@ const rollupStreamMessageBuckets = async (context: WorkerContext, bucketMinutes:
       message_count = excluded.message_count,
       active_chatter_count = excluded.active_chatter_count,
       updated_at = now()
+    where (
+      stream_activity_buckets.message_count,
+      stream_activity_buckets.active_chatter_count
+    ) is distinct from (
+      excluded.message_count,
+      excluded.active_chatter_count
+    )
   `);
 };
 
@@ -115,6 +131,13 @@ const rollupStreamMembershipBuckets = async (context: WorkerContext, bucketMinut
       join_count = excluded.join_count,
       part_count = excluded.part_count,
       updated_at = now()
+    where (
+      stream_activity_buckets.join_count,
+      stream_activity_buckets.part_count
+    ) is distinct from (
+      excluded.join_count,
+      excluded.part_count
+    )
   `);
 };
 
@@ -149,6 +172,7 @@ const rollupStreamEventBuckets = async (context: WorkerContext, bucketMinutes: n
     on conflict (twitch_stream_id, bucket_start, bucket_minutes) do update set
       event_counts = excluded.event_counts,
       updated_at = now()
+    where stream_activity_buckets.event_counts is distinct from excluded.event_counts
   `);
 };
 
@@ -174,6 +198,13 @@ const rollupChannelDailyStreams = async (context: WorkerContext, lookbackHours: 
       stream_count = excluded.stream_count,
       live_seconds = excluded.live_seconds,
       updated_at = now()
+    where (
+      channel_daily_stats.stream_count,
+      channel_daily_stats.live_seconds
+    ) is distinct from (
+      excluded.stream_count,
+      excluded.live_seconds
+    )
   `);
 };
 
@@ -204,6 +235,13 @@ const rollupChannelDailyViewers = async (context: WorkerContext, lookbackHours: 
       viewer_count_max = excluded.viewer_count_max,
       viewer_count_avg = excluded.viewer_count_avg,
       updated_at = now()
+    where (
+      channel_daily_stats.viewer_count_max,
+      channel_daily_stats.viewer_count_avg
+    ) is distinct from (
+      excluded.viewer_count_max,
+      excluded.viewer_count_avg
+    )
   `);
 };
 
@@ -230,6 +268,7 @@ const rollupChannelDailyMessages = async (context: WorkerContext, lookbackHours:
     on conflict (broadcaster_user_id, day) do update set
       message_count = excluded.message_count,
       updated_at = now()
+    where channel_daily_stats.message_count is distinct from excluded.message_count
   `);
 };
 
@@ -266,6 +305,17 @@ const rollupChatterChannelMessageBuckets = async (context: WorkerContext, bucket
       last_activity_at = excluded.last_activity_at,
       active_minutes = excluded.active_minutes,
       updated_at = now()
+    where (
+      chatter_channel_activity_buckets.message_count,
+      chatter_channel_activity_buckets.first_activity_at,
+      chatter_channel_activity_buckets.last_activity_at,
+      chatter_channel_activity_buckets.active_minutes
+    ) is distinct from (
+      excluded.message_count,
+      excluded.first_activity_at,
+      excluded.last_activity_at,
+      excluded.active_minutes
+    )
   `);
 };
 
@@ -308,6 +358,23 @@ const rollupChatterChannelMembershipBuckets = async (context: WorkerContext, buc
         excluded.last_activity_at
       ),
       updated_at = now()
+    where (
+      chatter_channel_activity_buckets.join_count,
+      chatter_channel_activity_buckets.part_count,
+      chatter_channel_activity_buckets.first_activity_at,
+      chatter_channel_activity_buckets.last_activity_at
+    ) is distinct from (
+      excluded.join_count,
+      excluded.part_count,
+      least(
+        coalesce(chatter_channel_activity_buckets.first_activity_at, excluded.first_activity_at),
+        excluded.first_activity_at
+      ),
+      greatest(
+        coalesce(chatter_channel_activity_buckets.last_activity_at, excluded.last_activity_at),
+        excluded.last_activity_at
+      )
+    )
   `);
 };
 
@@ -340,5 +407,16 @@ const rollupChatterDaily = async (context: WorkerContext, lookbackHours: number)
       active_minutes = excluded.active_minutes,
       summary = excluded.summary,
       updated_at = now()
+    where (
+      chatter_daily_stats.message_count,
+      chatter_daily_stats.channels_active,
+      chatter_daily_stats.active_minutes,
+      chatter_daily_stats.summary
+    ) is distinct from (
+      excluded.message_count,
+      excluded.channels_active,
+      excluded.active_minutes,
+      excluded.summary
+    )
   `);
 };

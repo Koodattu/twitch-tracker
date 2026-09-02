@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   allocatePoolAssignmentCandidates,
+  isPermanentAssignmentError,
   reduceEffectiveAssignmentStatuses,
   selectStableAssignmentCandidates,
   type AssignmentCandidate
@@ -119,6 +120,19 @@ describe("Chat Assignment selection", () => {
     expect(allocations.get("bot-1")?.map((item) => item.twitchStreamId)).toEqual(["popular"]);
     expect(allocations.get("bot-2")?.map((item) => item.twitchStreamId)).toEqual(["incumbent"]);
   });
+
+  it("does not retry a permanently blocked broadcaster on the same bot", () => {
+    const allocations = allocatePoolAssignmentCandidates({
+      accounts: [{ botAccountId: "bot-1", capacity: 2 }],
+      candidates: [candidate("blocked", 1_000), candidate("first", 100), candidate("second", 90)],
+      incumbentStreamIdsByAccount: new Map(),
+      blockedBroadcasterIdsByAccount: new Map([
+        ["bot-1", new Set(["user-blocked"])]
+      ])
+    });
+
+    expect(allocations.get("bot-1")?.map((item) => item.twitchStreamId)).toEqual(["first", "second"]);
+  });
 });
 
 describe("effective Chat Assignment status", () => {
@@ -132,5 +146,14 @@ describe("effective Chat Assignment status", () => {
     ]);
 
     expect([...statuses.entries()]).toEqual([["stream-1", "joined"]]);
+  });
+});
+
+describe("permanent Chat Assignment errors", () => {
+  it("recognizes Twitch notices that must not be retried", () => {
+    expect(isPermanentAssignmentError("IRC NOTICE msg_banned: permanently banned")).toBe(true);
+    expect(isPermanentAssignmentError("IRC NOTICE msg_channel_suspended: unavailable")).toBe(true);
+    expect(isPermanentAssignmentError("join acknowledgement timed out; retrying")).toBe(false);
+    expect(isPermanentAssignmentError(null)).toBe(false);
   });
 });

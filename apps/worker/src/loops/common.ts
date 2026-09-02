@@ -1,5 +1,7 @@
 import { ingestionRuns, workerHeartbeats, type DbClient } from "@twitch-tracker/db";
-import { eq, and } from "drizzle-orm";
+
+const successfulRunSampleIntervalMs = 60 * 60 * 1000;
+const successfulRunSamples = new Map<string, { lastRecordedAt: number; unrecordedRuns: number }>();
 
 export type LoopContext = {
   db: DbClient;
@@ -115,38 +117,44 @@ export const runWithIngestionRecord = async (
   jobType: string,
   run: () => Promise<Record<string, unknown>>
 ) => {
-  const [created] = await db
-    .insert(ingestionRuns)
-    .values({ jobType, status: "running", startedAt: new Date() })
-    .returning({ id: ingestionRuns.id });
-
-  if (created == null) {
-    throw new Error(`Failed to create ingestion run for ${jobType}.`);
-  }
+  const startedAt = new Date();
 
   try {
     const summary = await run();
-    await db
-      .update(ingestionRuns)
-      .set({
-        status: "succeeded",
-        finishedAt: new Date(),
-        summary,
-        updatedAt: new Date()
-      })
-      .where(eq(ingestionRuns.id, created.id));
+    const finishedAt = new Date();
+    const sample = successfulRunSamples.get(jobType);
+    if (sample != null && finishedAt.getTime() - sample.lastRecordedAt < successfulRunSampleIntervalMs) {
+      sample.unrecordedRuns += 1;
+      return summary;
+    }
+
+    await db.insert(ingestionRuns).values({
+      jobType,
+      status: "succeeded",
+      startedAt,
+      finishedAt,
+      summary: {
+        ...summary,
+        sampling: {
+          intervalMs: successfulRunSampleIntervalMs,
+          successfulRuns: (sample?.unrecordedRuns ?? 0) + 1
+        }
+      }
+    });
+    successfulRunSamples.set(jobType, {
+      lastRecordedAt: finishedAt.getTime(),
+      unrecordedRuns: 0
+    });
     return summary;
   } catch (error) {
-    await db
-      .update(ingestionRuns)
-      .set({
-        status: "failed",
-        finishedAt: new Date(),
-        errorClass: error instanceof Error ? error.name : "UnknownError",
-        errorMessage: error instanceof Error ? error.message : String(error),
-        updatedAt: new Date()
-      })
-      .where(and(eq(ingestionRuns.id, created.id)));
+    await db.insert(ingestionRuns).values({
+      jobType,
+      status: "failed",
+      startedAt,
+      finishedAt: new Date(),
+      errorClass: error instanceof Error ? error.name : "UnknownError",
+      errorMessage: error instanceof Error ? error.message : String(error)
+    });
     throw error;
   }
 };

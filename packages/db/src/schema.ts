@@ -217,8 +217,7 @@ export const rawIrcMessages = pgTable("raw_irc_messages", {
   parseError: text("parse_error"),
   ...timestamps
 }, (table) => ({
-  receivedIdx: index("raw_irc_messages_received_idx").on(table.receivedAt),
-  channelReceivedIdx: index("raw_irc_messages_channel_received_idx").on(table.channelLogin, table.receivedAt)
+  receivedIdx: index("raw_irc_messages_received_idx").on(table.receivedAt)
 }));
 
 export const rawEventsubEvents = pgTable("raw_eventsub_events", {
@@ -255,8 +254,7 @@ export const eventsubSubscriptions = pgTable("eventsub_subscriptions", {
   ...timestamps
 }, (table) => ({
   twitchSubscriptionIdx: uniqueIndex("eventsub_subscriptions_twitch_subscription_idx").on(table.twitchSubscriptionId),
-  desiredIdentityIdx: uniqueIndex("eventsub_subscriptions_desired_identity_idx").on(table.eventType, table.eventVersion, table.conditionKey, table.callbackUrl),
-  statusIdx: index("eventsub_subscriptions_status_idx").on(table.status, table.updatedAt)
+  desiredIdentityIdx: uniqueIndex("eventsub_subscriptions_desired_identity_idx").on(table.eventType, table.eventVersion, table.conditionKey, table.callbackUrl)
 }));
 
 export const chatMessages = pgTable("chat_messages", {
@@ -302,7 +300,6 @@ export const chatMembershipEvents = pgTable("chat_membership_events", {
   rawIrcMessageId: uuid("raw_irc_message_id").references(() => rawIrcMessages.id),
   ...timestamps
 }, (table) => ({
-  channelReceivedIdx: index("chat_membership_events_channel_received_idx").on(table.broadcasterUserId, table.receivedAt),
   chatterReceivedIdx: index("chat_membership_events_chatter_received_idx").on(table.chatterUserId, table.receivedAt),
   dedupeKeyIdx: uniqueIndex("chat_membership_events_dedupe_key_idx").on(table.dedupeKey)
 }));
@@ -368,9 +365,7 @@ export const channelEvents = pgTable("channel_events", {
   rawIrcMessageId: uuid("raw_irc_message_id").references(() => rawIrcMessages.id),
   ...timestamps
 }, (table) => ({
-  channelOccurredIdx: index("channel_events_channel_occurred_idx").on(table.broadcasterUserId, table.occurredAt),
   streamOccurredIdx: index("channel_events_stream_occurred_idx").on(table.twitchStreamId, table.occurredAt),
-  sourceEventIdx: index("channel_events_source_event_idx").on(table.source, table.sourceEventId),
   sourceEventUniqueIdx: uniqueIndex("channel_events_source_event_unique_idx").on(table.source, table.eventType, table.sourceEventId)
 }));
 

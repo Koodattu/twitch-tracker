@@ -51,6 +51,7 @@ export const baseEnvSchema = z.object({
   DEFAULT_BOT_JOIN_CAPACITY: intFromString(100),
   DEFAULT_BOT_JOIN_RATE_PER_10_SECONDS: intFromString(20),
   DISCOVERY_INTERVAL_MS: positiveIntFromString(180_000),
+  BROADCASTER_METADATA_REFRESH_INTERVAL_MS: positiveIntFromString(86_400_000),
   USER_HYDRATION_INTERVAL_MS: positiveIntFromString(300_000),
   ASSIGNMENT_INTERVAL_MS: positiveIntFromString(30_000),
   CHATTERS_RECONCILIATION_INTERVAL_MS: positiveIntFromString(300_000),
@@ -60,7 +61,6 @@ export const baseEnvSchema = z.object({
   AGGREGATION_BUCKET_MINUTES: positiveIntFromString(5),
   AGGREGATION_LOOKBACK_HOURS: positiveIntFromString(48),
   MAINTENANCE_INTERVAL_MS: positiveIntFromString(300_000),
-  RAW_CHAT_RETENTION_DAYS: intFromString(30),
   RAW_PAYLOAD_RETENTION_DAYS: intFromString(30),
   STALE_ASSIGNMENT_GRACE_MINUTES: positiveIntFromString(15),
   BACKUP_RETENTION_DAYS: positiveIntFromString(14)

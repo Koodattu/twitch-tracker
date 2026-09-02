@@ -41,6 +41,15 @@ docker compose --env-file .env.production exec -T postgres \
   < packages/db/online-migrations/0009_public_analytics_indexes.sql
 ```
 
+Remove the superseded storage-heavy indexes outside a transaction. This file is
+idempotent and finishes by reporting `removed = t` for all five names:
+
+```sh
+docker compose --env-file .env.production exec -T postgres \
+  sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1' \
+  < packages/db/online-migrations/0010_storage_index_cleanup.sql
+```
+
 See [public analytics indexes](public-analytics-indexes.md) for validation and invalid-index recovery.
 
 Start the application:
@@ -84,6 +93,12 @@ docker compose --env-file .env.production run --rm \
 Compare representative row counts and run read-only queries against the drill database. Record the date, dump name, duration, and result. Drop the drill database only after verification. The restore script refuses to target the configured production database.
 
 The backup mount must be copied or replicated off the application host. A directory on the same physical server is not a disaster-recovery backup.
+
+Local backup retention is also bounded by count and total bytes, and the health
+check enforces freshness plus disk thresholds. Follow the
+[storage and backup lifecycle](storage-and-backup-lifecycle.md) runbook to
+verify the off-host destination, preview pruning, inspect growth, and plan any
+database cleanup.
 
 ## 6. Updating and rollback
 

@@ -1,6 +1,6 @@
 # Raw Event Ledger and Normalized Tables
 
-Status: accepted
+Status: amended by ADR 0017
 
 The database stores raw Twitch observations first, then parses and upserts them
 into normalized product tables and aggregates. Raw Helix responses, IRC

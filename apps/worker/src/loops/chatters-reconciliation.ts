@@ -399,7 +399,7 @@ const persistRawHelixResponse = async (
       statusCode: raw.statusCode,
       responseJson: raw.responseJson,
       pagination: raw.pagination,
-      rateLimitHeaders: raw.rateLimit.raw,
+      rateLimitHeaders: {},
       observedAt: raw.observedAt
     })
     .returning({ id: rawHelixResponses.id });

@@ -16,6 +16,13 @@ type InternalBotAccount = {
   priority: number;
   healthStatus: string;
   updatedAt: string;
+  blockedChannels: Array<{
+    broadcasterUserId: string;
+    broadcasterLogin: string | null;
+    broadcasterDisplayName: string | null;
+    reason: string | null;
+    detectedAt: string;
+  }>;
   token: null | {
     scopes: string[];
     expiresAt: string | null;
@@ -32,6 +39,10 @@ export default async function BotAccountsPage() {
   const accounts = await getApiData<InternalBotAccount[]>("/api/internal/bot-accounts", apiInit);
   const activeAccounts = accounts?.filter((account) => account.enabled).length ?? 0;
   const totalCapacity = accounts?.filter((account) => account.enabled).reduce((sum, account) => sum + account.maxJoinedRooms, 0) ?? 0;
+  const blockedChannels = accounts?.flatMap((account) => account.blockedChannels.map((channel) => ({
+    ...channel,
+    botLogin: account.login
+  }))) ?? [];
 
   return (
     <>
@@ -48,20 +59,38 @@ export default async function BotAccountsPage() {
             <MetricCard label="Connected accounts" value={formatCount(accounts.length)} />
             <MetricCard label="Enabled accounts" value={formatCount(activeAccounts)} />
             <MetricCard label="Join capacity" value={formatCount(totalCapacity)} detail="Configured rooms across enabled accounts" />
+            <MetricCard label="Blocked channels" value={formatCount(blockedChannels.length)} detail="Unique bot and channel pairs" />
           </section>
 
           <section className="panel">
             <div className="panel-header"><div className="panel-heading"><h2>Account pool</h2><p>Token values are never exposed in this response</p></div><StatusPill>{accounts.length} accounts</StatusPill></div>
             {accounts.length === 0 ? <EmptyState title="No bot accounts connected" description="Connect a dedicated Twitch bot identity before enabling chat ingestion." action={<a className="button" href="/api/internal/bot-accounts/oauth/start">Connect bot account</a>} /> : (
-              <div className="table-scroll" role="region" aria-label="Bot account pool" tabIndex={0}><table className="table"><thead><tr><th scope="col">Account</th><th scope="col">State</th><th scope="col">Capacity</th><th scope="col">Token</th><th scope="col">Scopes</th><th scope="col">Updated</th></tr></thead><tbody>
+              <div className="table-scroll" role="region" aria-label="Bot account pool" tabIndex={0}><table className="table"><thead><tr><th scope="col">Account</th><th scope="col">State</th><th scope="col">Capacity</th><th scope="col">Blocked</th><th scope="col">Token</th><th scope="col">Scopes</th><th scope="col">Updated</th></tr></thead><tbody>
                 {accounts.map((account) => (
                   <tr key={account.id}>
                     <td><div className="cell-stack"><strong>{account.login}</strong><span>{account.twitchUserId ?? "No Twitch user ID"}</span></div></td>
                     <td><div className="cell-stack"><StatusPill tone={account.enabled ? "success" : "neutral"}>{account.enabled ? "Enabled" : "Disabled"}</StatusPill><span>{formatStatus(account.healthStatus)}</span></div></td>
                     <td><div className="cell-stack"><strong>{formatCount(account.maxJoinedRooms)} rooms</strong><span>{formatCount(account.joinRatePer10Seconds)} joins / 10s</span></div></td>
+                    <td>{account.blockedChannels.length === 0 ? <span className="muted">None</span> : <StatusPill tone="danger">{formatCount(account.blockedChannels.length)}</StatusPill>}</td>
                     <td>{account.token == null ? <StatusPill tone="danger">Missing</StatusPill> : <div className="cell-stack"><StatusPill tone={account.token.refreshStatus === "valid" || account.token.refreshStatus === "refreshed" ? "success" : "warning"}>{formatStatus(account.token.refreshStatus)}</StatusPill><span>{account.token.expiresAt == null ? "No expiry" : `Expires ${formatDateTime(account.token.expiresAt)}`}</span></div>}</td>
                     <td>{account.token == null || account.token.scopes.length === 0 ? <span className="muted">No scopes stored</span> : <div className="scope-list">{account.token.scopes.map((scope) => <StatusPill key={scope}>{scope}</StatusPill>)}</div>}</td>
                     <td className="time-cell">{formatDateTime(account.updatedAt)}</td>
+                  </tr>
+                ))}
+              </tbody></table></div>
+            )}
+          </section>
+
+          <section className="panel">
+            <div className="panel-header"><div className="panel-heading"><h2>Blocked channels</h2><p>Permanent Twitch IRC restrictions are not retried</p></div><StatusPill tone={blockedChannels.length === 0 ? "success" : "danger"}>{formatCount(blockedChannels.length)} blocked</StatusPill></div>
+            {blockedChannels.length === 0 ? <EmptyState title="No blocked channels" description="Twitch has not reported a permanent channel restriction for any connected bot." /> : (
+              <div className="table-scroll" role="region" aria-label="Blocked bot channels" tabIndex={0}><table className="table"><thead><tr><th scope="col">Bot</th><th scope="col">Channel</th><th scope="col">Twitch response</th><th scope="col">Last detected</th></tr></thead><tbody>
+                {blockedChannels.map((channel) => (
+                  <tr key={`${channel.botLogin}:${channel.broadcasterUserId}`}>
+                    <td><strong>{channel.botLogin}</strong></td>
+                    <td><div className="cell-stack">{channel.broadcasterLogin == null ? <strong>{channel.broadcasterDisplayName ?? channel.broadcasterUserId}</strong> : <Link href={`/channels/${encodeURIComponent(channel.broadcasterLogin)}`}><strong>{channel.broadcasterDisplayName ?? channel.broadcasterLogin}</strong></Link>}<span>{channel.broadcasterLogin == null ? channel.broadcasterUserId : `@${channel.broadcasterLogin}`}</span></div></td>
+                    <td>{channel.reason ?? "Permanent IRC restriction"}</td>
+                    <td className="time-cell">{formatDateTime(channel.detectedAt)}</td>
                   </tr>
                 ))}
               </tbody></table></div>

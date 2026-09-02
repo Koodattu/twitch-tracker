@@ -18,7 +18,9 @@ const productionEnv = (): NodeJS.ProcessEnv => ({
 
 describe("production configuration", () => {
   it("accepts a secure same-origin configuration", () => {
-    expect(loadConfig(productionEnv()).APP_MODE).toBe("production");
+    const config = loadConfig(productionEnv());
+    expect(config.APP_MODE).toBe("production");
+    expect(config.BROADCASTER_METADATA_REFRESH_INTERVAL_MS).toBe(86_400_000);
   });
 
   it("rejects different public origins", () => {

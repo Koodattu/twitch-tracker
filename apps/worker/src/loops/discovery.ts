@@ -7,7 +7,7 @@ import {
   twitchUsers
 } from "@twitch-tracker/db";
 import type { HelixStream, HelixUsersResponse, RawTwitchResponse } from "@twitch-tracker/twitch";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { resolvePrimaryBotCredentials } from "../bot-auth.js";
 import { upsertTwitchUserMetadata } from "../twitch-user-metadata.js";
 import type { WorkerContext } from "../worker.js";
@@ -126,7 +126,7 @@ const persistRawHelixResponse = async <T>(
       statusCode: raw.statusCode,
       responseJson: raw.responseJson,
       pagination: raw.pagination,
-      rateLimitHeaders: raw.rateLimit.raw,
+      rateLimitHeaders: {},
       observedAt: raw.observedAt
     })
     .returning({ id: rawHelixResponses.id });
@@ -166,9 +166,27 @@ const hydrateBroadcasterMetadata = async (
     return { hydratedBroadcasters: 0, failed: false };
   }
 
+  const metadataRows = await context.db
+    .select({
+      twitchUserId: twitchUsers.twitchUserId,
+      lastMetadataRefreshAt: twitchUsers.lastMetadataRefreshAt
+    })
+    .from(twitchUsers)
+    .where(inArray(twitchUsers.twitchUserId, userIds));
+  const refreshCutoff = Date.now() - context.config.BROADCASTER_METADATA_REFRESH_INTERVAL_MS;
+  const freshUserIds = new Set(
+    metadataRows
+      .filter((row) => row.lastMetadataRefreshAt != null && row.lastMetadataRefreshAt.getTime() >= refreshCutoff)
+      .map((row) => row.twitchUserId)
+  );
+  const staleUserIds = userIds.filter((userId) => !freshUserIds.has(userId));
+  if (staleUserIds.length === 0) {
+    return { hydratedBroadcasters: 0, failed: false };
+  }
+
   let raw: RawTwitchResponse<HelixUsersResponse>;
   try {
-    raw = await context.rest.getUsers({ ids: userIds, accessToken });
+    raw = await context.rest.getUsers({ ids: staleUserIds, accessToken });
   } catch (error) {
     console.error(JSON.stringify({
       level: "error",
@@ -232,6 +250,7 @@ const getPaginationCursor = (pagination: Record<string, unknown>): string | unde
 const upsertStream = async (context: WorkerContext, stream: HelixStream, rawHelixResponseId: string) => {
   const now = new Date();
   const startedAt = new Date(stream.started_at);
+  const tags = stream.tags ?? stream.tag_ids ?? [];
 
   await context.db
     .insert(twitchUsers)
@@ -299,17 +318,45 @@ const upsertStream = async (context: WorkerContext, stream: HelixStream, rawHeli
       }
     });
 
+  const [latestMetadata] = await context.db
+    .select({
+      title: streamSnapshots.title,
+      categoryId: streamSnapshots.categoryId,
+      categoryName: streamSnapshots.categoryName,
+      language: streamSnapshots.language,
+      tags: streamSnapshots.tags,
+      thumbnailUrl: streamSnapshots.thumbnailUrl
+    })
+    .from(streamSnapshots)
+    .where(and(
+      eq(streamSnapshots.twitchStreamId, stream.id),
+      isNotNull(streamSnapshots.title)
+    ))
+    .orderBy(desc(streamSnapshots.observedAt), desc(streamSnapshots.id))
+    .limit(1);
+  const metadataChanged = latestMetadata == null
+    || latestMetadata.title !== stream.title
+    || latestMetadata.categoryId !== stream.game_id
+    || latestMetadata.categoryName !== stream.game_name
+    || latestMetadata.language !== stream.language
+    || latestMetadata.thumbnailUrl !== stream.thumbnail_url
+    || !sameStringArray(latestMetadata.tags, tags);
+
   await context.db.insert(streamSnapshots).values({
     twitchStreamId: stream.id,
     broadcasterUserId: stream.user_id,
     observedAt: now,
     viewerCount: stream.viewer_count,
-    title: stream.title,
-    categoryId: stream.game_id,
-    categoryName: stream.game_name,
-    language: stream.language,
-    tags: stream.tags ?? stream.tag_ids ?? [],
-    thumbnailUrl: stream.thumbnail_url,
+    title: metadataChanged ? stream.title : null,
+    categoryId: metadataChanged ? stream.game_id : null,
+    categoryName: metadataChanged ? stream.game_name : null,
+    language: metadataChanged ? stream.language : null,
+    tags: metadataChanged ? tags : [],
+    thumbnailUrl: metadataChanged ? stream.thumbnail_url : null,
     sourceRunId: rawHelixResponseId
   });
+};
+
+const sameStringArray = (left: string[], right: string[]) => {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
 };

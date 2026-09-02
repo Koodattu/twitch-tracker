@@ -92,7 +92,13 @@ type DbTransaction = Parameters<Parameters<DbClient["transaction"]>[0]>[0];
 const incumbentStatuses: ChatAssignmentStatus[] = ["desired", "joining", "joined", "leaving"];
 const roomReservationStatuses: ChatAssignmentStatus[] = ["joining", "joined"];
 const promotableStatuses: ChatAssignmentStatus[] = ["desired", "joining", "joined"];
-const terminalRetryStatuses: ChatAssignmentStatus[] = ["left", "failed"];
+const terminalRetryStatuses: ChatAssignmentStatus[] = ["left"];
+const permanentAssignmentErrorPrefixes = [
+  "IRC NOTICE msg_banned:",
+  "IRC NOTICE msg_channel_blocked:",
+  "IRC NOTICE msg_channel_suspended:",
+  "IRC NOTICE tos_ban:"
+] as const;
 const viewerHysteresisRatio = 1.25;
 const viewerHysteresisMinimum = 10;
 
@@ -199,7 +205,29 @@ export const createChatAssignmentControl = (db: DbClient) => {
         twitchStreamId: chatAssignments.twitchStreamId
       })
       .from(chatAssignments)
-      .where(inArray(chatAssignments.botAccountId, accounts.map((account) => account.botAccountId)));
+      .where(and(
+        inArray(chatAssignments.botAccountId, accounts.map((account) => account.botAccountId)),
+        inArray(chatAssignments.status, incumbentStatuses)
+      ));
+    const failedAssignments = await db
+      .select({
+        botAccountId: chatAssignments.botAccountId,
+        broadcasterUserId: chatAssignments.broadcasterUserId,
+        latestError: chatAssignments.latestError
+      })
+      .from(chatAssignments)
+      .where(and(
+        inArray(chatAssignments.botAccountId, accounts.map((account) => account.botAccountId)),
+        eq(chatAssignments.status, "failed")
+      ));
+    const blockedBroadcasterIdsByAccount = new Map<string, Set<string>>(
+      accounts.map((account) => [account.botAccountId, new Set<string>()])
+    );
+    for (const assignment of failedAssignments) {
+      if (isPermanentAssignmentError(assignment.latestError)) {
+        blockedBroadcasterIdsByAccount.get(assignment.botAccountId)?.add(assignment.broadcasterUserId);
+      }
+    }
     const incumbentStreamIdsByAccount = new Map<string, Set<string>>(
       accounts.map((account) => [account.botAccountId, new Set<string>()])
     );
@@ -214,7 +242,8 @@ export const createChatAssignmentControl = (db: DbClient) => {
     const allocations = allocatePoolAssignmentCandidates({
       accounts,
       candidates,
-      incumbentStreamIdsByAccount
+      incumbentStreamIdsByAccount,
+      blockedBroadcasterIdsByAccount
     });
     const accountResults = [];
     for (const account of accounts) {
@@ -556,6 +585,7 @@ export const allocatePoolAssignmentCandidates = (input: {
   accounts: AssignmentPoolAccount[];
   candidates: AssignmentCandidate[];
   incumbentStreamIdsByAccount: Map<string, Set<string>>;
+  blockedBroadcasterIdsByAccount?: Map<string, Set<string>>;
 }): Map<string, AssignmentCandidate[]> => {
   const accounts = input.accounts.map((account) => ({
     ...account,
@@ -569,7 +599,9 @@ export const allocatePoolAssignmentCandidates = (input: {
   }
 
   const selected = selectStableAssignmentCandidates({
-    candidates: input.candidates,
+    candidates: input.candidates.filter((candidate) => accounts.some(
+      (account) => !(input.blockedBroadcasterIdsByAccount?.get(account.botAccountId)?.has(candidate.broadcasterUserId) ?? false)
+    )),
     incumbentStreamIds,
     capacity: accounts.reduce((sum, account) => sum + account.capacity, 0)
   });
@@ -585,7 +617,8 @@ export const allocatePoolAssignmentCandidates = (input: {
       if (
         allocation.length >= account.capacity ||
         !unassignedStreamIds.has(candidate.twitchStreamId) ||
-        !accountIncumbents.has(candidate.twitchStreamId)
+        !accountIncumbents.has(candidate.twitchStreamId) ||
+        (input.blockedBroadcasterIdsByAccount?.get(account.botAccountId)?.has(candidate.broadcasterUserId) ?? false)
       ) {
         continue;
       }
@@ -605,6 +638,9 @@ export const allocatePoolAssignmentCandidates = (input: {
       if (!unassignedStreamIds.has(candidate.twitchStreamId)) {
         continue;
       }
+      if (input.blockedBroadcasterIdsByAccount?.get(account.botAccountId)?.has(candidate.broadcasterUserId) ?? false) {
+        continue;
+      }
 
       allocation.push(candidate);
       unassignedStreamIds.delete(candidate.twitchStreamId);
@@ -613,6 +649,10 @@ export const allocatePoolAssignmentCandidates = (input: {
   }
 
   return allocations;
+};
+
+export const isPermanentAssignmentError = (error: string | null) => {
+  return error != null && permanentAssignmentErrorPrefixes.some((prefix) => error.startsWith(prefix));
 };
 
 export const reduceEffectiveAssignmentStatuses = (

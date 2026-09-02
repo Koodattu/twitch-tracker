@@ -17,6 +17,7 @@ import {
   eventProcessingFailures,
   eventsubSubscriptions,
   ingestionRuns,
+  isPermanentAssignmentError,
   oauthAccounts,
   rateLimitObservations,
   privacyRequestEvents,
@@ -137,7 +138,18 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
       .select({
         viewerCount: streamSnapshots.viewerCount,
         observedAt: streamSnapshots.observedAt,
-        thumbnailUrl: streamSnapshots.thumbnailUrl
+        thumbnailUrl: sql<string | null>`coalesce(
+          ${streamSnapshots.thumbnailUrl},
+          (
+            select metadata.thumbnail_url
+            from stream_snapshots metadata
+            where metadata.twitch_stream_id = ${streamSnapshots.twitchStreamId}
+              and metadata.title is not null
+              and metadata.observed_at <= ${streamSnapshots.observedAt}
+            order by metadata.observed_at desc, metadata.id desc
+            limit 1
+          )
+        )`
       })
       .from(streamSnapshots)
       .where(eq(streamSnapshots.twitchStreamId, streamSessions.twitchStreamId))
@@ -274,8 +286,30 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
         .select({
           observedAt: streamSnapshots.observedAt,
           viewerCount: streamSnapshots.viewerCount,
-          title: streamSnapshots.title,
-          categoryName: streamSnapshots.categoryName
+          title: sql<string | null>`coalesce(
+            ${streamSnapshots.title},
+            (
+              select metadata.title
+              from stream_snapshots metadata
+              where metadata.twitch_stream_id = ${streamSnapshots.twitchStreamId}
+                and metadata.title is not null
+                and metadata.observed_at <= ${streamSnapshots.observedAt}
+              order by metadata.observed_at desc, metadata.id desc
+              limit 1
+            )
+          )`,
+          categoryName: sql<string | null>`coalesce(
+            ${streamSnapshots.categoryName},
+            (
+              select metadata.category_name
+              from stream_snapshots metadata
+              where metadata.twitch_stream_id = ${streamSnapshots.twitchStreamId}
+                and metadata.title is not null
+                and metadata.observed_at <= ${streamSnapshots.observedAt}
+              order by metadata.observed_at desc, metadata.id desc
+              limit 1
+            )
+          )`
         })
         .from(streamSnapshots)
         .where(eq(streamSnapshots.twitchStreamId, params.streamId))
@@ -483,10 +517,54 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
         twitchStreamId: streamSnapshots.twitchStreamId,
         observedAt: streamSnapshots.observedAt,
         viewerCount: streamSnapshots.viewerCount,
-        title: streamSnapshots.title,
-        categoryId: streamSnapshots.categoryId,
-        categoryName: streamSnapshots.categoryName,
-        thumbnailUrl: streamSnapshots.thumbnailUrl
+        title: sql<string | null>`coalesce(
+          ${streamSnapshots.title},
+          (
+            select metadata.title
+            from stream_snapshots metadata
+            where metadata.twitch_stream_id = ${streamSnapshots.twitchStreamId}
+              and metadata.title is not null
+              and metadata.observed_at <= ${streamSnapshots.observedAt}
+            order by metadata.observed_at desc, metadata.id desc
+            limit 1
+          )
+        )`,
+        categoryId: sql<string | null>`coalesce(
+          ${streamSnapshots.categoryId},
+          (
+            select metadata.category_id
+            from stream_snapshots metadata
+            where metadata.twitch_stream_id = ${streamSnapshots.twitchStreamId}
+              and metadata.title is not null
+              and metadata.observed_at <= ${streamSnapshots.observedAt}
+            order by metadata.observed_at desc, metadata.id desc
+            limit 1
+          )
+        )`,
+        categoryName: sql<string | null>`coalesce(
+          ${streamSnapshots.categoryName},
+          (
+            select metadata.category_name
+            from stream_snapshots metadata
+            where metadata.twitch_stream_id = ${streamSnapshots.twitchStreamId}
+              and metadata.title is not null
+              and metadata.observed_at <= ${streamSnapshots.observedAt}
+            order by metadata.observed_at desc, metadata.id desc
+            limit 1
+          )
+        )`,
+        thumbnailUrl: sql<string | null>`coalesce(
+          ${streamSnapshots.thumbnailUrl},
+          (
+            select metadata.thumbnail_url
+            from stream_snapshots metadata
+            where metadata.twitch_stream_id = ${streamSnapshots.twitchStreamId}
+              and metadata.title is not null
+              and metadata.observed_at <= ${streamSnapshots.observedAt}
+            order by metadata.observed_at desc, metadata.id desc
+            limit 1
+          )
+        )`
       })
       .from(streamSnapshots)
       .where(eq(streamSnapshots.broadcasterUserId, channel.twitchUserId))
@@ -1163,6 +1241,26 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
             .from(botAccountTokens)
             .where(inArray(botAccountTokens.botAccountId, accountIds))
             .orderBy(desc(botAccountTokens.updatedAt));
+    const failedAssignments =
+      accountIds.length === 0
+        ? []
+        : await c
+            .get("db")
+            .select({
+              botAccountId: chatAssignments.botAccountId,
+              broadcasterUserId: chatAssignments.broadcasterUserId,
+              broadcasterLogin: twitchUsers.login,
+              broadcasterDisplayName: twitchUsers.displayName,
+              latestError: chatAssignments.latestError,
+              detectedAt: chatAssignments.updatedAt
+            })
+            .from(chatAssignments)
+            .leftJoin(twitchUsers, eq(chatAssignments.broadcasterUserId, twitchUsers.twitchUserId))
+            .where(and(
+              inArray(chatAssignments.botAccountId, accountIds),
+              eq(chatAssignments.status, "failed")
+            ))
+            .orderBy(desc(chatAssignments.updatedAt));
 
     const latestTokenByAccount = new Map<string, (typeof tokens)[number]>();
     for (const token of tokens) {
@@ -1170,12 +1268,34 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
         latestTokenByAccount.set(token.botAccountId, token);
       }
     }
+    const blockedChannelsByAccount = new Map<string, typeof failedAssignments>();
+    const seenBlocks = new Set<string>();
+    for (const assignment of failedAssignments) {
+      if (!isPermanentAssignmentError(assignment.latestError)) {
+        continue;
+      }
+      const identity = `${assignment.botAccountId}:${assignment.broadcasterUserId}`;
+      if (seenBlocks.has(identity)) {
+        continue;
+      }
+      seenBlocks.add(identity);
+      const accountBlocks = blockedChannelsByAccount.get(assignment.botAccountId) ?? [];
+      accountBlocks.push(assignment);
+      blockedChannelsByAccount.set(assignment.botAccountId, accountBlocks);
+    }
 
     return c.json({
       data: accounts.map((account) => {
         const token = latestTokenByAccount.get(account.id);
         return {
           ...account,
+          blockedChannels: (blockedChannelsByAccount.get(account.id) ?? []).map((assignment) => ({
+            broadcasterUserId: assignment.broadcasterUserId,
+            broadcasterLogin: assignment.broadcasterLogin,
+            broadcasterDisplayName: assignment.broadcasterDisplayName,
+            reason: assignment.latestError,
+            detectedAt: assignment.detectedAt.toISOString()
+          })),
           token:
             token == null
               ? null
