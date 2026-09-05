@@ -36,7 +36,7 @@ import {
   type DbClient
 } from "@twitch-tracker/db";
 import { createEventSubEnvelope, eventSubHeaders, exchangeTwitchAuthorizationCode, FetchHelixAdapter, isEventSubMessageTimestampFresh, refreshTwitchUserAccessToken, TwitchAuthError, validateTwitchAccessToken, verifyEventSubSignature } from "@twitch-tracker/twitch";
-import { and, desc, eq, gt, ilike, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, ilike, inArray, isNotNull, isNull, lt, max, min, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import type { MiddlewareHandler } from "hono";
@@ -155,7 +155,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
             order by metadata.observed_at desc, metadata.id desc
             limit 1
           )
-        )`
+        )`.as("thumbnail_url")
       })
       .from(streamSnapshots)
       .where(eq(streamSnapshots.twitchStreamId, streamSessions.twitchStreamId))
@@ -740,8 +740,8 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
       .select({
         messageCount: sql<number>`count(*)::int`,
         channelCount: sql<number>`count(distinct ${chatMessages.broadcasterUserId})::int`,
-        firstMessageAt: sql<Date | null>`min(${chatMessages.receivedAt})`,
-        lastMessageAt: sql<Date | null>`max(${chatMessages.receivedAt})`
+        firstMessageAt: min(chatMessages.receivedAt),
+        lastMessageAt: max(chatMessages.receivedAt)
       })
       .from(chatMessages)
       .where(eq(chatMessages.chatterUserId, session.user.twitchUserId));
@@ -1615,8 +1615,8 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
       .select({
         messageCount: sql<number>`count(*)::int`,
         channelCount: sql<number>`count(distinct ${chatMessages.broadcasterUserId})::int`,
-        firstMessageAt: sql<Date | null>`min(${chatMessages.receivedAt})`,
-        lastMessageAt: sql<Date | null>`max(${chatMessages.receivedAt})`
+        firstMessageAt: min(chatMessages.receivedAt),
+        lastMessageAt: max(chatMessages.receivedAt)
       })
       .from(chatMessages)
       .where(eq(chatMessages.chatterUserId, chatter.twitchUserId));
