@@ -44,7 +44,18 @@ export type RecentStreamSummary = {
   finnishMatchReason: "language" | "tag" | "manual";
   startedAt: string;
   endedAt: string | null;
+  thumbnailUrl: string | null;
 };
+
+export function getSizedThumbnailUrl(value: string | null | undefined, width = 640, height = 360) {
+  if (value == null || value === "") {
+    return null;
+  }
+
+  return value
+    .replaceAll("%{width}", String(width)).replaceAll("%{height}", String(height))
+    .replaceAll("{width}", String(width)).replaceAll("{height}", String(height));
+}
 
 export type ChannelSummary = {
   twitchUserId: string;

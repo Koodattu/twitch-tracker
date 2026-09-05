@@ -41,6 +41,7 @@ import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import type { MiddlewareHandler } from "hono";
 import { z } from "zod";
+import { createVodThumbnailLookup } from "./vod-thumbnails.js";
 
 type ApiBindings = {
   Variables: {
@@ -98,6 +99,7 @@ const publicSubjectVisibilityCondition = or(
 
 export const createApiApp = ({ config, db }: CreateApiAppInput) => {
   const app = new Hono<ApiBindings>();
+  const getVodThumbnail = createVodThumbnailLookup(config);
 
   app.use("*", async (c, next) => {
     c.set("config", config);
@@ -140,6 +142,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
   app.get("/api/streams/live", async (c) => {
     const db = c.get("db");
     const canSeeSuppressed = await hasAdminAccess(c);
+    // Keep outer references qualified: Drizzle unqualifies interpolated columns in single-table selections.
     const latestSnapshot = db
       .select({
         viewerCount: streamSnapshots.viewerCount,
@@ -149,9 +152,9 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
           (
             select metadata.thumbnail_url
             from stream_snapshots metadata
-            where metadata.twitch_stream_id = ${streamSnapshots.twitchStreamId}
+            where metadata.twitch_stream_id = stream_snapshots.twitch_stream_id
               and metadata.title is not null
-              and metadata.observed_at <= ${streamSnapshots.observedAt}
+              and metadata.observed_at <= stream_snapshots.observed_at
             order by metadata.observed_at desc, metadata.id desc
             limit 1
           )
@@ -192,8 +195,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
             eq(streamSessions.isFinnishEligible, true),
             publicSubjectVisibilityCondition
           ))
-      .orderBy(desc(sql<number>`coalesce(${latestSnapshot.viewerCount}, -1)`), desc(streamSessions.lastSeenLiveAt))
-      .limit(100);
+      .orderBy(desc(sql<number>`coalesce(${latestSnapshot.viewerCount}, -1)`), desc(streamSessions.lastSeenLiveAt), streamSessions.twitchStreamId);
 
     const liveRows = rows;
     const streamIds = liveRows.map((row) => row.streamId);
@@ -253,9 +255,34 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
       data: rows.map((row) => ({
         ...row,
         startedAt: row.startedAt.toISOString(),
-        endedAt: toIso(row.endedAt)
+        endedAt: toIso(row.endedAt),
+        thumbnailUrl: row.endedAt == null ? null : `/api/streams/${encodeURIComponent(row.streamId)}/thumbnail`
       }))
     });
+  });
+
+  app.get("/api/streams/:streamId/thumbnail", async (c) => {
+    const { streamId } = streamParamSchema.parse(c.req.param());
+    const [row] = await c.get("db")
+      .select({
+        broadcasterId: streamSessions.broadcasterUserId,
+        endedAt: streamSessions.endedAt,
+        publicProfileHidden: subjectPrivacyStates.publicProfileHidden,
+        trackingOptedOut: subjectPrivacyStates.trackingOptedOut
+      })
+      .from(streamSessions)
+      .leftJoin(subjectPrivacyStates, eq(streamSessions.broadcasterUserId, subjectPrivacyStates.twitchUserId))
+      .where(eq(streamSessions.twitchStreamId, streamId))
+      .limit(1);
+
+    c.header("Cache-Control", "private, no-store");
+    if (row == null || (isSubjectSuppressed(row) && !(await hasAdminAccess(c)))) {
+      return c.body(null, 404);
+    }
+    if (row.endedAt == null) return c.body(null, 204);
+
+    const thumbnail = await getVodThumbnail(row.broadcasterId, streamId);
+    return thumbnail == null ? c.body(null, 204) : c.redirect(thumbnail);
   });
 
   app.get("/api/streams/:streamId/activity", async (c) => {
@@ -301,9 +328,9 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
             (
               select metadata.title
               from stream_snapshots metadata
-              where metadata.twitch_stream_id = ${streamSnapshots.twitchStreamId}
+              where metadata.twitch_stream_id = stream_snapshots.twitch_stream_id
                 and metadata.title is not null
-                and metadata.observed_at <= ${streamSnapshots.observedAt}
+                and metadata.observed_at <= stream_snapshots.observed_at
               order by metadata.observed_at desc, metadata.id desc
               limit 1
             )
@@ -313,9 +340,9 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
             (
               select metadata.category_name
               from stream_snapshots metadata
-              where metadata.twitch_stream_id = ${streamSnapshots.twitchStreamId}
+              where metadata.twitch_stream_id = stream_snapshots.twitch_stream_id
                 and metadata.title is not null
-                and metadata.observed_at <= ${streamSnapshots.observedAt}
+                and metadata.observed_at <= stream_snapshots.observed_at
               order by metadata.observed_at desc, metadata.id desc
               limit 1
             )
@@ -532,9 +559,9 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
           (
             select metadata.title
             from stream_snapshots metadata
-            where metadata.twitch_stream_id = ${streamSnapshots.twitchStreamId}
+            where metadata.twitch_stream_id = stream_snapshots.twitch_stream_id
               and metadata.title is not null
-              and metadata.observed_at <= ${streamSnapshots.observedAt}
+              and metadata.observed_at <= stream_snapshots.observed_at
             order by metadata.observed_at desc, metadata.id desc
             limit 1
           )
@@ -544,9 +571,9 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
           (
             select metadata.category_id
             from stream_snapshots metadata
-            where metadata.twitch_stream_id = ${streamSnapshots.twitchStreamId}
+            where metadata.twitch_stream_id = stream_snapshots.twitch_stream_id
               and metadata.title is not null
-              and metadata.observed_at <= ${streamSnapshots.observedAt}
+              and metadata.observed_at <= stream_snapshots.observed_at
             order by metadata.observed_at desc, metadata.id desc
             limit 1
           )
@@ -556,9 +583,9 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
           (
             select metadata.category_name
             from stream_snapshots metadata
-            where metadata.twitch_stream_id = ${streamSnapshots.twitchStreamId}
+            where metadata.twitch_stream_id = stream_snapshots.twitch_stream_id
               and metadata.title is not null
-              and metadata.observed_at <= ${streamSnapshots.observedAt}
+              and metadata.observed_at <= stream_snapshots.observed_at
             order by metadata.observed_at desc, metadata.id desc
             limit 1
           )
@@ -568,9 +595,9 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
           (
             select metadata.thumbnail_url
             from stream_snapshots metadata
-            where metadata.twitch_stream_id = ${streamSnapshots.twitchStreamId}
+            where metadata.twitch_stream_id = stream_snapshots.twitch_stream_id
               and metadata.title is not null
-              and metadata.observed_at <= ${streamSnapshots.observedAt}
+              and metadata.observed_at <= stream_snapshots.observed_at
             order by metadata.observed_at desc, metadata.id desc
             limit 1
           )

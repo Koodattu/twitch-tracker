@@ -60,13 +60,7 @@ export function formatRelativeTime(value: string | Date | null | undefined, refe
   return `${Math.floor(hours / 24)}d ago`;
 }
 
-export function getSizedThumbnailUrl(value: string | null | undefined, width = 640, height = 360) {
-  if (value == null || value === "") {
-    return null;
-  }
-
-  return value.replaceAll("{width}", String(width)).replaceAll("{height}", String(height));
-}
+export { getSizedThumbnailUrl } from "@twitch-tracker/shared";
 
 export function formatStatus(value: string) {
   return value

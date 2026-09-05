@@ -4,10 +4,12 @@ import Link from "next/link";
 import { getApiData, getPublicApiInit } from "./api-client";
 import { formatCount, formatDateTime, formatDuration, formatRelativeTime, getSizedThumbnailUrl } from "./format";
 import { Avatar, EmptyState, MetricCard, StatusPill } from "./ui";
+import { StreamThumbnail } from "./stream-thumbnail";
 
 export const metadata: Metadata = { title: "Live streams" };
 
-export default async function HomePage() {
+export default async function HomePage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
+  const search = await searchParams;
   const apiInit = await getPublicApiInit();
   const [streamResponse, recentResponse] = await Promise.all([
     getApiData<LiveStreamSummary[]>("/api/streams/live", apiInit),
@@ -17,6 +19,11 @@ export default async function HomePage() {
   const recentStreams = recentResponse ?? [];
   const streamsAvailable = streamResponse != null;
   const featuredStreams = streams.slice(0, 4);
+  const pageSize = 100;
+  const totalPages = Math.max(1, Math.ceil(streams.length / pageSize));
+  const page = Math.min(totalPages, Math.max(1, Number.parseInt(search.page ?? "1", 10) || 1));
+  const pageOffset = (page - 1) * pageSize;
+  const rankedStreams = streams.slice(pageOffset, pageOffset + pageSize);
   const totalViewers = streams.reduce((sum, stream) => sum + (stream.viewerCount ?? 0), 0);
   const trackedStreams = streams.filter((stream) => stream.isChatTracked).length;
   const latestObservation = streams
@@ -64,7 +71,7 @@ export default async function HomePage() {
         </section>
       )}
 
-      <section className="panel">
+      <section className="panel" id="live-ranking">
         <div className="panel-header">
           <div className="panel-heading">
             <h2>Full live ranking</h2>
@@ -92,11 +99,11 @@ export default async function HomePage() {
                 </tr>
               </thead>
               <tbody>
-                {streams.map((stream, index) => {
+                {rankedStreams.map((stream, index) => {
                   const identity = stream.broadcasterDisplayName ?? stream.broadcasterLogin ?? stream.broadcasterId;
                   return (
                     <tr key={stream.streamId}>
-                      <td className="rank-cell">{index + 1}</td>
+                      <td className="rank-cell">{pageOffset + index + 1}</td>
                       <td>
                         <div className="channel-cell">
                           <Avatar name={identity} src={stream.broadcasterProfileImageUrl} size="small" />
@@ -127,6 +134,15 @@ export default async function HomePage() {
             </table>
           </div>
         )}
+        {totalPages > 1 ? (
+          <nav className="pagination" aria-label="Live ranking pages">
+            <span>Page {page} of {totalPages} · {formatCount(streams.length)} live streams</span>
+            <div className="pagination-actions">
+              {page > 1 ? <Link className="button button-secondary button-compact" href={`/?page=${page - 1}#live-ranking`}>Previous</Link> : null}
+              {page < totalPages ? <Link className="button button-secondary button-compact" href={`/?page=${page + 1}#live-ranking`}>Next</Link> : null}
+            </div>
+          </nav>
+        ) : null}
       </section>
 
       <section className="panel" id="recent-streams">
@@ -161,9 +177,7 @@ function LiveStreamCard({ stream, rank, now, priority }: { stream: LiveStreamSum
   return (
     <article className="live-card">
       <Link className="stream-preview" href={`/streams/${stream.streamId}`} aria-label={`Open ${identity} stream session`}>
-        {thumbnailUrl == null ? <StreamPreviewPlaceholder /> : (
-          <img src={thumbnailUrl} alt="" width={640} height={360} loading={priority ? "eager" : "lazy"} fetchPriority={priority ? "high" : "auto"} decoding="async" />
-        )}
+        <StreamThumbnail src={thumbnailUrl} priority={priority} />
         <span className="stream-preview-topline" aria-hidden="true">
           <span className="live-badge">Live</span>
           <span className="rank-badge">#{rank}</span>
@@ -197,7 +211,7 @@ function RecentStreamCard({ stream, now }: { stream: RecentStreamSummary; now: D
   return (
     <article className="recent-stream-card">
       <Link className="recent-stream-preview" href={`/streams/${stream.streamId}`} aria-label={`Open ${identity} stream session`}>
-        <StreamPreviewPlaceholder />
+        <StreamThumbnail src={getSizedThumbnailUrl(stream.thumbnailUrl)} />
       </Link>
       <div className="recent-stream-copy">
         <div className="recent-stream-channel">
@@ -212,10 +226,6 @@ function RecentStreamCard({ stream, now }: { stream: RecentStreamSummary; now: D
       </div>
     </article>
   );
-}
-
-function StreamPreviewPlaceholder() {
-  return <span className="stream-preview-placeholder" aria-hidden="true"><span /><span /><span /></span>;
 }
 
 const formatFinnishMatchReason = (reason: LiveStreamSummary["finnishMatchReason"]) => {

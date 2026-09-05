@@ -3,6 +3,7 @@ import type {
   HelixModeratedChannelsResponse,
   HelixStreamsResponse,
   HelixUsersResponse,
+  HelixVideosResponse,
   RawTwitchResponse,
   TwitchRateLimitHeaders,
   TwitchRestAdapter
@@ -56,6 +57,18 @@ const callHelix = async <T>(input: {
 
 export class FetchHelixAdapter implements TwitchRestAdapter {
   constructor(private readonly clientId: string) {}
+
+  async getArchivedVideos(input: {
+    userId: string;
+    accessToken: string;
+  }): Promise<RawTwitchResponse<HelixVideosResponse>> {
+    return callHelix<HelixVideosResponse>({
+      endpoint: "/videos",
+      params: new URLSearchParams({ user_id: input.userId, type: "archive", sort: "time", first: "100" }),
+      clientId: this.clientId,
+      accessToken: input.accessToken
+    });
+  }
 
   async getLiveStreamsByLanguage(input: {
     language: string;

@@ -114,6 +114,20 @@ export type TwitchRestAdapter = {
   }): Promise<RawTwitchResponse<HelixChattersResponse>>;
 };
 
+export type HelixVideo = {
+  id: string;
+  stream_id: string | null;
+  user_id: string;
+  thumbnail_url: string;
+  type: string;
+  viewable: string;
+};
+
+export type HelixVideosResponse = {
+  data: HelixVideo[];
+  pagination?: { cursor?: string };
+};
+
 export type ParsedIrcMessage = {
   rawLine: string;
   tags: Record<string, string>;
