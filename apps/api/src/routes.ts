@@ -43,6 +43,7 @@ import type { MiddlewareHandler } from "hono";
 import { z } from "zod";
 import { createVodThumbnailLookup } from "./vod-thumbnails.js";
 import { getStreamDetail, getStreamOverview, streamDetailQuerySchema } from "./stream-detail.js";
+import { channelDetailQuerySchema, getChannelDetail, getChannelOverview } from "./channel-detail.js";
 
 type ApiBindings = {
   Variables: {
@@ -522,6 +523,29 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
 
     return c.json({ data: row.user });
   });
+
+  for (const kind of ["overview", "sessions", "daily", "observations", "buckets"] as const) {
+    app.get(`/api/channels/:login/${kind}`, async (c) => {
+      const params = loginParamSchema.parse(c.req.param());
+      const query = channelDetailQuerySchema.safeParse(c.req.query());
+      if (!query.success) return c.json({ error: { code: "invalid_query", message: "Check the page number." } }, 400);
+      const [channel] = await c.get("db").select({
+        twitchUserId: twitchUsers.twitchUserId,
+        publicProfileHidden: subjectPrivacyStates.publicProfileHidden,
+        trackingOptedOut: subjectPrivacyStates.trackingOptedOut
+      }).from(twitchUsers)
+        .leftJoin(subjectPrivacyStates, eq(twitchUsers.twitchUserId, subjectPrivacyStates.twitchUserId))
+        .where(eq(twitchUsers.login, params.login.toLowerCase())).limit(1);
+      if (channel == null || (isSubjectSuppressed(channel) && !(await hasPrivilegedAccess(c)))) {
+        return c.json({ error: { code: "not_found", message: "Channel not found." } }, 404);
+      }
+      c.header("Cache-Control", "private, no-store");
+      const data = kind === "overview"
+        ? await getChannelOverview(c.get("db"), channel.twitchUserId)
+        : await getChannelDetail(c.get("db"), channel.twitchUserId, kind, query.data.page);
+      return c.json({ data });
+    });
+  }
 
   app.get("/api/channels/:login/streams", async (c) => {
     const params = loginParamSchema.parse(c.req.param());

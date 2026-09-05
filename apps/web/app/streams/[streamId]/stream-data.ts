@@ -7,7 +7,4 @@ export const getStreamSession = cache(async (streamId: string) => {
   return getApiData<StreamSessionDetail>(`/api/streams/${encodeURIComponent(streamId)}`, await getPublicApiInit());
 });
 
-export function getDetailPageNumber(value: string | undefined) {
-  const page = Number(value ?? 1);
-  return Number.isInteger(page) && page >= 1 && page <= 100_000 ? page : 1;
-}
+export { getDetailPageNumber } from "../../api-client";

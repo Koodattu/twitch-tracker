@@ -1,6 +1,11 @@
 import "server-only";
 import { cookies } from "next/headers";
 
+export function getDetailPageNumber(value: string | undefined) {
+  const page = Number(value ?? 1);
+  return Number.isInteger(page) && page >= 1 && page <= 100_000 ? page : 1;
+}
+
 export const getApiBaseUrl = () => {
   return process.env.INTERNAL_API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 };

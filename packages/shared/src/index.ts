@@ -1,4 +1,5 @@
 export type * from "./stream-detail.js";
+export type * from "./channel-detail.js";
 
 export const appModes = ["local", "private_mvp", "production"] as const;
 

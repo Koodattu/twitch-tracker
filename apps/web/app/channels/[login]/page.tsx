@@ -1,238 +1,34 @@
 import Link from "next/link";
-import type { Metadata } from "next";
+import type { ChannelOverview } from "@twitch-tracker/shared";
 import { getApiData, getPublicApiInit } from "../../api-client";
-import { formatCount, formatDateTime, formatDuration } from "../../format";
-import { Avatar, EmptyState, MetricCard, StatusPill } from "../../ui";
-import { ViewerTrendChart, type ViewerTrendPoint } from "./viewer-trend-chart";
-
-type Channel = {
-  twitchUserId: string;
-  login: string | null;
-  displayName: string | null;
-  description: string | null;
-  profileImageUrl: string | null;
-};
-
-type StreamSession = {
-  twitchStreamId: string;
-  latestTitle: string | null;
-  latestCategoryName: string | null;
-  startedAt: string;
-  endedAt: string | null;
-};
-
-type ViewerHistoryPoint = {
-  twitchStreamId: string;
-  observedAt: string;
-  viewerCount: number | null;
-  title: string | null;
-  categoryName: string | null;
-};
-
-type ChannelActivity = {
-  totals: {
-    streamCount: number;
-    liveSeconds: number;
-    messageCount: number;
-    viewerCountMax: number | null;
-    viewerCountAvg: number | null;
-  };
-  daily: Array<{
-    day: string;
-    streamCount: number;
-    liveSeconds: number;
-    viewerCountMax: number | null;
-    viewerCountAvg: number | null;
-    messageCount: number;
-  }>;
-  recentBuckets: Array<{
-    twitchStreamId: string;
-    bucketStart: string;
-    bucketMinutes: number;
-    viewerCountAvg: number | null;
-    messageCount: number;
-    joinCount: number;
-    partCount: number;
-    activeChatterCount: number | null;
-  }>;
-};
-
-export async function generateMetadata({ params }: { params: Promise<{ login: string }> }): Promise<Metadata> {
-  const { login } = await params;
-  return { title: `${login} channel` };
-}
+import { formatCount, formatDuration } from "../../format";
+import { DetailUnavailable } from "../../detail-ui";
+import { MetricCard, StatusPill } from "../../ui";
+import { ViewerTrendChart } from "./viewer-trend-chart";
+import { ChannelSessionList } from "./session-list";
 
 export default async function ChannelPage({ params }: { params: Promise<{ login: string }> }) {
   const { login } = await params;
-  const apiInit = await getPublicApiInit();
-  const [channel, streamResponse, viewerHistoryResponse, activity] = await Promise.all([
-    getApiData<Channel>(`/api/channels/${login}`, apiInit),
-    getApiData<StreamSession[]>(`/api/channels/${login}/streams?limit=24`, apiInit),
-    getApiData<ViewerHistoryPoint[]>(`/api/channels/${login}/viewer-history?limit=96`, apiInit),
-    getApiData<ChannelActivity>(`/api/channels/${login}/activity?days=30&buckets=48`, apiInit)
-  ]);
-  const streams = streamResponse ?? [];
-  const viewerHistory = viewerHistoryResponse ?? [];
-  const name = channel?.displayName ?? channel?.login ?? login;
-  const isLive = streams.some((stream) => stream.endedAt == null);
-  const viewerTrend = createViewerTrend(viewerHistory);
-
-  return (
-    <>
-      <section className="page-title page-title-wide">
-        <div className="breadcrumbs"><Link href="/">Live streams</Link><span>/</span><span>Channel</span></div>
-        <div className="page-heading-row">
-          <div className="identity-heading">
-            <Avatar name={name} src={channel?.profileImageUrl} size="large" />
-            <div>
-              <span className="eyebrow">Channel analytics</span>
-              <h1>{name}</h1>
-            </div>
-          </div>
-          <div className="page-actions">
-            {streamResponse == null ? <StatusPill tone="danger">Unavailable</StatusPill> : isLive ? <StatusPill tone="success">Live now</StatusPill> : <StatusPill>Offline</StatusPill>}
-            <a className="button button-secondary" href={`https://www.twitch.tv/${channel?.login ?? login}`} target="_blank" rel="noreferrer">Open on Twitch ↗</a>
-          </div>
-        </div>
-        <p>{channel?.description ?? "Stream history and aggregate activity appear here as the tracker observes this channel."}</p>
-      </section>
-
-      {channel == null ? (
-        <div className="callout callout-warning">
-          <div><strong>Channel profile unavailable</strong><p>The channel may be hidden, missing, or the API may be temporarily unavailable. Any accessible aggregate history is shown below.</p></div>
-        </div>
-      ) : null}
-
-      <section className="stat-row" aria-label="Channel summary">
-        <MetricCard label="Streams observed" value={activity == null && streamResponse == null ? "—" : formatCount(activity?.totals.streamCount ?? streams.length)} />
-        <MetricCard label="Live time" value={activity == null ? "—" : formatDuration(activity.totals.liveSeconds)} />
-        <MetricCard label="Peak viewers" value={formatCount(activity?.totals.viewerCountMax)} detail={activity == null ? "Activity unavailable" : activity.totals.viewerCountAvg == null ? "No average yet" : `${formatCount(activity.totals.viewerCountAvg)} average viewers`} />
-        <MetricCard label="Messages captured" value={formatCount(activity?.totals.messageCount)} detail="Only while chat tracking was active" />
-      </section>
-
-      <section className="panel">
-        <div className="panel-header">
-          <div className="panel-heading"><h2>Viewer trend</h2><p>Recent snapshots in UTC; gaps separate stream sessions</p></div>
-          <StatusPill tone={viewerHistoryResponse == null ? "danger" : "neutral"}>{viewerHistoryResponse == null ? "Unavailable" : `${viewerHistory.length} snapshots`}</StatusPill>
-        </div>
-        {viewerHistoryResponse == null ? <EmptyState title="Viewer trend unavailable" description="Viewer snapshots could not be loaded right now." /> : <ViewerTrendChart points={viewerTrend} />}
-      </section>
-
-      <section className="panel">
-        <div className="panel-header"><div className="panel-heading"><h2>Stream history</h2><p>Most recent sessions first</p></div><StatusPill tone={streamResponse == null ? "danger" : "neutral"}>{streamResponse == null ? "Unavailable" : `${streams.length} loaded`}</StatusPill></div>
-        {streamResponse == null ? (
-          <EmptyState title="Stream history unavailable" description="The API did not return stream history for this channel." />
-        ) : streams.length === 0 ? (
-          <EmptyState title="No sessions observed" description="No stream session has been associated with this channel yet." />
-        ) : (
-          <div className="table-scroll" role="region" aria-label="Channel stream history" tabIndex={0}>
-            <table className="table">
-              <thead><tr><th scope="col">Stream</th><th scope="col">Category</th><th scope="col">Started</th><th scope="col">Status</th></tr></thead>
-              <tbody>
-                {streams.map((stream) => (
-                  <tr key={stream.twitchStreamId}>
-                    <td className="message-cell"><Link href={`/streams/${stream.twitchStreamId}`}><strong>{stream.latestTitle ?? "Untitled stream"}</strong></Link></td>
-                    <td>{stream.latestCategoryName ?? <span className="muted">Unknown</span>}</td>
-                    <td className="time-cell">{formatDateTime(stream.startedAt)}</td>
-                    <td>{stream.endedAt == null ? <StatusPill tone="success">Live</StatusPill> : <StatusPill>Ended</StatusPill>}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      <section className="panel">
-        <div className="panel-header"><div className="panel-heading"><h2>Daily activity</h2><p>Fourteen latest aggregate days</p></div></div>
-        {activity == null ? (
-          <EmptyState title="Daily activity unavailable" description="Daily channel activity could not be loaded right now." />
-        ) : activity.daily.length === 0 ? (
-          <EmptyState title="No daily rollups" description="Daily channel activity has not been aggregated yet." />
-        ) : (
-          <div className="table-scroll" role="region" aria-label="Daily channel activity" tabIndex={0}>
-            <table className="table">
-              <thead><tr><th scope="col">Day</th><th scope="col">Streams</th><th scope="col">Live time</th><th scope="col">Peak viewers</th><th scope="col">Avg viewers</th><th scope="col">Messages</th></tr></thead>
-              <tbody>
-                {activity.daily.slice(0, 14).map((day) => (
-                  <tr key={day.day}>
-                    <td className="time-cell">{day.day}</td><td className="number-cell">{formatCount(day.streamCount)}</td><td className="number-cell">{formatDuration(day.liveSeconds)}</td><td className="number-cell">{formatCount(day.viewerCountMax)}</td><td className="number-cell">{formatCount(day.viewerCountAvg)}</td><td className="number-cell">{formatCount(day.messageCount)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      <section className="panel">
-        <div className="panel-header"><div className="panel-heading"><h2>Latest viewer snapshots</h2><p>Most recent observations across sessions</p></div><StatusPill tone={viewerHistoryResponse == null ? "danger" : "neutral"}>{viewerHistoryResponse == null ? "Unavailable" : `${Math.min(viewerHistory.length, 12)} shown`}</StatusPill></div>
-        {viewerHistoryResponse == null ? (
-          <EmptyState title="Viewer snapshots unavailable" description="Viewer snapshots could not be loaded right now." />
-        ) : viewerHistory.length === 0 ? (
-          <EmptyState title="No viewer snapshots" description="Viewer snapshots have not been stored for this channel yet." />
-        ) : (
-          <div className="table-scroll" role="region" aria-label="Channel viewer history" tabIndex={0}>
-            <table className="table">
-              <thead><tr><th scope="col">Observed</th><th scope="col">Viewers</th><th scope="col">Stream</th><th scope="col">Category</th></tr></thead>
-              <tbody>
-                {viewerHistory.slice(0, 12).map((point) => (
-                  <tr key={`${point.twitchStreamId}-${point.observedAt}`}>
-                    <td className="time-cell">{formatDateTime(point.observedAt)}</td><td className="number-cell">{formatCount(point.viewerCount)}</td><td className="message-cell"><Link href={`/streams/${point.twitchStreamId}`}>{point.title ?? point.twitchStreamId}</Link></td><td>{point.categoryName ?? <span className="muted">Unknown</span>}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      <section className="panel">
-        <div className="panel-header"><div className="panel-heading"><h2>Recent chat activity</h2><p>Coverage buckets are not exact viewership</p></div></div>
-        {activity == null ? (
-          <EmptyState title="Chat activity unavailable" description="Recent chat activity could not be loaded right now." />
-        ) : activity.recentBuckets.length === 0 ? (
-          <EmptyState title="No chat buckets" description="Aggregate chat activity has not been produced for this channel yet." />
-        ) : (
-          <div className="table-scroll" role="region" aria-label="Recent channel chat activity" tabIndex={0}>
-            <table className="table">
-              <thead><tr><th scope="col">Bucket</th><th scope="col">Stream</th><th scope="col">Messages</th><th scope="col">Active chatters</th><th scope="col">Joins</th><th scope="col">Parts</th></tr></thead>
-              <tbody>
-                {activity.recentBuckets.slice(0, 25).map((bucket) => (
-                  <tr key={`${bucket.twitchStreamId}-${bucket.bucketStart}`}>
-                    <td className="time-cell">{formatDateTime(bucket.bucketStart)}</td><td><Link href={`/streams/${bucket.twitchStreamId}`}>Open session</Link></td><td className="number-cell">{formatCount(bucket.messageCount)}</td><td className="number-cell">{formatCount(bucket.activeChatterCount)}</td><td className="number-cell">{formatCount(bucket.joinCount)}</td><td className="number-cell">{formatCount(bucket.partCount)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      <p className="data-note">Viewer counts come from periodic Twitch REST snapshots. Chat messages and presence signals are available only during active chat coverage.</p>
-    </>
-  );
-}
-
-function createViewerTrend(history: ViewerHistoryPoint[]): ViewerTrendPoint[] {
-  const points: ViewerTrendPoint[] = [];
-  let previousStreamId: string | null = null;
-
-  for (const point of history.slice().reverse()) {
-    const time = new Date(point.observedAt).toLocaleString("en-GB", {
-      day: "numeric",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-      timeZone: "UTC"
-    });
-    if (previousStreamId != null && previousStreamId !== point.twitchStreamId) {
-      points.push({ time, viewers: null, title: "Session gap" });
-    }
-
-    points.push({ time, viewers: point.viewerCount, title: point.title ?? "Untitled stream" });
-    previousStreamId = point.twitchStreamId;
-  }
-
-  return points;
+  const overview = await getApiData<ChannelOverview>(`/api/channels/${encodeURIComponent(login)}/overview`, await getPublicApiInit());
+  if (overview == null) return <section className="panel"><DetailUnavailable /></section>;
+  const { totals, liveSession } = overview;
+  return <>
+    {liveSession == null ? null : <div className="callout">
+      <div><StatusPill tone="success">Live now</StatusPill><p>{liveSession.latestTitle ?? "This channel is live."}</p></div>
+      <Link className="button" href={`/streams/${encodeURIComponent(liveSession.twitchStreamId)}`} prefetch={false}>Open live session</Link>
+    </div>}
+    <div className="section-heading-row"><h2>Last 30 days</h2><span className="muted">{overview.fromDay} – {overview.toDay} · UTC</span></div>
+    <section className="stat-row stream-summary" aria-label="Channel summary for the last 30 days">
+      <MetricCard label="Streams started" value={formatCount(totals?.streamCount)} />
+      <MetricCard label="Stream time" value={totals == null ? "—" : formatDuration(totals.liveSeconds)} detail="Grouped by session start date" />
+      <MetricCard label="Peak viewers" value={formatCount(totals?.viewerCountMax)} detail={totals?.viewerCountAvg == null ? "No daily viewer average yet" : `${formatCount(totals.viewerCountAvg)} average across observed days`} />
+      <MetricCard label="Messages captured" value={formatCount(totals?.messageCount)} detail="Only where chat was captured" />
+    </section>
+    <ViewerTrendChart overview={overview} />
+    <section className="panel">
+      <div className="panel-header"><div className="panel-heading"><h2>Recent sessions</h2><p>Six most recent sessions across all dates</p></div><Link className="button button-secondary button-compact" href={`/channels/${encodeURIComponent(login)}/streams`} prefetch={false}>View all streams</Link></div>
+      <ChannelSessionList sessions={overview.recentSessions} />
+    </section>
+    <p className="data-note">Recent activity may take a few minutes to appear. Stream time is grouped by the date each session started. Missing observations do not mean the channel was offline.</p>
+  </>;
 }

@@ -1366,6 +1366,11 @@ li,
 .stream-chart-inspector input { width: 100%; accent-color: var(--accent); }
 .stream-chart-values { display: flex; flex-wrap: wrap; gap: 8px 20px; min-height: 40px; font-variant-numeric: tabular-nums; }
 
+.channel-session-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 12px; padding: 0 18px 18px; }
+.channel-session-card { display: grid; align-content: start; gap: 12px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-raised); min-width: 0; }
+.channel-session-card .message-meta { justify-content: space-between; }
+.channel-session-card .recent-stream-title { overflow-wrap: anywhere; }
+
 .sr-only {
   position: absolute;
   width: 1px;

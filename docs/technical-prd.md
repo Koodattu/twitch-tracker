@@ -727,6 +727,11 @@ Public endpoints:
 - `GET /api/channels/:login/streams`
 - `GET /api/channels/:login/viewer-history`
 - `GET /api/channels/:login/activity`
+- `GET /api/channels/:login/overview`
+- `GET /api/channels/:login/sessions`
+- `GET /api/channels/:login/daily`
+- `GET /api/channels/:login/observations`
+- `GET /api/channels/:login/buckets`
 - `GET /api/chatters/:login`
 
 Stream and channel analytics endpoints are aggregate-first.
@@ -754,6 +759,19 @@ with link prefetching disabled. The six detail endpoints return
 parameter. Ordering is newest first with a stable tie-breaker; pagination uses
 offsets, so newly arriving records can shift pages on live sessions. The
 existing combined `activity` and private `raw` endpoints remain available.
+
+The channel overview reads daily rollups for the last 30 UTC calendar days,
+including today, plus six recent sessions and the latest live session. It does
+not fetch viewer snapshots or activity buckets. Period totals use those daily
+rollups; average viewers is the mean of available daily averages. Missing
+observations remain unknown, and stream counts and duration follow the rollup's
+session-start day attribution.
+
+Channel Streams and Data subpages fetch sessions, daily rollups, viewer
+observations, or activity buckets only when opened, with prefetching disabled.
+These four endpoints use the same 50-item `{ items, page, hasMore }` pagination
+contract and stable ordering as stream detail endpoints. Existing channel
+endpoints remain available. Channel visibility rules apply to every new route.
 
 Authenticated endpoints:
 

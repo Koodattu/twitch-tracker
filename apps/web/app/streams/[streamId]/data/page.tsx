@@ -4,8 +4,8 @@ import type { ReactNode } from "react";
 import type { StreamBucket, StreamDetailPage, StreamMembership, StreamObservation, StreamPresence } from "@twitch-tracker/shared";
 import { getApiData, getAuthenticatedApiInit, getPublicApiInit } from "../../../api-client";
 import { formatCount, formatDateTime, formatStatus } from "../../../format";
-import { EmptyState, StatusPill } from "../../../ui";
-import { DetailPagination, DetailUnavailable } from "../detail-ui";
+import { StatusPill } from "../../../ui";
+import { DetailTable, DetailUnavailable } from "../../../detail-ui";
 import { getDetailPageNumber, getStreamSession } from "../stream-data";
 
 export const metadata: Metadata = { title: "Stream data" };
@@ -44,13 +44,7 @@ async function DataTable({ streamId, view, page, pathname }: { streamId: string;
   const init = await (privateData ? getAuthenticatedApiInit() : getPublicApiInit());
   const endpoint = `${privateData ? "/api/private/streams" : "/api/streams"}/${encodeURIComponent(streamId)}/${view}?page=${page}`;
   function table<T>(data: StreamDetailPage<T> | null, columns: string[], row: (item: T) => ReactNode) {
-    if (data == null) return <DetailUnavailable privateData={privateData} />;
-    return <>
-      {data.items.length === 0 ? <EmptyState title="No records on this page" description="No retained observations are available for this view and page." /> : <div className="table-scroll" role="region" aria-label={views[view]} tabIndex={0}>
-        <table className="table table-compact"><thead><tr>{columns.map((column) => <th scope="col" key={column}>{column}</th>)}</tr></thead><tbody>{data.items.map(row)}</tbody></table>
-      </div>}
-      <DetailPagination page={data.page} hasMore={data.hasMore} pathname={pathname} filters={{ view }} />
-    </>;
+    return <DetailTable data={data} columns={columns} row={row} label={views[view]} pathname={pathname} filters={{ view }} privateData={privateData} />;
   }
   switch (view) {
     case "observations": return table(await getApiData<StreamDetailPage<StreamObservation>>(endpoint, init), ["Observed", "Viewers", "Category", "Title"], (item) =>

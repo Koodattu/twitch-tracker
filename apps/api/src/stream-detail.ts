@@ -2,21 +2,16 @@ import { chatMembershipEvents, chatMessages, chatPresenceSnapshots, streamActivi
 import type { StreamEvent, StreamOverview } from "@twitch-tracker/shared";
 import { and, desc, eq, gte, lt, sql } from "drizzle-orm";
 import { z } from "zod";
+import { detailPage as streamDetailPage, detailPageNumberSchema, detailPageSize as pageSize, viewerObservationFields } from "./detail-records.js";
 
 export const streamDetailQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).max(100_000).default(1),
+  page: detailPageNumberSchema,
   chatter: z.string().trim().max(100).default(""),
   from: z.iso.datetime({ offset: true }).optional(),
   to: z.iso.datetime({ offset: true }).optional()
 }).refine((query) => query.from == null || query.to == null || new Date(query.from) < new Date(query.to), {
   message: "The end time must be after the start time."
 });
-
-const pageSize = 50;
-
-export function streamDetailPage<T>(items: T[], page: number) {
-  return { items: items.slice(0, pageSize), page, hasMore: items.length > pageSize };
-}
 
 export async function getStreamEvents(db: DbClient, streamId: string, limit: number, offset = 0) {
   const result = await db.execute<StreamEvent>(sql`
@@ -98,15 +93,7 @@ export async function getStreamDetail(db: DbClient, streamId: string, kind: "obs
   const offset = (query.page - 1) * pageSize;
   switch (kind) {
     case "events": return streamDetailPage(await getStreamEvents(db, streamId, limit, offset), query.page);
-    case "observations": return streamDetailPage(await db.select({
-      id: streamSnapshots.id, observedAt: streamSnapshots.observedAt, viewerCount: streamSnapshots.viewerCount,
-      title: sql<string | null>`coalesce(${streamSnapshots.title}, (select metadata.title from stream_snapshots metadata
-        where metadata.twitch_stream_id = stream_snapshots.twitch_stream_id and metadata.title is not null
-          and metadata.observed_at <= stream_snapshots.observed_at order by metadata.observed_at desc, metadata.id desc limit 1))`,
-      categoryName: sql<string | null>`coalesce(${streamSnapshots.categoryName}, (select metadata.category_name from stream_snapshots metadata
-        where metadata.twitch_stream_id = stream_snapshots.twitch_stream_id and metadata.title is not null
-          and metadata.observed_at <= stream_snapshots.observed_at order by metadata.observed_at desc, metadata.id desc limit 1))`
-    }).from(streamSnapshots).where(eq(streamSnapshots.twitchStreamId, streamId))
+    case "observations": return streamDetailPage(await db.select(viewerObservationFields).from(streamSnapshots).where(eq(streamSnapshots.twitchStreamId, streamId))
       .orderBy(desc(streamSnapshots.observedAt), desc(streamSnapshots.id)).limit(limit).offset(offset), query.page);
     case "buckets": return streamDetailPage(await db.select({
       bucketStart: streamActivityBuckets.bucketStart, bucketMinutes: streamActivityBuckets.bucketMinutes,

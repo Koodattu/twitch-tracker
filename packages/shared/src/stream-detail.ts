@@ -45,11 +45,13 @@ export type StreamOverview = {
   events: StreamEvent[];
 };
 
-export type StreamDetailPage<T> = {
+export type DetailPage<T> = {
   items: T[];
   page: number;
   hasMore: boolean;
 };
+
+export type StreamDetailPage<T> = DetailPage<T>;
 
 export type StreamMessage = {
   messageId: string;

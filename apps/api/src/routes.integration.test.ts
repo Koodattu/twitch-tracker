@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { encryptSecret, hashSessionToken, loadConfig } from "@twitch-tracker/config";
-import { appUsers, channelEvents, chatMembershipEvents, chatMessages, chatPresenceSnapshots, createDb, oauthAccounts, raids, rawEventsubEvents, sessions, streamActivityBuckets, streamSessions, streamSnapshots, subjectPrivacyStates, twitchUsers } from "@twitch-tracker/db";
+import { appUsers, channelDailyStats, channelEvents, chatMembershipEvents, chatMessages, chatPresenceSnapshots, createDb, oauthAccounts, raids, rawEventsubEvents, sessions, streamActivityBuckets, streamSessions, streamSnapshots, subjectPrivacyStates, twitchUsers } from "@twitch-tracker/db";
 import { eq } from "drizzle-orm";
 import { createApiApp } from "./routes.js";
 
@@ -302,6 +302,124 @@ describe.skipIf(database == null)("Analytics routes with PostgreSQL", () => {
     await db.update(appUsers).set({ isAdmin: true }).where(eq(appUsers.twitchUserId, "chatter"));
     expect((await publicApp.request("/api/streams/stream/overview", { headers })).status).toBe(200);
     expect((await publicApp.request("/api/private/streams/stream/messages", { headers })).status).toBe(200);
+  });
+
+  it("loads a channel overview without querying snapshots, buckets, or raw chat", async () => {
+    const querySpy = vi.spyOn(pool, "query");
+    try {
+      const response = await app.request("/api/channels/CHANNEL/overview");
+      expect(response.status).toBe(200);
+      const data = (await response.json()).data;
+      expect(data.totals).toBeNull();
+      expect(data.daily).toEqual([]);
+      expect(data.liveSession.twitchStreamId).toBe("stream");
+      expect(data.recentSessions).toHaveLength(1);
+      const queries = querySpy.mock.calls.map((call) => {
+        const query: unknown = call[0];
+        return typeof query === "string" ? query : query != null && typeof query === "object" && "text" in query ? String(query.text) : "";
+      }).join("\n");
+      expect(queries).toContain("channel_daily_stats");
+      expect(queries).not.toMatch(/stream_snapshots|stream_activity_buckets|chat_messages|chat_membership_events|chat_presence_|raw_irc_messages|raw_eventsub_events/);
+    } finally {
+      querySpy.mockRestore();
+    }
+  });
+
+  it("uses the same 30 UTC calendar days for channel chart and totals", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const dayAt = (offset: number) => new Date(Date.parse(today) + offset * 86_400_000).toISOString().slice(0, 10);
+    await db.insert(channelDailyStats).values([
+      { broadcasterUserId: "broadcaster", day: dayAt(-30), streamCount: 100, liveSeconds: 99999, viewerCountMax: 99999, viewerCountAvg: 99999, messageCount: 99999 },
+      { broadcasterUserId: "broadcaster", day: dayAt(-29), streamCount: 1, liveSeconds: 3600, viewerCountMax: 30, viewerCountAvg: 10, messageCount: 50 },
+      { broadcasterUserId: "broadcaster", day: dayAt(-1), streamCount: 0, messageCount: 5 },
+      { broadcasterUserId: "broadcaster", day: today, streamCount: 2, liveSeconds: 7200, viewerCountMax: 50, viewerCountAvg: 20, messageCount: 100 },
+      { broadcasterUserId: "broadcaster", day: dayAt(1), streamCount: 100, liveSeconds: 99999, viewerCountMax: 99999, viewerCountAvg: 99999, messageCount: 99999 },
+      { broadcasterUserId: "chatter", day: today, streamCount: 100, messageCount: 99999 }
+    ]);
+    const response = await app.request("/api/channels/channel/overview");
+    expect(response.status).toBe(200);
+    const data = (await response.json()).data;
+    expect(data.fromDay).toBe(dayAt(-29));
+    expect(data.toDay).toBe(today);
+    expect(data.daily.map((day: { day: string }) => day.day)).toEqual([dayAt(-29), dayAt(-1), today]);
+    expect(data.daily[1].viewerCountAvg).toBeNull();
+    expect(data.totals).toEqual({ streamCount: 3, liveSeconds: 10800, messageCount: 155, viewerCountMax: 50, viewerCountAvg: 15 });
+  });
+
+  it("bounds the recent channel preview and finds a live session outside it", async () => {
+    await db.insert(streamSessions).values(Array.from({ length: 8 }, (_, index) => ({
+      twitchStreamId: `recent-${index}`, broadcasterUserId: "broadcaster",
+      startedAt: new Date(firstSeen.getTime() + (index + 1) * 60_000), endedAt: new Date(firstSeen.getTime() + (index + 2) * 60_000)
+    })));
+    const response = await app.request("/api/channels/channel/overview");
+    expect(response.status).toBe(200);
+    const data = (await response.json()).data;
+    expect(data.recentSessions).toHaveLength(6);
+    expect(data.recentSessions[0].twitchStreamId).toBe("recent-7");
+    expect(data.liveSession.twitchStreamId).toBe("stream");
+    await db.update(streamSessions).set({ endedAt: latestSeen }).where(eq(streamSessions.twitchStreamId, "stream"));
+    const ended = await app.request("/api/channels/channel/overview");
+    expect((await ended.json()).data.liveSession).toBeNull();
+  });
+
+  it.each(["sessions", "daily", "observations", "buckets"])("paginates channel %s without including another channel", async (kind) => {
+    await db.insert(streamSessions).values({ twitchStreamId: "other-channel-stream", broadcasterUserId: "chatter", startedAt: firstSeen });
+    switch (kind) {
+      case "sessions": await db.insert(streamSessions).values(Array.from({ length: 50 }, (_, index) => ({
+        twitchStreamId: `session-${index}`, broadcasterUserId: "broadcaster", startedAt: firstSeen
+      }))); break;
+      case "daily": await db.insert(channelDailyStats).values([
+        ...Array.from({ length: 51 }, (_, index) => ({ broadcasterUserId: "broadcaster", day: new Date(firstSeen.getTime() - index * 86_400_000).toISOString().slice(0, 10) })),
+        { broadcasterUserId: "chatter", day: firstSeen.toISOString().slice(0, 10), messageCount: 99999 }
+      ]); break;
+      case "observations": await db.insert(streamSnapshots).values([
+        ...Array.from({ length: 51 }, () => ({ broadcasterUserId: "broadcaster", twitchStreamId: "stream", observedAt: firstSeen })),
+        { broadcasterUserId: "chatter", twitchStreamId: "other-channel-stream", observedAt: latestSeen }
+      ]); break;
+      case "buckets": await db.insert(streamActivityBuckets).values([
+        ...Array.from({ length: 51 }, (_, index) => ({ twitchStreamId: "stream", bucketStart: new Date(firstSeen.getTime() + index * 60_000), bucketMinutes: 1 })),
+        { twitchStreamId: "other-channel-stream", bucketStart: latestSeen, bucketMinutes: 1 }
+      ]); break;
+    }
+    const first = await app.request(`/api/channels/channel/${kind}`);
+    const second = await app.request(`/api/channels/channel/${kind}?page=2`);
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    const firstPage = (await first.json()).data;
+    const secondPage = (await second.json()).data;
+    expect(firstPage.items).toHaveLength(50);
+    expect(firstPage.hasMore).toBe(true);
+    expect(secondPage.items).toHaveLength(1);
+    expect(secondPage.hasMore).toBe(false);
+    expect(firstPage.items).not.toContainEqual(secondPage.items[0]);
+    expect(JSON.stringify([firstPage, secondPage])).not.toMatch(/other-channel-stream|99999/);
+    expect((await app.request(`/api/channels/channel/${kind}?page=0`)).status).toBe(400);
+  });
+
+  it("keeps fallback metadata attached to the correct channel session", async () => {
+    await db.insert(streamSessions).values({ twitchStreamId: "other-session", broadcasterUserId: "broadcaster", startedAt: latestSeen });
+    await db.insert(streamSnapshots).values([
+      { broadcasterUserId: "broadcaster", twitchStreamId: "stream", observedAt: firstSeen, title: "Original title", categoryName: "Original category" },
+      { broadcasterUserId: "broadcaster", twitchStreamId: "stream", observedAt: latestSeen, viewerCount: 5 },
+      { broadcasterUserId: "broadcaster", twitchStreamId: "other-session", observedAt: latestSeen, title: "Other title", categoryName: "Other category" }
+    ]);
+    const response = await app.request("/api/channels/channel/observations");
+    expect(response.status).toBe(200);
+    expect((await response.json()).data.items).toContainEqual(expect.objectContaining({ twitchStreamId: "stream", viewerCount: 5, title: "Original title", categoryName: "Original category" }));
+  });
+
+  it.each(["publicProfileHidden", "trackingOptedOut"] as const)("protects all channel detail routes when %s", async (flag) => {
+    const publicApp = createApiApp({ db, config: { ...config, APP_MODE: "production" } });
+    await db.insert(subjectPrivacyStates).values({ twitchUserId: "broadcaster", [flag]: true });
+    for (const kind of ["overview", "sessions", "daily", "observations", "buckets"]) {
+      expect((await publicApp.request(`/api/channels/channel/${kind}`)).status).toBe(404);
+      expect((await publicApp.request(`/api/channels/channel/${kind}`, { headers })).status).toBe(404);
+      expect((await app.request(`/api/channels/missing/${kind}`)).status).toBe(404);
+    }
+    await db.update(appUsers).set({ isAdmin: true }).where(eq(appUsers.twitchUserId, "chatter"));
+    for (const kind of ["overview", "sessions", "daily", "observations", "buckets"]) {
+      expect((await publicApp.request(`/api/channels/channel/${kind}`, { headers })).status).toBe(200);
+    }
   });
 
   describe.each(["/api/me/data", "/api/private/chatters/chatter"])("%s", (path) => {
