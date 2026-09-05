@@ -1,3 +1,5 @@
+export type * from "./stream-detail.js";
+
 export const appModes = ["local", "private_mvp", "production"] as const;
 
 export type AppMode = (typeof appModes)[number];

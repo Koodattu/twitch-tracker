@@ -42,6 +42,7 @@ import { getCookie, setCookie } from "hono/cookie";
 import type { MiddlewareHandler } from "hono";
 import { z } from "zod";
 import { createVodThumbnailLookup } from "./vod-thumbnails.js";
+import { getStreamDetail, getStreamOverview, streamDetailQuerySchema } from "./stream-detail.js";
 
 type ApiBindings = {
   Variables: {
@@ -285,6 +286,39 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
     return thumbnail == null ? c.body(null, 204) : c.redirect(thumbnail);
   });
 
+  const requireStreamAccess: MiddlewareHandler<ApiBindings> = async (c, next) => {
+    const { streamId } = streamParamSchema.parse(c.req.param());
+    const [row] = await c.get("db").select({
+      publicProfileHidden: subjectPrivacyStates.publicProfileHidden,
+      trackingOptedOut: subjectPrivacyStates.trackingOptedOut
+    }).from(streamSessions)
+      .leftJoin(subjectPrivacyStates, eq(streamSessions.broadcasterUserId, subjectPrivacyStates.twitchUserId))
+      .where(eq(streamSessions.twitchStreamId, streamId)).limit(1);
+    if (row == null || (isSubjectSuppressed(row) && !(await hasPrivilegedAccess(c)))) {
+      return c.json({ error: { code: "not_found", message: "Stream not found." } }, 404);
+    }
+    c.header("Cache-Control", "private, no-store");
+    await next();
+  };
+
+  app.get("/api/streams/:streamId/overview", requireStreamAccess, async (c) => {
+    return c.json({ data: await getStreamOverview(c.get("db"), c.req.param("streamId")) });
+  });
+
+  for (const kind of ["observations", "buckets", "events", "messages", "membership", "presence"] as const) {
+    const isPrivate = kind === "messages" || kind === "membership" || kind === "presence";
+    const path = `${isPrivate ? "/api/private/streams" : "/api/streams"}/:streamId/${kind}`;
+    const handler: MiddlewareHandler<ApiBindings> = async (c) => {
+      const query = streamDetailQuerySchema.safeParse(c.req.query());
+      if (!query.success) {
+        return c.json({ error: { code: "invalid_query", message: "Check the page number and time filters." } }, 400);
+      }
+      return c.json({ data: await getStreamDetail(c.get("db"), c.req.param("streamId")!, kind, query.data) });
+    };
+    if (isPrivate) app.get(path, requireInternal, requireStreamAccess, handler);
+    else app.get(path, requireStreamAccess, handler);
+  }
+
   app.get("/api/streams/:streamId/activity", async (c) => {
     const params = streamParamSchema.parse(c.req.param());
     const db = c.get("db");
@@ -458,7 +492,8 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
         ...row.stream,
         broadcasterLogin: row.broadcasterLogin,
         broadcasterDisplayName: row.broadcasterDisplayName,
-        broadcasterProfileImageUrl: row.broadcasterProfileImageUrl
+        broadcasterProfileImageUrl: row.broadcasterProfileImageUrl,
+        canInspectRaw: await hasPrivilegedAccess(c)
       }
     });
   });

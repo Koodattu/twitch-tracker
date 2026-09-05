@@ -719,6 +719,10 @@ Public endpoints:
 - `GET /api/streams/recent`
 - `GET /api/streams/:streamId`
 - `GET /api/streams/:streamId/activity`
+- `GET /api/streams/:streamId/overview`
+- `GET /api/streams/:streamId/observations`
+- `GET /api/streams/:streamId/buckets`
+- `GET /api/streams/:streamId/events`
 - `GET /api/channels/:login`
 - `GET /api/channels/:login/streams`
 - `GET /api/channels/:login/viewer-history`
@@ -735,6 +739,21 @@ buckets, channel events, raids, and totals. Channel `viewer-history` returns
 bounded recent viewer snapshots from `stream_snapshots`. Channel `activity`
 returns daily stats, recent stream activity buckets, and aggregate totals from
 PostgreSQL rollup tables.
+
+The stream page uses `overview` for totals, at most 300 chart intervals across
+the full observed session, peak audience and chat intervals, the largest
+incoming raid, and five recent events. Grouped chart intervals retain viewer
+peaks and missing-data indicators; active chatters use the maximum original
+bucket count, not a sum of distinct speakers. Chat rates use minutes with
+captured-chat evidence. These are observed metrics, not collection-coverage
+or unique-viewer estimates.
+
+Stream Chat, Events, and Data subpages load their selected records on demand,
+with link prefetching disabled. The six detail endpoints return
+`{ items, page, hasMore }`, with up to 50 items and a one-based `page` query
+parameter. Ordering is newest first with a stable tie-breaker; pagination uses
+offsets, so newly arriving records can shift pages on live sessions. The
+existing combined `activity` and private `raw` endpoints remain available.
 
 Authenticated endpoints:
 
@@ -758,11 +777,20 @@ Private/admin/internal endpoints:
 - `GET /api/internal/errors`
 - `GET /api/private/chatters/:login`
 - `GET /api/private/streams/:streamId/raw`
+- `GET /api/private/streams/:streamId/messages`
+- `GET /api/private/streams/:streamId/membership`
+- `GET /api/private/streams/:streamId/presence`
 
 The private chatter endpoint may return bounded recent message and JOIN/PART
 timelines for local/private MVP validation. The private stream raw endpoint may
 return bounded raw-linked chat, membership, and EventSub-derived rows for a
 specific stream. These are not public analytics endpoints.
+
+The paginated `messages` endpoint accepts an exact case-insensitive `chatter`
+login and optional ISO timestamps `from` (inclusive) and `to` (exclusive),
+applied to capture time. The web form labels these filters in UTC. Private
+stream details use the existing local/private-mode or administrator access
+rules, while public stream details preserve subject suppression checks.
 
 Webhook endpoints:
 
