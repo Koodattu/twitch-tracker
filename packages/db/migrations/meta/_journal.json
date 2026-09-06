@@ -85,6 +85,13 @@
       "when": 1788382000000,
       "tag": "0011_eventsub_reconciliation_state",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1788699600000,
+      "tag": "0012_recover_shared_chat_sources",
+      "breakpoints": true
     }
   ]
 }

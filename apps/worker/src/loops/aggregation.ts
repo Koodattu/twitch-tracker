@@ -1,8 +1,12 @@
-import { sql } from "drizzle-orm";
+import { ingestionRuns } from "@twitch-tracker/db";
+import { and, eq, sql } from "drizzle-orm";
 import type { WorkerContext } from "../worker.js";
-import { startIntervalLoop } from "./common.js";
+import { runWithIngestionRecord, startIntervalLoop } from "./common.js";
+
+const boundaryRepairJobType = "aggregation-boundary-repair-v1";
 
 export const runAggregationLoop = (context: WorkerContext) => {
+  let historyRepaired = false;
   return startIntervalLoop({
     name: "aggregation",
     intervalMs: context.config.AGGREGATION_INTERVAL_MS,
@@ -11,16 +15,12 @@ export const runAggregationLoop = (context: WorkerContext) => {
       const bucketMinutes = Math.max(1, context.config.AGGREGATION_BUCKET_MINUTES);
       const lookbackHours = Math.max(1, context.config.AGGREGATION_LOOKBACK_HOURS);
 
-      await rollupStreamViewerBuckets(context, bucketMinutes, lookbackHours);
-      await rollupStreamMessageBuckets(context, bucketMinutes, lookbackHours);
-      await rollupStreamMembershipBuckets(context, bucketMinutes, lookbackHours);
-      await rollupStreamEventBuckets(context, bucketMinutes, lookbackHours);
-      await rollupChannelDailyStreams(context, lookbackHours);
-      await rollupChannelDailyViewers(context, lookbackHours);
-      await rollupChannelDailyMessages(context, lookbackHours);
-      await rollupChatterChannelMessageBuckets(context, bucketMinutes, lookbackHours);
-      await rollupChatterChannelMembershipBuckets(context, bucketMinutes, lookbackHours);
-      await rollupChatterDaily(context, lookbackHours);
+      if (!historyRepaired) {
+        await repairHistoricalBoundaries(context, bucketMinutes);
+        historyRepaired = true;
+      }
+      await rollupBuckets(context, bucketMinutes, lookbackHours);
+      await rollupDays(context, lookbackHours);
 
       return {
         bucketMinutes,
@@ -28,6 +28,53 @@ export const runAggregationLoop = (context: WorkerContext) => {
         rollupsExecuted: 10
       };
     }
+  });
+};
+
+const rollupBuckets = async (context: WorkerContext, bucketMinutes: number, lookbackHours: number) => {
+  await rollupStreamViewerBuckets(context, bucketMinutes, lookbackHours);
+  await rollupStreamMessageBuckets(context, bucketMinutes, lookbackHours);
+  await rollupStreamMembershipBuckets(context, bucketMinutes, lookbackHours);
+  await rollupStreamEventBuckets(context, bucketMinutes, lookbackHours);
+  await rollupChatterChannelMessageBuckets(context, bucketMinutes, lookbackHours);
+  await rollupChatterChannelMembershipBuckets(context, bucketMinutes, lookbackHours);
+};
+
+const rollupDays = async (context: WorkerContext, lookbackHours: number) => {
+  await rollupChannelDailyStreams(context, lookbackHours);
+  await rollupChannelDailyViewers(context, lookbackHours);
+  await rollupChannelDailyMessages(context, lookbackHours);
+  await rollupChatterDaily(context, lookbackHours);
+};
+
+const repairHistoricalBoundaries = async (context: WorkerContext, bucketMinutes: number) => {
+  const [completed] = await context.db.select({ id: ingestionRuns.id }).from(ingestionRuns)
+    .where(and(eq(ingestionRuns.jobType, boundaryRepairJobType), eq(ingestionRuns.status, "succeeded"))).limit(1);
+  if (completed != null) return;
+
+  await runWithIngestionRecord(context.db, boundaryRepairJobType, async () => {
+    const { rows } = await context.db.execute<{ lookback_hours: number }>(sql`
+      select greatest(1, ceil(extract(epoch from (now() - min(first_at))) / 3600) + 1)::int as lookback_hours
+      from (
+        select min(started_at) as first_at from stream_sessions
+        union all select min(observed_at) from stream_snapshots
+        union all select min(coalesce(sent_at, received_at)) from chat_messages
+        union all select min(received_at) from chat_messages
+        union all select min(coalesce(event_at, received_at)) from chat_membership_events
+        union all select min(occurred_at) from channel_events
+      ) as sources
+    `);
+    const lookbackHours = rows[0]!.lookback_hours;
+    const resolutions = await context.db.execute<{ bucket_minutes: number }>(sql`
+      select bucket_minutes from stream_activity_buckets
+      union select bucket_minutes from chatter_channel_activity_buckets
+      union select ${bucketMinutes}::int
+    `);
+    for (const resolution of resolutions.rows) {
+      await rollupBuckets(context, resolution.bucket_minutes, lookbackHours);
+    }
+    await rollupDays(context, lookbackHours);
+    return { lookbackHours, bucketMinutes: resolutions.rows.map((row) => row.bucket_minutes) };
   });
 };
 
@@ -51,7 +98,7 @@ const rollupStreamViewerBuckets = async (context: WorkerContext, bucketMinutes: 
       round(avg(viewer_count))::int as viewer_count_avg,
       now() as updated_at
     from stream_snapshots
-    where observed_at >= now() - make_interval(hours => ${lookbackHours})
+    where observed_at >= date_bin(make_interval(mins => ${bucketMinutes}), now() - make_interval(hours => ${lookbackHours}), timestamptz '1970-01-01')
       and viewer_count is not null
     group by twitch_stream_id, bucket_start
     on conflict (twitch_stream_id, bucket_start, bucket_minutes) do update set
@@ -90,7 +137,7 @@ const rollupStreamMessageBuckets = async (context: WorkerContext, bucketMinutes:
       now() as updated_at
     from chat_messages
     where twitch_stream_id is not null
-      and coalesce(sent_at, received_at) >= now() - make_interval(hours => ${lookbackHours})
+      and coalesce(sent_at, received_at) >= date_bin(make_interval(mins => ${bucketMinutes}), now() - make_interval(hours => ${lookbackHours}), timestamptz '1970-01-01')
     group by twitch_stream_id, bucket_start
     on conflict (twitch_stream_id, bucket_start, bucket_minutes) do update set
       message_count = excluded.message_count,
@@ -125,7 +172,7 @@ const rollupStreamMembershipBuckets = async (context: WorkerContext, bucketMinut
       now() as updated_at
     from chat_membership_events
     where twitch_stream_id is not null
-      and coalesce(event_at, received_at) >= now() - make_interval(hours => ${lookbackHours})
+      and coalesce(event_at, received_at) >= date_bin(make_interval(mins => ${bucketMinutes}), now() - make_interval(hours => ${lookbackHours}), timestamptz '1970-01-01')
     group by twitch_stream_id, bucket_start
     on conflict (twitch_stream_id, bucket_start, bucket_minutes) do update set
       join_count = excluded.join_count,
@@ -151,7 +198,7 @@ const rollupStreamEventBuckets = async (context: WorkerContext, bucketMinutes: n
         count(*)::int as event_count
       from channel_events
       where twitch_stream_id is not null
-        and occurred_at >= now() - make_interval(hours => ${lookbackHours})
+        and occurred_at >= date_bin(make_interval(mins => ${bucketMinutes}), now() - make_interval(hours => ${lookbackHours}), timestamptz '1970-01-01')
       group by twitch_stream_id, bucket_start, event_type
     )
     insert into stream_activity_buckets (
@@ -192,7 +239,7 @@ const rollupChannelDailyStreams = async (context: WorkerContext, lookbackHours: 
       sum(greatest(0, extract(epoch from (coalesce(ended_at, last_seen_live_at, started_at) - started_at))))::int as live_seconds,
       now() as updated_at
     from stream_sessions
-    where started_at >= now() - make_interval(hours => ${lookbackHours})
+    where started_at >= date_trunc('day', now() - make_interval(hours => ${lookbackHours}), 'UTC')
     group by broadcaster_user_id, day
     on conflict (broadcaster_user_id, day) do update set
       stream_count = excluded.stream_count,
@@ -228,7 +275,7 @@ const rollupChannelDailyViewers = async (context: WorkerContext, lookbackHours: 
       round(avg(viewer_count))::int as viewer_count_avg,
       now() as updated_at
     from stream_snapshots
-    where observed_at >= now() - make_interval(hours => ${lookbackHours})
+    where observed_at >= date_trunc('day', now() - make_interval(hours => ${lookbackHours}), 'UTC')
       and viewer_count is not null
     group by broadcaster_user_id, day
     on conflict (broadcaster_user_id, day) do update set
@@ -263,7 +310,7 @@ const rollupChannelDailyMessages = async (context: WorkerContext, lookbackHours:
       count(*)::int as message_count,
       now() as updated_at
     from chat_messages
-    where received_at >= now() - make_interval(hours => ${lookbackHours})
+    where received_at >= date_trunc('day', now() - make_interval(hours => ${lookbackHours}), 'UTC')
     group by broadcaster_user_id, day
     on conflict (broadcaster_user_id, day) do update set
       message_count = excluded.message_count,
@@ -297,7 +344,7 @@ const rollupChatterChannelMessageBuckets = async (context: WorkerContext, bucket
       now() as updated_at
     from chat_messages
     where chatter_user_id is not null
-      and coalesce(sent_at, received_at) >= now() - make_interval(hours => ${lookbackHours})
+      and coalesce(sent_at, received_at) >= date_bin(make_interval(mins => ${bucketMinutes}), now() - make_interval(hours => ${lookbackHours}), timestamptz '1970-01-01')
     group by chatter_user_id, broadcaster_user_id, bucket_start
     on conflict (chatter_user_id, broadcaster_user_id, bucket_start, bucket_minutes) do update set
       message_count = excluded.message_count,
@@ -344,7 +391,7 @@ const rollupChatterChannelMembershipBuckets = async (context: WorkerContext, buc
       now() as updated_at
     from chat_membership_events
     where chatter_user_id is not null
-      and coalesce(event_at, received_at) >= now() - make_interval(hours => ${lookbackHours})
+      and coalesce(event_at, received_at) >= date_bin(make_interval(mins => ${bucketMinutes}), now() - make_interval(hours => ${lookbackHours}), timestamptz '1970-01-01')
     group by chatter_user_id, broadcaster_user_id, bucket_start
     on conflict (chatter_user_id, broadcaster_user_id, bucket_start, bucket_minutes) do update set
       join_count = excluded.join_count,
@@ -399,7 +446,7 @@ const rollupChatterDaily = async (context: WorkerContext, lookbackHours: number)
       now() as updated_at
     from chat_messages
     where chatter_user_id is not null
-      and received_at >= now() - make_interval(hours => ${lookbackHours})
+      and received_at >= date_trunc('day', now() - make_interval(hours => ${lookbackHours}), 'UTC')
     group by chatter_user_id, day
     on conflict (chatter_user_id, day) do update set
       message_count = excluded.message_count,

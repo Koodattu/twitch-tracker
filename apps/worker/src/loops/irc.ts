@@ -375,6 +375,7 @@ const persistChatMessage = async (
       badges: parseBadgeTag(message.tags.badges),
       emotes: { raw: message.tags.emotes ?? "" },
       replyParentMessageId: message.tags["reply-parent-msg-id"] ?? null,
+      sharedChatSourceChannelId: message.tags["source-room-id"] || null,
       rawIrcMessageId
     })
     .onConflictDoNothing();

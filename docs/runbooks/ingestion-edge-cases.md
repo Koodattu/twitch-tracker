@@ -55,6 +55,43 @@ for large channels.
 - Get Chatters observations are stored as presence snapshots, not fake JOIN
   events.
 
+## Shared Chat Attribution
+
+IRC `PRIVMSG` records preserve `source-room-id` in
+`chat_messages.shared_chat_source_channel_id`. An absent or empty tag is stored
+as null. The receiving broadcaster and message ID remain unchanged: Shared Chat
+copies have their own message IDs and still belong in the receiving channel's
+observed message archive.
+
+For chatter-overlap analysis, a non-null source different from the receiving
+broadcaster identifies a relayed message, not evidence that the chatter visited
+both channels. A matching source identifies the original message in a shared
+room. See [Twitch's Shared Chat documentation](https://dev.twitch.tv/docs/chat/irc/#shared-chat).
+
+Migration `0012_recover_shared_chat_sources` recovers historical source tags
+from linked raw IRC records. It only reads the leading tag block, preserves
+already populated source IDs, and skips messages without a chatter identity.
+Missing or redacted raw records cannot establish historical source attribution;
+historical null values alone do not prove that messages were native. Existing
+message-count rollups still include observed relayed messages; the map needs
+its own source-filtered input.
+
+## Aggregation Boundaries
+
+Rolling lookback windows begin at a complete time-bucket boundary or UTC
+midnight for daily statistics. Replacing a full aggregate with only the portion
+after a moving cutoff would progressively undercount messages, active chatters,
+membership events, viewer samples, and daily streams.
+
+The aggregation loop runs `aggregation-boundary-repair-v1` once to rebuild
+historical aggregates from retained normalized observations, including every
+stored bucket resolution. It reuses the normal rollup queries and records
+success only after all queries finish. A failed or interrupted repair is retried
+on a later run; a successful record prevents repeating it after restart. The
+initial repair scans retained history and may take longer than routine rollups.
+It preserves source observations and does not require a separate maintenance
+command. Existing null chatter identities remain excluded from chatter rollups.
+
 ## Missed JOIN
 
 Symptoms:
