@@ -32,8 +32,9 @@ FROM build AS worker-deployment
 RUN pnpm --filter @twitch-tracker/worker deploy --prod /opt/worker
 
 FROM dependencies AS db-build
+COPY packages/shared packages/shared
 COPY packages/db packages/db
-RUN pnpm --filter @twitch-tracker/db build
+RUN pnpm -r --filter @twitch-tracker/db... build
 
 FROM db-build AS migrate-deployment
 RUN pnpm --filter @twitch-tracker/db deploy /opt/migrate
