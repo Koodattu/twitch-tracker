@@ -47,7 +47,6 @@ const MapArtwork = memo(function MapArtwork({ map, matches, selected, hovered, h
       return <g key={node.id} data-channel={node.id} className="community-node" style={{ "--community-node-radius": `${radius}px` } as CSSProperties} role="button" tabIndex={node.id === selected ? 0 : -1}
         aria-label={`${name(node)}, ${formatCount(participants(node))} people observed in chat`} aria-pressed={node.id === selected}
         onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect(node); } }}
-        onMouseEnter={() => onHover(node.id)} onMouseLeave={() => onHover(null)}
         onFocus={() => onHover(node.id)} onBlur={() => onHover(null)} opacity={dimmed(node.id) ? 0.16 : 1}>
         <circle className="community-node-hit" cx={node.x} cy={node.y} r={radius + 7} fill="transparent" />
         {highlighted && <circle className="community-node-halo" cx={node.x} cy={node.y} r={radius + 5} fill="none" stroke={color(node.community)} strokeOpacity={0.6} />}
@@ -92,10 +91,12 @@ export function CommunityExplorer({ map }: { map: CommunityMap }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [page, setPage] = useState(0);
-  const homeView = useMemo(() => fitCommunityView(map.graph.nodes), [map]);
+  const [hideUnconnected, setHideUnconnected] = useState(true);
+  const connectedView = useMemo(() => fitCommunityView(map.graph.nodes.filter((node) => node.community != null)), [map]);
+  const allView = useMemo(() => fitCommunityView(map.graph.nodes), [map]);
+  const homeView = hideUnconnected ? connectedView : allView;
   const [view, setView] = useState(homeView);
   const [mapSize, setMapSize] = useState({ width: 1000, height: 1000 });
-  const [hideUnconnected, setHideUnconnected] = useState(false);
   const mapSide = Math.max(1, Math.min(mapSize.width, mapSize.height));
   const unconnectedCount = map.graph.nodes.filter((node) => node.community == null).length;
   const svg = useRef<SVGSVGElement>(null);
@@ -141,7 +142,7 @@ export function CommunityExplorer({ map }: { map: CommunityMap }) {
     const center = { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 };
     return transformCamera(current, bounds, center, center, factor, homeView.size * 2);
   });
-  const reset = () => { setView(homeView); setSelected(null); setHovered(null); setQuery(""); setGroup("all"); setHideUnconnected(false); setSearchOpen(false); setPage(0); };
+  const reset = () => { setView(connectedView); setSelected(null); setHovered(null); setQuery(""); setGroup("all"); setHideUnconnected(true); setSearchOpen(false); setPage(0); };
   useEffect(() => {
     const element = svg.current;
     if (element == null) return;
@@ -189,7 +190,10 @@ export function CommunityExplorer({ map }: { map: CommunityMap }) {
         event.currentTarget.setPointerCapture(event.pointerId);
       }}
       onPointerMove={(event) => {
-        if (!pointers.current.has(event.pointerId)) return;
+        if (!pointers.current.has(event.pointerId)) {
+          if (event.pointerType !== "touch") setHovered((event.target as Element).closest("[data-channel]")?.getAttribute("data-channel") ?? null);
+          return;
+        }
         const before = [...pointers.current.values()];
         pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
         const after = [...pointers.current.values()];
@@ -211,7 +215,7 @@ export function CommunityExplorer({ map }: { map: CommunityMap }) {
           if (gesture.id != null) select(byId.get(gesture.id)!);
           else { setSelected(null); setSearchOpen(false); setHelpOpen(false); }
         }
-      }} onPointerCancel={() => { pointers.current.clear(); drag.current = null; }}>
+      }} onPointerLeave={() => setHovered(null)} onPointerCancel={() => { pointers.current.clear(); drag.current = null; }}>
       <MapArtwork map={map} matches={matches} selected={selected} hovered={hovered} hideUnconnected={hideUnconnected} onHover={setHovered} onSelect={select} />
       <MapLabels map={map} matches={matches} selected={selected} hovered={hovered} view={view}
         width={mapSize.width} height={mapSize.height} hideUnconnected={hideUnconnected} referenceSize={homeView.size} />
@@ -231,7 +235,7 @@ export function CommunityExplorer({ map }: { map: CommunityMap }) {
             onClick={() => { setSearchOpen(!searchOpen); setHelpOpen(false); }}>{searchOpen ? "−" : "+"}</button>
         </div>
         {unconnectedCount > 0 && <label className="community-ring-control"><input type="checkbox" checked={hideUnconnected}
-          onChange={(event) => { setHideUnconnected(event.target.checked); if (event.target.checked && selectedNode?.community == null) setSelected(null); }} />
+          onChange={(event) => { setHideUnconnected(event.target.checked); setView(event.target.checked ? connectedView : allView); if (event.target.checked && selectedNode?.community == null) setSelected(null); }} />
           Hide unconnected channels ({formatCount(unconnectedCount)})</label>}
         {searchOpen && <div id="community-search-results" className="community-search-results">
           <label htmlFor="community-filter">Community</label>

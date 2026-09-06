@@ -1,13 +1,12 @@
 import { createHash } from "node:crypto";
 import { UndirectedGraph } from "graphology";
 import louvainModule from "graphology-communities-louvain";
-import forceAtlas2Module from "graphology-layout-forceatlas2";
 import { communityMapThresholds, type CommunityEdge, type CommunityGraph, type CommunityNode } from "@twitch-tracker/shared";
 import { spaceCommunityNodes } from "./community-spacing.js";
+import { layoutCommunityGraph } from "./community-layout.js";
 
 // These CommonJS packages declare their callable module.exports as ESM defaults.
 const louvain = louvainModule as unknown as typeof louvainModule.default;
-const forceAtlas2 = forceAtlas2Module as unknown as typeof forceAtlas2Module.default;
 
 export const maxCommunityMemberships = 500_000;
 export type CommunityGraphInput = { memberships: Array<{ chatterId: string; channelId: string; weight?: number }>; previous: CommunityGraph | null };
@@ -101,22 +100,10 @@ export function buildCommunityGraph({ memberships, previous }: CommunityGraphInp
     used.add(id);
     ids.forEach((channel) => communityIds.set(channel, id));
   });
-  if (graph.size > 0) forceAtlas2.assign(graph, { iterations: 250, getEdgeWeight: "weight",
-    settings: { ...forceAtlas2.inferSettings(graph), barnesHutOptimize: true, gravity: 1, slowDown: 5 } });
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  graph.forEachNode((_id, attributes) => {
-    minX = Math.min(minX, attributes.x); maxX = Math.max(maxX, attributes.x);
-    minY = Math.min(minY, attributes.y); maxY = Math.max(maxY, attributes.y);
-  });
-  const span = Math.max(maxX - minX, maxY - minY, 1);
-  const nodes: CommunityNode[] = channels.map((id) => {
-    const point = connected.has(id) ? graph.getNodeAttributes(id) : null;
-    const x = point == null ? 500 : 500 + (point.x - (minX + maxX) / 2) / span * 800;
-    const y = point == null ? 500 : 500 + (point.y - (minY + maxY) / 2) / span * 800;
-    return { id, chatters: [...audiences.get(id)!.values()].filter((weight) => weight === 1).length,
+  const nodes: CommunityNode[] = channels.map((id) => ({ id, chatters: [...audiences.get(id)!.values()].filter((weight) => weight === 1).length,
       participants: audiences.get(id)!.size, community: communityIds.get(id) ?? null,
-      x, y };
-  });
+      x: 500, y: 500 }));
+  layoutCommunityGraph(graph, nodes);
   const result = { nodes, edges };
   const spacing = spaceCommunityNodes(nodes);
   if (nodes.some((node) => !Number.isFinite(node.x) || !Number.isFinite(node.y))) throw new Error("Invalid community layout");

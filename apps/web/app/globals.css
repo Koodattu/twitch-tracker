@@ -38,6 +38,8 @@ body:has(.community-stage) .topbar { flex: 0 0 auto; }
 .community-node { cursor: pointer; outline: none; }
 .community-node-dot { r: min(var(--community-node-radius), calc(var(--community-unit) * 18)); stroke-width: calc(var(--community-unit) * 1.5); }
 .community-node-hit, .community-node-halo { r: calc(min(var(--community-node-radius), var(--community-unit) * 18) + min(4px, var(--community-unit) * 4)); }
+.community-node-hit { pointer-events: all; }
+.community-node-dot, .community-node-halo { pointer-events: none; }
 .community-node-halo { stroke-width: var(--community-unit); }
 .community-node:focus-visible circle { stroke: white; stroke-width: 3; }
 .community-node-label { fill: var(--foreground); paint-order: stroke; stroke: #0b0a12; stroke-width: calc(var(--community-label-size, 14px) / 4); font-size: var(--community-label-size, 14px); font-weight: 650; pointer-events: none; }
