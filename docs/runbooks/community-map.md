@@ -2,6 +2,8 @@
 
 The public explorer is at `/communities`. In **Admin → Ingestion**, the **Community map → Build now** button queues a rebuild and shows its progress and last successful build. It requires the existing admin session and a same-origin request. Repeated pending requests coalesce.
 
+The explorer fills the viewport below the site navigation. Search, community filters, channel details, map controls, and the explanation float over the graph. Mouse-wheel zoom follows the cursor; touch gestures support pan and pinch zoom. Keyboard users can select channels from search, use arrow keys to pan, +/− to zoom, Home to fit the map, and Escape to close panels. Mobile channel details use a scrollable bottom panel, with the selected channel positioned above it. Reporting dates, coverage, and the recipe explanation are available under **How it works**.
+
 ## Scheduling and input
 
 The existing worker checks every 30 seconds. The nightly window becomes due at **03:00 UTC**; restarts catch up to the latest due window. An on-demand build uses the latest 30 completed UTC days even before 03:00. No external cron or additional deployment service is needed.

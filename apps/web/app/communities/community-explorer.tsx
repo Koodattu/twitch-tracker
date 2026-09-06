@@ -1,19 +1,73 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import type { CommunityMap } from "@twitch-tracker/shared";
 import { formatCount, formatDateTime } from "../format";
-import { Avatar, EmptyState, MetricCard } from "../ui";
+import { Avatar, EmptyState } from "../ui";
+import { transformCamera, type MapView } from "./map-camera";
 
 type MapNode = CommunityMap["graph"]["nodes"][number];
 const name = (node: MapNode) => node.displayName ?? node.login ?? "Unnamed channel";
-const palette = ["#b58aff", "#48d597", "#f4c86b", "#62ccff", "#ff83b4", "#ff9f66", "#80e2d7", "#d5df73"];
 function color(id: string | null) {
   if (id == null) return "#a7a1b4";
   let hash = 0;
   for (const char of id) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
-  return palette[hash % palette.length]!;
+  return `hsl(${hash % 360} 78% 68%)`;
+}
+const homeView: MapView = { x: -70, y: -70, size: 1140 };
+
+// Camera movement only changes the SVG viewBox, leaving the graph artwork intact.
+const MapArtwork = memo(function MapArtwork({ map, matches, selected, hovered, onHover, onSelect }: {
+  map: CommunityMap; matches: MapNode[]; selected: string | null; hovered: string | null;
+  onHover: (id: string | null) => void; onSelect: (node: MapNode) => void;
+}) {
+  const byId = new Map(map.graph.nodes.map((node) => [node.id, node]));
+  const matching = new Set(matches.map((node) => node.id));
+  const neighbors = new Set(map.graph.edges.filter((edge) => edge.source === selected || edge.target === selected)
+    .flatMap((edge) => [edge.source, edge.target]));
+  const dimmed = (id: string) => !matching.has(id) || (selected != null && id !== selected && !neighbors.has(id));
+  return <>
+    <g aria-hidden="true">{map.graph.edges.map((edge) => {
+      const a = byId.get(edge.source)!, b = byId.get(edge.target)!;
+      const highlighted = selected != null && (edge.source === selected || edge.target === selected);
+      return <line key={`${edge.source}-${edge.target}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+        stroke={color(highlighted ? byId.get(selected!)!.community : a.community)}
+        strokeOpacity={highlighted ? 0.75 : dimmed(a.id) || dimmed(b.id) ? 0.025 : 0.16}
+        strokeWidth={highlighted ? 1.2 + edge.score * 1.5 : 0.35 + edge.score} />;
+    })}</g>
+    {map.graph.nodes.map((node) => {
+      const highlighted = node.id === selected || node.id === hovered;
+      const radius = Math.min(17, 3 + Math.sqrt(node.chatters) * 0.6);
+      return <g key={node.id} data-channel={node.id} className="community-node" role="button" tabIndex={node.id === selected ? 0 : -1}
+        aria-label={`${name(node)}, ${formatCount(node.chatters)} active chatters`} aria-pressed={node.id === selected}
+        onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect(node); } }}
+        onMouseEnter={() => onHover(node.id)} onMouseLeave={() => onHover(null)}
+        onFocus={() => onHover(node.id)} onBlur={() => onHover(null)} opacity={dimmed(node.id) ? 0.16 : 1}>
+        <circle cx={node.x} cy={node.y} r={radius + 7} fill="transparent" />
+        {highlighted && <circle cx={node.x} cy={node.y} r={radius + 5} fill="none" stroke={color(node.community)} strokeOpacity={0.6} />}
+        <circle cx={node.x} cy={node.y} r={radius} fill={color(node.community)} stroke={highlighted ? "#fff" : "none"} strokeWidth={1.5} />
+      </g>;
+    })}
+  </>;
+});
+
+function MapLabels({ map, matches, selected, hovered, unit, limit }: {
+  map: CommunityMap; matches: MapNode[]; selected: string | null; hovered: string | null; unit: number; limit: number;
+}) {
+  const candidates = map.graph.nodes.filter((node) => node.id === selected || node.id === hovered)
+    .concat(selected == null ? matches.slice(0, limit * 5) : []);
+  const placed: Array<{ node: MapNode; x: number; y: number; halfWidth: number }> = [];
+  for (const node of candidates) {
+    if (placed.length >= limit || placed.some((item) => item.node.id === node.id)) continue;
+    const y = node.y - Math.min(17, 3 + Math.sqrt(node.chatters) * 0.6) - 7;
+    const halfWidth = (name(node).length * 3.8 + 5) * unit;
+    if (node.id !== selected && node.id !== hovered && placed.some((item) => Math.abs(item.x - node.x) < item.halfWidth + halfWidth && Math.abs(item.y - y) < 19 * unit)) continue;
+    placed.push({ node, x: node.x, y, halfWidth });
+  }
+  return <g aria-hidden="true">{placed.map(({ node, x, y }) =>
+    <text key={node.id} x={x} y={y} textAnchor="middle" className="community-node-label">{name(node)}</text>
+  )}</g>;
 }
 
 export function CommunityExplorer({ map }: { map: CommunityMap }) {
@@ -21,9 +75,14 @@ export function CommunityExplorer({ map }: { map: CommunityMap }) {
   const [group, setGroup] = useState("all");
   const [selected, setSelected] = useState<string | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [page, setPage] = useState(0);
-  const [view, setView] = useState({ x: 0, y: 0, size: 1000 });
+  const [view, setView] = useState(homeView);
+  const [mapSide, setMapSide] = useState(1000);
   const svg = useRef<SVGSVGElement>(null);
+  const search = useRef<HTMLInputElement>(null);
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
   const drag = useRef<{ x: number; y: number; moved: boolean; id: string | null } | null>(null);
   const byId = useMemo(() => new Map(map.graph.nodes.map((node) => [node.id, node])), [map]);
   const communities = useMemo(() => {
@@ -40,134 +99,175 @@ export function CommunityExplorer({ map }: { map: CommunityMap }) {
   const connections = useMemo(() => selected == null ? [] : map.graph.edges.filter((edge) => edge.source === selected || edge.target === selected)
     .map((edge) => ({ ...edge, node: byId.get(edge.source === selected ? edge.target : edge.source)! }))
     .sort((a, b) => b.score - a.score || b.shared - a.shared || name(a.node).localeCompare(name(b.node))), [map, selected, byId]);
-  const neighbors = new Set(connections.map((edge) => edge.node.id));
-  const matches = map.graph.nodes.filter((node) =>
+  const matches = useMemo(() => map.graph.nodes.filter((node) =>
     (group === "all" || (node.community ?? "ungrouped") === group) &&
     `${name(node)} ${node.login ?? ""}`.toLowerCase().includes(query.trim().toLowerCase()))
-    .sort((a, b) => b.chatters - a.chatters || name(a).localeCompare(name(b)));
-  const select = (node: MapNode) => {
-    setSelected(node.id);
-    setView((current) => ({ ...current, x: node.x - current.size / 2, y: node.y - current.size / 2 }));
-  };
+    .sort((a, b) => b.chatters - a.chatters || name(a).localeCompare(name(b))), [map, group, query]);
+  const select = useCallback((node: MapNode) => {
+    setSelected(node.id); setSearchOpen(false); setHelpOpen(false); setQuery(""); setGroup("all"); setPage(0);
+    setView((current) => {
+      const size = Math.min(current.size, 650);
+      const next = { size, x: node.x - size / 2, y: node.y - size / 2 };
+      const bounds = svg.current?.getBoundingClientRect();
+      if (bounds == null || bounds.width > 760) return next;
+      const center = { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 };
+      return transformCamera(next, bounds, center, { ...center, y: bounds.top + bounds.height * 0.38 });
+    });
+    svg.current?.focus({ preventScroll: true });
+  }, []);
   const zoom = (factor: number) => setView((current) => {
-    const size = Math.min(1600, Math.max(120, current.size * factor));
-    return { size, x: current.x + (current.size - size) / 2, y: current.y + (current.size - size) / 2 };
+    const bounds = svg.current?.getBoundingClientRect();
+    if (bounds == null) return current;
+    const center = { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 };
+    return transformCamera(current, bounds, center, center, factor);
   });
-  const reset = () => { setView({ x: 0, y: 0, size: 1000 }); setSelected(null); };
-  const position = (clientX: number, clientY: number) => {
-    const matrix = svg.current?.getScreenCTM();
-    return matrix == null ? null : new DOMPoint(clientX, clientY).matrixTransform(matrix.inverse());
-  };
-  const dimmed = (node: MapNode) => (group !== "all" && (node.community ?? "ungrouped") !== group) ||
-    (selected != null && node.id !== selected && !neighbors.has(node.id));
+  const reset = () => { setView(homeView); setSelected(null); setHovered(null); setQuery(""); setGroup("all"); setSearchOpen(false); setPage(0); };
+  useEffect(() => {
+    const element = svg.current;
+    if (element == null) return;
+    const wheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const bounds = element.getBoundingClientRect();
+      const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? bounds.height : 1);
+      const cursor = { x: event.clientX, y: event.clientY };
+      setView((current) => transformCamera(current, bounds, cursor, cursor, Math.exp(Math.max(-120, Math.min(120, delta)) * 0.0025)));
+    };
+    element.addEventListener("wheel", wheel, { passive: false });
+    const resize = new ResizeObserver(([entry]) => {
+      if (entry != null) setMapSide(Math.max(1, Math.min(entry.contentRect.width, entry.contentRect.height)));
+    });
+    resize.observe(element);
+    return () => { element.removeEventListener("wheel", wheel); resize.disconnect(); };
+  }, []);
   const reportingEnd = new Date(new Date(map.windowEnd).getTime() - 1).toISOString().slice(0, 10);
 
-  return <>
-    <section className="stat-row" aria-label="Community map summary">
-      <MetricCard label="Channels" value={formatCount(map.graph.nodes.length)} />
-      <MetricCard label="Communities" value={formatCount(communities.length)} />
-      <MetricCard label="Connections" value={formatCount(map.graph.edges.length)} />
-      <MetricCard label="Last built" value={formatDateTime(map.generatedAt)} detail="Rebuilt nightly at 03:00 UTC" />
-    </section>
-    <div className="community-period">{map.windowStart.slice(0, 10)} – {reportingEnd} · 30 completed UTC days</div>
-    {map.graph.nodes.length === 0 ? <section className="panel"><EmptyState title="Not enough recorded chat activity" description="No channels meet the activity threshold for this reporting window yet." /></section> :
-      <div className="community-layout">
-        <section className="community-map" aria-label="Channel community map">
-          <div className="community-map-caption"><strong>Finnish chat communities</strong><span>Explore a channel to see its connections</span></div>
-          <svg ref={svg} viewBox={`${view.x} ${view.y} ${view.size} ${view.size}`} aria-label="Channels connected by shared active chatters"
-            onPointerDown={(event) => {
-              if (event.button !== 0) return;
-              drag.current = { x: event.clientX, y: event.clientY, moved: false,
-                id: (event.target as Element).closest("[data-channel]")?.getAttribute("data-channel") ?? null };
-              event.currentTarget.setPointerCapture(event.pointerId);
-            }}
-            onPointerMove={(event) => {
-              const previous = drag.current;
-              if (previous == null) return;
-              const from = position(previous.x, previous.y), to = position(event.clientX, event.clientY);
-              if (from == null || to == null) return;
-              if (Math.hypot(event.clientX - previous.x, event.clientY - previous.y) > 2) previous.moved = true;
-              if (previous.moved) setView((current) => ({ ...current, x: current.x + from.x - to.x, y: current.y + from.y - to.y }));
-              previous.x = event.clientX; previous.y = event.clientY;
-            }}
-            onPointerUp={(event) => {
-              const previous = drag.current; drag.current = null;
-              event.currentTarget.releasePointerCapture(event.pointerId);
-              if (previous != null && !previous.moved && previous.id != null) select(byId.get(previous.id)!);
-            }} onPointerCancel={() => { drag.current = null; }}>
-            <g aria-hidden="true">{map.graph.edges.map((edge) => {
-              const a = byId.get(edge.source)!, b = byId.get(edge.target)!;
-              const highlighted = selected != null && (edge.source === selected || edge.target === selected);
-              return <line key={`${edge.source}-${edge.target}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                stroke={highlighted ? color(selectedNode?.community ?? null) : color(a.community)}
-                strokeOpacity={highlighted ? 0.8 : selected != null || dimmed(a) || dimmed(b) ? 0.045 : 0.2}
-                strokeWidth={highlighted ? 1.3 + edge.score * 2 : 0.4 + edge.score * 1.4} />;
-            })}</g>
-            {map.graph.nodes.map((node) => {
-              const highlighted = node.id === selected || node.id === hovered;
-              const radius = Math.min(17, 3 + Math.sqrt(node.chatters) * 0.6);
-              return <g key={node.id} data-channel={node.id} className="community-node" role="button" tabIndex={0}
-                aria-label={`${name(node)}, ${formatCount(node.chatters)} active chatters`} aria-pressed={node.id === selected}
-                onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); select(node); } }}
-                onMouseEnter={() => setHovered(node.id)} onMouseLeave={() => setHovered(null)}
-                onFocus={() => setHovered(node.id)} onBlur={() => setHovered(null)} opacity={dimmed(node) ? 0.22 : 1}>
-                <circle cx={node.x} cy={node.y} r={radius + 6} fill="transparent" />
-                <circle cx={node.x} cy={node.y} r={radius} fill={color(node.community)} stroke={highlighted ? "#fff" : "none"} strokeWidth={2} />
-                {(highlighted || (selected == null && node.chatters >= (matches[9]?.chatters ?? Infinity))) &&
-                  <text x={node.x} y={node.y - radius - 6} textAnchor="middle" className="community-node-label" fontSize={highlighted ? 14 : 11}>{name(node)}</text>}
-              </g>;
-            })}
-          </svg>
-          <div className="community-map-controls" aria-label="Map controls">
-            <button className="button button-secondary" onClick={() => zoom(0.75)} aria-label="Zoom in">+</button>
-            <button className="button button-secondary" onClick={() => zoom(1.33)} aria-label="Zoom out">−</button>
-            <button className="button button-secondary" onClick={reset}>Reset view</button>
-          </div>
-          <p className="community-legend">Size: active chatters · Lines: shared chatters · Color: community</p>
-        </section>
-        <aside className="community-sidebar">
-          <section className="panel">
-            <h2>Find a channel</h2>
-            <label className="sr-only" htmlFor="community-search">Search channels</label>
-            <input id="community-search" className="input community-input" type="search" placeholder="Search channels" value={query}
-              onChange={(event) => { setQuery(event.target.value); setPage(0); }} />
-            <label htmlFor="community-filter">Community</label>
-            <select id="community-filter" className="input community-input" value={group} onChange={(event) => { setGroup(event.target.value); setPage(0); }}>
-              <option value="all">All communities</option>
-              {communities.map((item) => <option key={item.id} value={item.id}>{labels.get(item.id)} ({item.nodes.length})</option>)}
-              <option value="ungrouped">Ungrouped channels</option>
-            </select>
-            <p className="community-muted" aria-live="polite">{formatCount(matches.length)} {matches.length === 1 ? "channel" : "channels"}</p>
-            {matches.length === 0 ? <p>Not enough recorded chat activity for this map.</p> : <ul className="community-channel-list">
-              {matches.slice(page * 20, page * 20 + 20).map((node) => <li key={node.id}><button onClick={() => select(node)} aria-pressed={selected === node.id}>
-                <span className="community-color" style={{ background: color(node.community) }} /><span>{name(node)}</span><small>{formatCount(node.chatters)}</small>
-              </button></li>)}
-            </ul>}
-            {matches.length > 20 && <div className="community-pagination"><button className="button button-secondary" disabled={page === 0} onClick={() => setPage(page - 1)}>Previous</button>
-              <button className="button button-secondary" disabled={(page + 1) * 20 >= matches.length} onClick={() => setPage(page + 1)}>Next</button></div>}
-          </section>
-          <section className="panel" aria-live="polite">
-            {selectedNode == null ? <><h2>Explore a connection</h2><p>Select a channel on the map or in the list to see where its chat community overlaps.</p></> : <>
-              <div className="community-selected"><Avatar name={name(selectedNode)} src={selectedNode.profileImageUrl} size="small" /><h2>{name(selectedNode)}</h2></div>
-              <p>{formatCount(selectedNode.chatters)} qualifying active chatters</p>
-              <p className="community-muted">{selectedNode.community == null ? "Ungrouped channel" : labels.get(selectedNode.community)}</p>
-              {selectedNode.login != null && <Link className="button button-secondary" href={`/channels/${encodeURIComponent(selectedNode.login)}`}>Channel profile</Link>}
-              <h3>Strongest connections</h3>
-              {connections.length === 0 ? <p>No connections meet the shared-chatter threshold.</p> : <ul className="community-channel-list">
-                {connections.map((edge) => <li key={edge.node.id}><button onClick={() => select(edge.node)}><span>{name(edge.node)}<small>{formatCount(edge.shared)} shared chatters</small></span>
-                  <strong>{Math.round(edge.shared / selectedNode.chatters * 100)}%</strong></button></li>)}
-              </ul>}
-              {connections.length > 0 && <p className="community-muted">Percentages are shares of {name(selectedNode)}’s qualifying chatters.</p>}
-            </>}
-          </section>
-        </aside>
-      </div>}
-    <section className="panel community-explanation">
-      <h2>Reading the map</h2>
-      <p>These connections come from recorded chat messages, not all viewers or followers. A person qualifies after sending at least 3 messages in a channel during the reporting window. Channels need 10 qualifying chatters; connections need 5 shared chatters. Only the strongest connections are shown.</p>
-      <p>Colors group channels with overlapping chats. Position is not geographic, and a connection does not establish friendship or affiliation. Untyped viewing, collection interruptions, and channels we could not track are not represented.</p>
-      <p className="community-muted">Qualifying observations: {formatDateTime(map.coverage.firstObservedAt)} – {formatDateTime(map.coverage.lastObservedAt)}.</p>
+  return <div className="community-explorer" onKeyDown={(event) => {
+    if (event.key === "Escape") { setSelected(null); setSearchOpen(false); setHelpOpen(false); svg.current?.focus({ preventScroll: true }); }
+  }}>
+    <svg className="community-canvas" ref={svg} viewBox={`${view.x} ${view.y} ${view.size} ${view.size}`} tabIndex={0}
+      style={{ "--community-label-size": `${view.size / mapSide * 12}px` } as CSSProperties}
+      aria-label={selectedNode == null ? "Finnish channel community map" : `Community map, ${name(selectedNode)} selected`}
+      aria-describedby="community-gesture-help"
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        const steps: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+        const step = steps[event.key];
+        if (step != null) { event.preventDefault(); setView((current) => ({ ...current, x: current.x + step[0] * current.size * 0.1, y: current.y + step[1] * current.size * 0.1 })); }
+        else if (["+", "=", "-", "Home", "/"].includes(event.key)) {
+          event.preventDefault();
+          if (event.key === "Home") reset();
+          else if (event.key === "/") search.current?.focus();
+          else zoom(event.key === "-" ? 1.25 : 0.8);
+        }
+      }}
+      onPointerDown={(event) => {
+        if (event.button !== 0) return;
+        pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        if (pointers.current.size === 1) drag.current = { x: event.clientX, y: event.clientY, moved: false,
+          id: (event.target as Element).closest("[data-channel]")?.getAttribute("data-channel") ?? null };
+        else if (drag.current != null) drag.current.moved = true;
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }}
+      onPointerMove={(event) => {
+        if (!pointers.current.has(event.pointerId)) return;
+        const before = [...pointers.current.values()];
+        pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        const after = [...pointers.current.values()];
+        const gesture = drag.current;
+        if (gesture == null) return;
+        if (Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) > 4) gesture.moved = true;
+        if (!gesture.moved) return;
+        const center = (points: Array<{ x: number; y: number }>) => ({ x: points.reduce((sum, point) => sum + point.x, 0) / points.length, y: points.reduce((sum, point) => sum + point.y, 0) / points.length });
+        const distance = (points: Array<{ x: number; y: number }>) => points.length < 2 ? 1 : Math.max(1, Math.hypot(points[0]!.x - points[1]!.x, points[0]!.y - points[1]!.y));
+        const bounds = event.currentTarget.getBoundingClientRect();
+        setView((current) => transformCamera(current, bounds, center(before), center(after), distance(before) / distance(after)));
+      }}
+      onPointerUp={(event) => {
+        pointers.current.delete(event.pointerId);
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+        if (pointers.current.size > 0) return;
+        const gesture = drag.current; drag.current = null;
+        if (gesture != null && !gesture.moved) {
+          if (gesture.id != null) select(byId.get(gesture.id)!);
+          else { setSelected(null); setSearchOpen(false); setHelpOpen(false); }
+        }
+      }} onPointerCancel={() => { pointers.current.clear(); drag.current = null; }}>
+      <MapArtwork map={map} matches={matches} selected={selected} hovered={hovered} onHover={setHovered} onSelect={select} />
+      <MapLabels map={map} matches={matches} selected={selected} hovered={hovered} unit={view.size / mapSide}
+        limit={view.size < 350 ? 40 : view.size < 650 ? 20 : mapSide < 550 ? 5 : 12} />
+    </svg>
+
+    <div className="community-heading"><span className="eyebrow">Discover · Finnish Twitch</span><h1>Chat communities</h1>
+      <p>{formatCount(map.graph.nodes.length)} channels <span>·</span> {formatCount(communities.length)} communities</p></div>
+    <div className="community-date"><strong>30-day map</strong><span>Updated {formatDateTime(map.generatedAt)}</span></div>
+
+    {map.graph.nodes.length === 0 ? <div className="community-empty community-glass"><EmptyState title="Not enough recorded chat activity" description="No channels meet the activity threshold for this reporting window yet." /></div> :
+      <section className="community-search community-glass" aria-label="Find a channel">
+        <div className="community-search-bar"><span aria-hidden="true">⌕</span>
+          <input ref={search} id="community-search" type="search" placeholder="Find a channel…" aria-label="Search channels" value={query}
+            onFocus={() => { setSearchOpen(true); setHelpOpen(false); setSelected(null); }}
+            onChange={(event) => { setQuery(event.target.value); setPage(0); setSelected(null); setSearchOpen(true); }} />
+          <button className="community-icon-button" aria-label={searchOpen ? "Collapse channel search" : "Browse channels"} aria-expanded={searchOpen} aria-controls="community-search-results"
+            onClick={() => { setSearchOpen(!searchOpen); setHelpOpen(false); }}>{searchOpen ? "−" : "+"}</button>
+        </div>
+        {searchOpen && <div id="community-search-results" className="community-search-results">
+          <label htmlFor="community-filter">Community</label>
+          <select id="community-filter" className="community-input" value={group} onChange={(event) => {
+            const next = event.target.value; setGroup(next); setPage(0); setSelected(null);
+            const nodes = map.graph.nodes.filter((node) => (node.community ?? "ungrouped") === next);
+            if (next === "all") setView(homeView);
+            else if (nodes.length > 0) {
+              const xs = nodes.map((node) => node.x), ys = nodes.map((node) => node.y);
+              const left = Math.min(...xs), right = Math.max(...xs), top = Math.min(...ys), bottom = Math.max(...ys);
+              const size = Math.max(300, Math.max(right - left, bottom - top) * 1.4);
+              setView({ x: (left + right - size) / 2, y: (top + bottom - size) / 2, size });
+            }
+          }}><option value="all">All communities</option>
+            {communities.map((item) => <option key={item.id} value={item.id}>{labels.get(item.id)} ({item.nodes.length})</option>)}
+            <option value="ungrouped">Ungrouped channels</option>
+          </select>
+          <div className="community-list-heading"><span aria-live="polite">{formatCount(matches.length)} {matches.length === 1 ? "channel" : "channels"}</span><span>Active chatters</span></div>
+          {matches.length === 0 ? <p className="community-no-results">No matching channels. Try another name or community. Some channels may not have enough recorded chat activity yet.</p> :
+            <ul className="community-channel-list">{matches.slice(page * 8, page * 8 + 8).map((node) => <li key={node.id}><button onClick={() => select(node)} aria-pressed={selected === node.id}>
+              <span className="community-color" style={{ background: color(node.community) }} /><span>{name(node)}</span><small>{formatCount(node.chatters)}</small>
+            </button></li>)}</ul>}
+          {matches.length > 8 && <div className="community-pagination"><button disabled={page === 0} onClick={() => setPage(page - 1)}>Previous</button><span>{page + 1} / {Math.ceil(matches.length / 8)}</span>
+            <button disabled={(page + 1) * 8 >= matches.length} onClick={() => setPage(page + 1)}>Next</button></div>}
+        </div>}
+      </section>}
+
+    {selectedNode != null && <section className="community-details community-glass" aria-label="Selected channel">
+      <div className="community-panel-heading"><span className="eyebrow">Channel connections</span><button className="community-icon-button" aria-label="Close channel details" onClick={() => { setSelected(null); svg.current?.focus(); }}>×</button></div>
+      <div className="community-selected"><Avatar name={name(selectedNode)} src={selectedNode.profileImageUrl} size="small" /><h2>{name(selectedNode)}</h2></div>
+      <div className="community-selected-stats"><strong>{formatCount(selectedNode.chatters)}<span>active chatters</span></strong><strong>{formatCount(connections.length)}<span>connections</span></strong></div>
+      <p className="community-group-name"><span className="community-color" style={{ background: color(selectedNode.community) }} />{selectedNode.community == null ? "Ungrouped channel" : labels.get(selectedNode.community)}</p>
+      {selectedNode.login != null && <Link className="community-profile-link" href={`/channels/${encodeURIComponent(selectedNode.login)}`}>View channel profile <span aria-hidden="true">↗</span></Link>}
+      <div className="community-connections"><h3>Strongest connections</h3>
+        <p>Shared chatters · share of {name(selectedNode)}’s chat</p>
+        {connections.length === 0 ? <p>No connections meet the shared-chatter threshold.</p> : <ul className="community-channel-list">
+          {connections.map((edge) => <li key={edge.node.id}><button onClick={() => select(edge.node)}><span className="community-color" style={{ background: color(edge.node.community) }} /><span>{name(edge.node)}<small>{formatCount(edge.shared)} shared chatters</small></span>
+            <strong>{Math.round(edge.shared / selectedNode.chatters * 100)}%</strong></button></li>)}
+        </ul>}
+      </div>
+    </section>}
+
+    <div className="community-bottom-bar"><button className="community-help-button community-glass" aria-expanded={helpOpen} aria-controls="community-explanation" onClick={() => { setHelpOpen(!helpOpen); setSearchOpen(false); }}>How it works <span aria-hidden="true">?</span></button>
+      <span className="community-hint">Scroll to zoom · Drag to explore · Select a channel</span></div>
+    <div className="community-map-controls community-glass" aria-label="Map controls">
+      <button aria-label="Zoom in" title="Zoom in (+)" onClick={() => zoom(0.8)}>+</button><button aria-label="Zoom out" title="Zoom out (−)" onClick={() => zoom(1.25)}>−</button>
+      <span className="community-zoom-level">{Math.round(homeView.size / view.size * 100)}%</span>
+      <button className="community-fit" onClick={reset} title="Reset zoom and filters (Home)">Fit map</button>
+    </div>
+    {helpOpen && <section id="community-explanation" className="community-explanation community-glass" aria-labelledby="community-help-title">
+      <div className="community-panel-heading"><h2 id="community-help-title">Reading the map</h2><button className="community-icon-button" aria-label="Close explanation" onClick={() => setHelpOpen(false)}>×</button></div>
+      <p><strong>Each dot is a channel.</strong> Larger dots have more active chatters. Lines connect channels with shared chatters, and colors show detected communities.</p>
+      <p>These are recorded chat communities, not all viewers or followers. Position is not geographic, and connections do not establish friendship or affiliation.</p>
+      <p>People qualify after 3 messages in a channel. Channels need 10 qualifying chatters; connections need 5 shared chatters. Only the strongest connections are shown.</p>
+      <dl><dt>Reporting window</dt><dd>{map.windowStart.slice(0, 10)} – {reportingEnd} (UTC)</dd><dt>Last built</dt><dd>{formatDateTime(map.generatedAt)} · nightly at 03:00 UTC</dd>
+        <dt>Qualifying observations</dt><dd>{formatDateTime(map.coverage.firstObservedAt)} – {formatDateTime(map.coverage.lastObservedAt)}</dd></dl>
       {map.coverage.unknownSource > 0 && <p>Some historical messages could not be verified as original channel messages and were excluded.</p>}
-    </section>
-  </>;
+      <p>Scroll or pinch to zoom. Drag to pan. With the map focused, use arrow keys to pan, + / − to zoom, Home to reset, or / to search. Escape closes panels.</p>
+    </section>}
+    <p id="community-gesture-help" className="sr-only">Scroll or pinch to zoom. Drag or use arrow keys to pan. Plus and minus zoom; Home resets the map. Use Search channels to select a channel with the keyboard. Escape closes panels.</p>
+  </div>;
 }
