@@ -3,6 +3,7 @@ export type CommunityNode = {
   chatters: number;
   /** Distinct qualifying people, including repeated chat presence. Absent in v1 snapshots. */
   participants?: number;
+  category?: { id: string; name: string; share: number };
   community: string | null;
   x: number;
   y: number;
@@ -10,6 +11,7 @@ export type CommunityNode = {
 export type CommunityEdge = { source: string; target: string; shared: number; score: number };
 export type CommunityGraph = { nodes: CommunityNode[]; edges: CommunityEdge[] };
 export type CommunityCoverage = {
+  thresholds?: { channelPeople: number; sharedPeople: number };
   firstObservedAt: string | null;
   lastObservedAt: string | null;
   messages: number;

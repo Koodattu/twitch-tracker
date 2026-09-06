@@ -3,6 +3,7 @@ import { claimCommunityBuild, failCommunityBuild, publishCommunityMap, renewComm
 import type { WorkerContext } from "../worker.js";
 import type { buildCommunityGraph, CommunityGraphInput } from "../community-graph.js";
 import { readCommunityInput } from "../community-input.js";
+import { addCommunityCategories } from "../community-categories.js";
 import { heartbeat, startIntervalLoop } from "./common.js";
 
 export async function runCommunityBuild(context: WorkerContext) {
@@ -27,9 +28,15 @@ export async function runCommunityBuild(context: WorkerContext) {
     const result = await runGraphThread({ memberships: input.memberships, previous: claim.previous }, signal);
     const graphMs = Math.round(performance.now() - graphStart);
     signal.throwIfAborted();
+    const categoryStart = performance.now();
+    await addCommunityCategories(context.db, claim, result.graph);
+    const categoryMs = Math.round(performance.now() - categoryStart);
+    signal.throwIfAborted();
+    const payloadBytes = Buffer.byteLength(JSON.stringify(result.graph));
+    if (payloadBytes > 10_000_000) throw new Error("Community snapshot budget exceeded");
     if (!(await publishCommunityMap(context.db, claim, result.graph, input.coverage))) throw new Error("Community build invalidated before publication");
-    return { windowStart: claim.windowStart.toISOString(), windowEnd: claim.windowEnd.toISOString(), inputMs, graphMs,
-      payloadBytes: Buffer.byteLength(JSON.stringify(result.graph)),
+    return { windowStart: claim.windowStart.toISOString(), windowEnd: claim.windowEnd.toISOString(), inputMs, graphMs, categoryMs,
+      payloadBytes,
       channels: result.graph.nodes.length, edges: result.graph.edges.length, ...input.coverage, ...result.diagnostics };
   } catch (error) {
     await failCommunityBuild(context.db, claim);

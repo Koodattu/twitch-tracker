@@ -1,10 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { mapPoint, transformCamera } from "./map-camera";
+import { fitCommunityView, mapPoint, transformCamera } from "./map-camera";
 
 const view = { x: 0, y: 0, size: 1000 };
 const bounds = { left: 20, top: 80, width: 1400, height: 800 };
 
 describe("Community map gestures", () => {
+  it("fits expanded layouts and permits zooming out past their full extent", () => {
+    const fit = fitCommunityView([{ x: -1200, y: -400 }, { x: 2200, y: 2100 }]);
+    expect(fit.x).toBeLessThan(-1200);
+    expect(fit.y).toBeLessThan(-400);
+    expect(fit.x + fit.size).toBeGreaterThan(2200);
+    expect(fit.y + fit.size).toBeGreaterThan(2100);
+    expect(transformCamera(fit, bounds, { x: 500, y: 500 }, { x: 500, y: 500 }, 2, fit.size * 2).size).toBe(fit.size * 2);
+    expect(fitCommunityView([])).toEqual({ x: -70, y: -70, size: 1140 });
+  });
   it("zooms around the cursor in a letterboxed viewport", () => {
     const cursor = { x: 540, y: 310 };
     const next = transformCamera(view, bounds, cursor, cursor, 0.5);

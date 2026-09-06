@@ -1,6 +1,6 @@
 # Finnish community map
 
-Status: implemented, 2026-09-06. The presence extension (`finnish-presence-v2`) is specified in [the current runbook](runbooks/community-map.md); it supersedes the message-only input and counting rules below. The original design is retained for context. The worker, saved snapshots, public explorer, and admin build control are implemented with graph and PostgreSQL integration tests. Read-only production aggregate checks and isolated desktop/mobile checks are recorded in [the community map runbook](runbooks/community-map.md). The sections below preserve the design rationale; the runbook describes the shipped behavior and measured limits.
+Status: implemented, 2026-09-06. The presence and category extension (`finnish-presence-v3`) is specified in [the current runbook](runbooks/community-map.md); it supersedes the message-only input and counting rules below. The original design is retained for context. The worker, saved snapshots, public explorer, and admin build control are implemented with graph and PostgreSQL integration tests. Read-only production aggregate checks and isolated desktop/mobile checks are recorded in [the community map runbook](runbooks/community-map.md). The sections below preserve the design rationale; the runbook describes the shipped behavior and measured limits.
 
 ## Product
 

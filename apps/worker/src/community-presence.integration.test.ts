@@ -54,9 +54,10 @@ describe.skipIf(database == null)("Community presence with PostgreSQL", () => {
       rest: new DisabledHelixAdapter(), workerName: "test", abortSignal: new AbortController().signal });
     expect(built).toMatchObject({ channels: 2, edges: 1 });
     const saved = (await pool.query("select recipe, graph, coverage from community_map_snapshots")).rows[0];
-    expect(saved.recipe).toBe("finnish-presence-v2");
+    expect(saved.recipe).toBe("finnish-presence-v3");
     expect(saved.graph).toEqual(graph);
     expect(saved.coverage.presence.presenceOnlyMemberships).toBe(19);
+    expect(saved.coverage.thresholds).toEqual({ channelPeople: 5, sharedPeople: 3 });
   });
 
   it("recovers historical identities only from unambiguous same-day evidence, including name changes", async () => {

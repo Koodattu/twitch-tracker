@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import type { CommunityBuildClaim, DbClient } from "@twitch-tracker/db";
-import type { CommunityCoverage } from "@twitch-tracker/shared";
+import { communityMapThresholds, type CommunityCoverage } from "@twitch-tracker/shared";
 import { maxCommunityMemberships } from "./community-graph.js";
 import { readCommunityPresence } from "./community-presence.js";
 
@@ -62,7 +62,7 @@ export async function readCommunityInput(db: DbClient, claim: CommunityBuildClai
       if (first == null || rowFirst < first) first = rowFirst;
       if (last == null || rowLast > last) last = rowLast;
     }
-    const coverage: CommunityCoverage = { ...diagnostics.rows[0]!, qualifyingMemberships: combined.size, presence: presence.coverage,
+    const coverage: CommunityCoverage = { ...diagnostics.rows[0]!, thresholds: communityMapThresholds, qualifyingMemberships: combined.size, presence: presence.coverage,
       firstObservedAt: first?.toISOString() ?? null, lastObservedAt: last?.toISOString() ?? null };
     return { memberships: [...combined.values()].map(({ chatterId, channelId, weight }) => ({ chatterId, channelId, weight })), coverage };
   }, { isolationLevel: "repeatable read", accessMode: "read only" });

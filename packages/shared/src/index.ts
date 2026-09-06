@@ -2,7 +2,9 @@ export type * from "./stream-detail.js";
 export type * from "./channel-detail.js";
 export type * from "./community-map.js";
 
-export const communityMapRecipe = "finnish-presence-v2";
+export const communityMapRecipe = "finnish-presence-v3";
+export const communityMapThresholds = { channelPeople: 5, sharedPeople: 3 } as const;
+export const communityNodeRadius = (people: number) => Math.min(17, 3 + Math.sqrt(people) * 0.6);
 
 export const appModes = ["local", "private_mvp", "production"] as const;
 

@@ -2,7 +2,8 @@ import { createHash } from "node:crypto";
 import { UndirectedGraph } from "graphology";
 import louvainModule from "graphology-communities-louvain";
 import forceAtlas2Module from "graphology-layout-forceatlas2";
-import type { CommunityEdge, CommunityGraph, CommunityNode } from "@twitch-tracker/shared";
+import { communityMapThresholds, type CommunityEdge, type CommunityGraph, type CommunityNode } from "@twitch-tracker/shared";
+import { spaceCommunityNodes } from "./community-spacing.js";
 
 // These CommonJS packages declare their callable module.exports as ESM defaults.
 const louvain = louvainModule as unknown as typeof louvainModule.default;
@@ -20,7 +21,7 @@ export function buildCommunityGraph({ memberships, previous }: CommunityGraphInp
     if (!audiences.has(channelId)) audiences.set(channelId, new Map());
     audiences.get(channelId)!.set(chatterId, Math.max(weight, audiences.get(channelId)!.get(chatterId) ?? 0));
   }
-  const channels = [...audiences.keys()].filter((id) => audiences.get(id)!.size >= 10).sort(compare);
+  const channels = [...audiences.keys()].filter((id) => audiences.get(id)!.size >= communityMapThresholds.channelPeople).sort(compare);
   if (channels.length > 10_000) throw new Error("Community channel budget exceeded");
   const visits = new Map<string, string[]>();
   for (const id of channels) for (const chatter of audiences.get(id)!.keys()) {
@@ -45,7 +46,7 @@ export function buildCommunityGraph({ memberships, previous }: CommunityGraphInp
   }
   const candidates: CommunityEdge[] = [];
   for (const [key, { shared, weighted }] of counts) {
-    if (shared < 5) continue;
+    if (shared < communityMapThresholds.sharedPeople) continue;
     const [source, target] = key.split("\0") as [string, string];
     candidates.push({ source, target, shared, score: weighted / Math.sqrt(audiences.get(source)!.size * audiences.get(target)!.size) });
   }
@@ -108,19 +109,17 @@ export function buildCommunityGraph({ memberships, previous }: CommunityGraphInp
     minY = Math.min(minY, attributes.y); maxY = Math.max(maxY, attributes.y);
   });
   const span = Math.max(maxX - minX, maxY - minY, 1);
-  const isolated = channels.filter((id) => !connected.has(id));
-  const isolateIndex = new Map(isolated.map((id, index) => [id, index]));
   const nodes: CommunityNode[] = channels.map((id) => {
     const point = connected.has(id) ? graph.getNodeAttributes(id) : null;
-    const angle = (isolateIndex.get(id) ?? 0) * 2 * Math.PI / Math.max(isolated.length, 1);
-    const x = point == null ? 500 + Math.cos(angle) * 465 : 500 + (point.x - (minX + maxX) / 2) / span * 800;
-    const y = point == null ? 500 + Math.sin(angle) * 465 : 500 + (point.y - (minY + maxY) / 2) / span * 800;
+    const x = point == null ? 500 : 500 + (point.x - (minX + maxX) / 2) / span * 800;
+    const y = point == null ? 500 : 500 + (point.y - (minY + maxY) / 2) / span * 800;
     return { id, chatters: [...audiences.get(id)!.values()].filter((weight) => weight === 1).length,
       participants: audiences.get(id)!.size, community: communityIds.get(id) ?? null,
-      x: Math.round(x * 1000) / 1000, y: Math.round(y * 1000) / 1000 };
+      x, y };
   });
   const result = { nodes, edges };
+  const spacing = spaceCommunityNodes(nodes);
   if (nodes.some((node) => !Number.isFinite(node.x) || !Number.isFinite(node.y))) throw new Error("Invalid community layout");
   if (Buffer.byteLength(JSON.stringify(result)) > 10_000_000) throw new Error("Community snapshot budget exceeded");
-  return { graph: result, diagnostics: { pairContributions, maxChannelsPerChatter, candidateEdges: candidates.length } };
+  return { graph: result, diagnostics: { pairContributions, maxChannelsPerChatter, candidateEdges: candidates.length, ...spacing } };
 }

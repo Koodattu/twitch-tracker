@@ -17,7 +17,7 @@ describe("Community graph", () => {
     expect(JSON.stringify(mixed)).not.toContain("user-");
   });
   it("counts distinct people, normalizes overlap, and retains isolated qualifying channels", () => {
-    const memberships = [...audience("a", 0, 10), ...audience("b", 5, 20), ...audience("c", 100, 10), ...audience("small", 0, 9)];
+    const memberships = [...audience("a", 0, 10), ...audience("b", 5, 20), ...audience("c", 100, 10), ...audience("small", 0, 4)];
     const { graph } = buildCommunityGraph({ memberships: [...memberships, ...memberships], previous: null });
     expect(graph.nodes.map(({ id, chatters }) => ({ id, chatters }))).toEqual([{ id: "a", chatters: 10 }, { id: "b", chatters: 20 }, { id: "c", chatters: 10 }]);
     expect(graph.edges).toEqual([{ source: "a", target: "b", shared: 5, score: 5 / Math.sqrt(200) }]);
@@ -31,8 +31,15 @@ describe("Community graph", () => {
     const { graph } = buildCommunityGraph({ memberships, previous: null });
     expect(graph.edges.length).toBeLessThanOrEqual(10 * graph.nodes.length);
     for (const node of graph.nodes) expect(graph.edges.filter((edge) => edge.source === node.id || edge.target === node.id).length).toBeGreaterThanOrEqual(10);
-    const weak = buildCommunityGraph({ memberships: [...audience("a", 0, 10), ...audience("b", 6, 10)], previous: null });
+    const weak = buildCommunityGraph({ memberships: [...audience("a", 0, 10), ...audience("b", 8, 10)], previous: null });
     expect(weak.graph.edges).toHaveLength(0);
+  });
+
+  it("includes five-person channels and three-person overlaps, while keeping smaller overlaps isolated", () => {
+    const { graph } = buildCommunityGraph({ memberships: [...audience("a",0,5),...audience("b",2,5),...audience("c",5,5)], previous:null });
+    expect(graph.nodes).toHaveLength(3);
+    expect(graph.edges).toEqual([{source:"a",target:"b",shared:3,score:0.6}]);
+    expect(graph.nodes.find((node)=>node.id === "c")!.community).toBeNull();
   });
 
   it("detects dense communities connected by a bridge and produces reproducible positions", () => {
