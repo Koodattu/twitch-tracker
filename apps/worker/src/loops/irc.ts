@@ -24,6 +24,8 @@ type BotConnection = {
   adapter: TwitchIrcAdapter;
   connected: boolean;
   login: string;
+  pendingMessages: Set<Promise<void>>;
+  disconnecting: Promise<void> | null;
 };
 
 export const runIrcLoop = (context: WorkerContext) => {
@@ -50,8 +52,8 @@ export const runIrcLoop = (context: WorkerContext) => {
       return;
     }
 
-    connections.delete(botAccountId);
     await connection.adapter.disconnect(reason);
+    await connection.disconnecting;
   };
 
   const ensureConnection = async (bot: ResolvedBotAccountCredentials & { accessToken: string }) => {
@@ -63,6 +65,14 @@ export const runIrcLoop = (context: WorkerContext) => {
       await disconnectConnection(bot.botAccountId, "bot_account_changed");
     }
 
+    // Persisted room membership belongs to the previous socket, even after an unclean exit.
+    await assignments.record({
+      type: "socket_disconnected",
+      botAccountId: bot.botAccountId,
+      reason: "irc_connection_starting",
+      observedAt: new Date()
+    });
+
     const adapter = new SocketIrcAdapter({
       login: bot.login,
       oauthToken: bot.accessToken,
@@ -72,24 +82,43 @@ export const runIrcLoop = (context: WorkerContext) => {
         },
         disconnected: async (reason) => {
           connection.connected = false;
-          if (connections.get(bot.botAccountId) === connection) {
-            connections.delete(bot.botAccountId);
-          }
-          if (reason === "socket_closed" || reason === "connect_failed") {
-            await recordUnexpectedDisconnect(bot.botAccountId);
-          }
-          await assignments.record({
-            type: "socket_disconnected",
-            botAccountId: bot.botAccountId,
-            reason,
-            observedAt: new Date()
-          });
+          connection.disconnecting ??= (async () => {
+            // A pending message can mark a room joined; requeue only after those writes finish.
+            await Promise.allSettled(connection.pendingMessages);
+            if (reason === "socket_closed" || reason === "connect_failed") {
+              await recordUnexpectedDisconnect(bot.botAccountId);
+            }
+            await assignments.record({
+              type: "socket_disconnected",
+              botAccountId: bot.botAccountId,
+              reason,
+              observedAt: new Date()
+            });
+            if (connections.get(bot.botAccountId) === connection) {
+              connections.delete(bot.botAccountId);
+            }
+          })();
+          await connection.disconnecting;
         },
         rawMessage: async (message) => {
-          if (message.command === "001") {
-            await markConnectionHealthy(bot.botAccountId);
+          if (!connection.connected) {
+            return;
           }
-          await persistRawIrcMessage(context.db, bot.botAccountId, bot.login, message);
+          const pending = (async () => {
+            if (message.command === "001") {
+              await markConnectionHealthy(bot.botAccountId);
+            }
+            await persistRawIrcMessage(context.db, bot.botAccountId, bot.login, message);
+          })();
+          connection.pendingMessages.add(pending);
+          try {
+            await pending;
+          } finally {
+            connection.pendingMessages.delete(pending);
+          }
+          if (!connection.connected) {
+            return;
+          }
           if (isAuthenticationFailureNotice(message)) {
             consecutiveDisconnects.set(bot.botAccountId, unavailableAfterConsecutiveDisconnects);
             await setBotHealthStatus(context.db, bot.botAccountId, "irc_unavailable");
@@ -110,7 +139,10 @@ export const runIrcLoop = (context: WorkerContext) => {
         }
       }
     });
-    const connection: BotConnection = { adapter, connected: false, login: bot.login };
+    const connection: BotConnection = {
+      adapter, connected: false, login: bot.login,
+      pendingMessages: new Set(), disconnecting: null
+    };
     connections.set(bot.botAccountId, connection);
 
     try {
