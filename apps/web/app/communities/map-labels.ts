@@ -14,9 +14,11 @@ export function placeMapLabels(candidates: LabelCandidate[], view: MapView, widt
     if (placed.length >= limit) break;
     const y = node.y - Math.min(node.radius, 18 * unit) - 7 * unit;
     const halfWidth = (node.width / 2 + 5) * unit;
-    if (node.x + halfWidth < topLeft.x || node.x - halfWidth > bottomRight.x || y < topLeft.y || y - 14 * unit > bottomRight.y) continue;
     if (placed.some((label) => Math.abs(label.x - node.x) < label.halfWidth + halfWidth && Math.abs(label.y - y) < 19 * unit)) continue;
     placed.push({ id: node.id, x: node.x, y, halfWidth });
   }
-  return placed;
+  // Choose labels for the whole graph before clipping. Panning must not promote a
+  // different label when a larger channel or a competing name leaves the viewport.
+  return placed.filter((label) => label.x + label.halfWidth >= topLeft.x && label.x - label.halfWidth <= bottomRight.x &&
+    label.y >= topLeft.y && label.y - 14 * unit <= bottomRight.y);
 }

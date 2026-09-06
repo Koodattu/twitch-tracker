@@ -56,8 +56,8 @@ const MapArtwork = memo(function MapArtwork({ map, matches, selected, hovered, h
   </>;
 });
 
-function MapLabels({ map, matches, selected, hovered, view, width, height, hideUnconnected, referenceSize }: {
-  map: CommunityMap; matches: MapNode[]; selected: string | null; hovered: string | null;
+function MapLabels({ map, matches, selected, view, width, height, hideUnconnected, referenceSize }: {
+  map: CommunityMap; matches: MapNode[]; selected: string | null;
   view: MapView; width: number; height: number; hideUnconnected: boolean; referenceSize: number;
 }) {
   const [textWidths, setTextWidths] = useState(new Map<string, number>());
@@ -72,11 +72,11 @@ function MapLabels({ map, matches, selected, hovered, view, width, height, hideU
     .flatMap((edge) => [edge.source, edge.target]));
   const candidates = matches.filter((node) =>
     (!hideUnconnected || node.community != null || node.id === selected) &&
-    (selected == null || neighbors.has(node.id) || node.id === selected || node.id === hovered));
+    (selected == null || neighbors.has(node.id) || node.id === selected));
   const byId = new Map(candidates.map((node) => [node.id, node]));
   const placed = placeMapLabels(candidates.map((node) => ({ id: node.id, x: node.x, y: node.y,
     radius: nodeRadius(node), width: textWidths.get(node.id) ?? name(node).length * 7.2,
-    audience: participants(node), priority: node.id === selected ? 3 : node.id === hovered ? 2 : 1 })), view, width, height, referenceSize);
+    audience: participants(node), priority: node.id === selected ? 3 : 1 })), view, width, height, referenceSize);
   return <g ref={layer} aria-hidden="true">{placed.map(({ id, x, y }) =>
     <text key={id} data-label-channel={id} x={x} y={y} textAnchor="middle" className="community-node-label">{name(byId.get(id)!)}</text>
   )}</g>;
@@ -124,9 +124,9 @@ export function CommunityExplorer({ map }: { map: CommunityMap }) {
     (group === "all" || (node.community ?? "ungrouped") === group) &&
     `${name(node)} ${node.login ?? ""}`.toLowerCase().includes(query.trim().toLowerCase()))
     .sort((a, b) => participants(b) - participants(a) || name(a).localeCompare(name(b))), [map, group, query]);
-  const select = useCallback((node: MapNode) => {
+  const select = useCallback((node: MapNode, locate = false) => {
     setSelected(node.id); setSearchOpen(false); setHelpOpen(false); setQuery(""); setGroup("all"); setPage(0);
-    setView((current) => {
+    if (locate) setView((current) => {
       const size = Math.min(current.size, 650);
       const next = { size, x: node.x - size / 2, y: node.y - size / 2 };
       const bounds = svg.current?.getBoundingClientRect();
@@ -183,6 +183,8 @@ export function CommunityExplorer({ map }: { map: CommunityMap }) {
       }}
       onPointerDown={(event) => {
         if (event.button !== 0) return;
+        event.preventDefault();
+        svg.current?.focus({ preventScroll: true });
         pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
         if (pointers.current.size === 1) drag.current = { x: event.clientX, y: event.clientY, moved: false,
           id: (event.target as Element).closest("[data-channel]")?.getAttribute("data-channel") ?? null };
@@ -217,7 +219,7 @@ export function CommunityExplorer({ map }: { map: CommunityMap }) {
         }
       }} onPointerLeave={() => setHovered(null)} onPointerCancel={() => { pointers.current.clear(); drag.current = null; }}>
       <MapArtwork map={map} matches={matches} selected={selected} hovered={hovered} hideUnconnected={hideUnconnected} onHover={setHovered} onSelect={select} />
-      <MapLabels map={map} matches={matches} selected={selected} hovered={hovered} view={view}
+      <MapLabels map={map} matches={matches} selected={selected} view={view}
         width={mapSize.width} height={mapSize.height} hideUnconnected={hideUnconnected} referenceSize={homeView.size} />
     </svg>
 
@@ -256,7 +258,7 @@ export function CommunityExplorer({ map }: { map: CommunityMap }) {
           </select>
           <div className="community-list-heading"><span aria-live="polite">{formatCount(matches.length)} {matches.length === 1 ? "channel" : "channels"}</span><span>People</span></div>
           {matches.length === 0 ? <p className="community-no-results">No matching channels. Try another name or community. Some channels may not have enough recorded chat activity yet.</p> :
-            <ul className="community-channel-list">{matches.slice(page * 8, page * 8 + 8).map((node) => <li key={node.id}><button onClick={() => select(node)} aria-pressed={selected === node.id}>
+            <ul className="community-channel-list">{matches.slice(page * 8, page * 8 + 8).map((node) => <li key={node.id}><button onClick={() => select(node, true)} aria-pressed={selected === node.id}>
               <span className="community-color" style={{ background: color(node.community) }} /><span>{name(node)}</span><small>{formatCount(participants(node))}</small>
             </button></li>)}</ul>}
           {matches.length > 8 && <div className="community-pagination"><button disabled={page === 0} onClick={() => setPage(page - 1)}>Previous</button><span>{page + 1} / {Math.ceil(matches.length / 8)}</span>
@@ -280,7 +282,7 @@ export function CommunityExplorer({ map }: { map: CommunityMap }) {
       <div className="community-connections"><h3>Strongest connections</h3>
         <p>Shared people · share of {name(selectedNode)}’s chat</p>
         {connections.length === 0 ? <p>This channel meets the {thresholds.channelPeople}-person threshold, but shares fewer than {thresholds.sharedPeople} qualifying people with every other qualifying channel in this window. The outer ring keeps it searchable; its position does not represent distance from a community.</p> : <ul className="community-channel-list">
-          {connections.map((edge) => <li key={edge.node.id}><button onClick={() => select(edge.node)}><span className="community-color" style={{ background: color(edge.node.community) }} /><span>{name(edge.node)}<small>{formatCount(edge.shared)} shared people</small></span>
+          {connections.map((edge) => <li key={edge.node.id}><button onClick={() => select(edge.node, true)}><span className="community-color" style={{ background: color(edge.node.community) }} /><span>{name(edge.node)}<small>{formatCount(edge.shared)} shared people</small></span>
             <strong>{Math.round(edge.shared / participants(selectedNode) * 100)}%</strong></button></li>)}
         </ul>}
       </div>
