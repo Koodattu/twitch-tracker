@@ -27,9 +27,10 @@ describe.skipIf(database == null)("Community API with PostgreSQL", () => {
   const publish = async () => {
     const claim = (await claimCommunityBuild(db))!;
     await publishCommunityMap(db, claim, {
-      nodes: [{ id: "channel", chatters: 20, community: "group", x: 300, y: 400 }, { id: "admin", chatters: 10, community: "group", x: 350, y: 420 }],
+      nodes: [{ id: "channel", chatters: 20, participants: 30, community: "group", x: 300, y: 400 }, { id: "admin", chatters: 10, participants: 20, community: "group", x: 350, y: 420 }],
       edges: [{ source: "admin", target: "channel", shared: 5, score: 5 / Math.sqrt(200) }]
-    }, { firstObservedAt: null, lastObservedAt: null, messages: 60, missingSession: 0, unknownSource: 0, relayedMessages: 0, qualifyingMemberships: 30 });
+    }, { firstObservedAt: null, lastObservedAt: null, messages: 60, missingSession: 0, unknownSource: 0, relayedMessages: 0, qualifyingMemberships: 50,
+      presence: { events: 40, unresolvedEvents: 0, recoveredEvents: 0, observedChannels: 2, snapshotChannels: 0, qualifyingMemberships: 20, presenceOnlyMemberships: 20 } });
   };
 
   it("requires an admin session and same-origin request to queue a build", async () => {
@@ -51,7 +52,8 @@ describe.skipIf(database == null)("Community API with PostgreSQL", () => {
     expect(response.headers.get("cache-control")).toBe("no-store");
     const body = await response.json();
     expect(body.data.graph.nodes).toHaveLength(1);
-    expect(body.data.graph.nodes[0]).toMatchObject({ id: "channel", login: "channel", chatters: 20 });
+    expect(body.data.graph.nodes[0]).toMatchObject({ id: "channel", login: "channel", chatters: 20, participants: 30 });
+    expect(body.data.coverage.presence.presenceOnlyMemberships).toBe(20);
     expect(body.data.graph.edges).toEqual([]);
     expect(JSON.stringify(body)).not.toContain("admin");
   });

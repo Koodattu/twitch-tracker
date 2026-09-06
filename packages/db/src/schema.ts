@@ -297,6 +297,7 @@ export const chatMembershipEvents = pgTable("chat_membership_events", {
   broadcasterUserId: text("broadcaster_user_id").notNull().references(() => twitchUsers.twitchUserId),
   chatterUserId: text("chatter_user_id").references(() => twitchUsers.twitchUserId),
   chatterLogin: text("chatter_login"),
+  identityCheckedAt: timestamp("identity_checked_at", { withTimezone: true }),
   twitchStreamId: text("twitch_stream_id").references(() => streamSessions.twitchStreamId),
   eventType: chatMembershipEventTypeEnum("event_type").notNull(),
   source: text("source").default("irc_membership").notNull(),
@@ -309,6 +310,7 @@ export const chatMembershipEvents = pgTable("chat_membership_events", {
   ...timestamps
 }, (table) => ({
   chatterReceivedIdx: index("chat_membership_events_chatter_received_idx").on(table.chatterUserId, table.receivedAt),
+  unresolvedIdx: index("chat_membership_events_unresolved_idx").on(table.receivedAt).where(sql`${table.chatterUserId} is null and ${table.identityCheckedAt} is null and ${table.chatterLogin} is not null`),
   dedupeKeyIdx: uniqueIndex("chat_membership_events_dedupe_key_idx").on(table.dedupeKey)
 }));
 

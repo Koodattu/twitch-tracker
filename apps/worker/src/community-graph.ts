@@ -9,41 +9,45 @@ const louvain = louvainModule as unknown as typeof louvainModule.default;
 const forceAtlas2 = forceAtlas2Module as unknown as typeof forceAtlas2Module.default;
 
 export const maxCommunityMemberships = 500_000;
-export type CommunityGraphInput = { memberships: Array<{ chatterId: string; channelId: string }>; previous: CommunityGraph | null };
+export type CommunityGraphInput = { memberships: Array<{ chatterId: string; channelId: string; weight?: number }>; previous: CommunityGraph | null };
 const compare = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
 
 export function buildCommunityGraph({ memberships, previous }: CommunityGraphInput) {
   if (memberships.length > maxCommunityMemberships) throw new Error("Community membership budget exceeded");
-  const audiences = new Map<string, Set<string>>();
-  for (const { chatterId, channelId } of memberships) {
-    if (!audiences.has(channelId)) audiences.set(channelId, new Set());
-    audiences.get(channelId)!.add(chatterId);
+  const audiences = new Map<string, Map<string, number>>();
+  for (const { chatterId, channelId, weight = 1 } of memberships) {
+    if (weight !== 1 && weight !== 0.25) throw new Error("Invalid community membership weight");
+    if (!audiences.has(channelId)) audiences.set(channelId, new Map());
+    audiences.get(channelId)!.set(chatterId, Math.max(weight, audiences.get(channelId)!.get(chatterId) ?? 0));
   }
   const channels = [...audiences.keys()].filter((id) => audiences.get(id)!.size >= 10).sort(compare);
   if (channels.length > 10_000) throw new Error("Community channel budget exceeded");
   const visits = new Map<string, string[]>();
-  for (const id of channels) for (const chatter of audiences.get(id)!) {
+  for (const id of channels) for (const chatter of audiences.get(id)!.keys()) {
     if (!visits.has(chatter)) visits.set(chatter, []);
     visits.get(chatter)!.push(id);
   }
-  const counts = new Map<string, number>();
+  const counts = new Map<string, { shared: number; weighted: number }>();
   let pairContributions = 0;
   let maxChannelsPerChatter = 0;
-  for (const ids of visits.values()) {
+  for (const [chatter, ids] of visits) {
     maxChannelsPerChatter = Math.max(maxChannelsPerChatter, ids.length);
     pairContributions += ids.length * (ids.length - 1) / 2;
     if (pairContributions > 10_000_000) throw new Error("Community pair budget exceeded");
     for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
       const key = `${ids[i]}\0${ids[j]}`;
-      counts.set(key, (counts.get(key) ?? 0) + 1);
+      const count = counts.get(key) ?? { shared: 0, weighted: 0 };
+      count.shared++;
+      count.weighted += Math.min(audiences.get(ids[i]!)!.get(chatter)!, audiences.get(ids[j]!)!.get(chatter)!);
+      counts.set(key, count);
       if (counts.size > 1_000_000) throw new Error("Community edge budget exceeded");
     }
   }
   const candidates: CommunityEdge[] = [];
-  for (const [key, shared] of counts) {
+  for (const [key, { shared, weighted }] of counts) {
     if (shared < 5) continue;
     const [source, target] = key.split("\0") as [string, string];
-    candidates.push({ source, target, shared, score: shared / Math.sqrt(audiences.get(source)!.size * audiences.get(target)!.size) });
+    candidates.push({ source, target, shared, score: weighted / Math.sqrt(audiences.get(source)!.size * audiences.get(target)!.size) });
   }
   candidates.sort((a, b) => b.score - a.score || b.shared - a.shared || compare(a.source, b.source) || compare(a.target, b.target));
   const ranks = new Map<string, number>();
@@ -111,7 +115,8 @@ export function buildCommunityGraph({ memberships, previous }: CommunityGraphInp
     const angle = (isolateIndex.get(id) ?? 0) * 2 * Math.PI / Math.max(isolated.length, 1);
     const x = point == null ? 500 + Math.cos(angle) * 465 : 500 + (point.x - (minX + maxX) / 2) / span * 800;
     const y = point == null ? 500 + Math.sin(angle) * 465 : 500 + (point.y - (minY + maxY) / 2) / span * 800;
-    return { id, chatters: audiences.get(id)!.size, community: communityIds.get(id) ?? null,
+    return { id, chatters: [...audiences.get(id)!.values()].filter((weight) => weight === 1).length,
+      participants: audiences.get(id)!.size, community: communityIds.get(id) ?? null,
       x: Math.round(x * 1000) / 1000, y: Math.round(y * 1000) / 1000 };
   });
   const result = { nodes, edges };

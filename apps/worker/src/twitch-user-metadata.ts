@@ -2,7 +2,7 @@ import { twitchUsers, type DbClient } from "@twitch-tracker/db";
 import type { HelixUser } from "@twitch-tracker/twitch";
 
 export const upsertTwitchUserMetadata = async (
-  db: DbClient,
+  db: Pick<DbClient, "insert">,
   user: HelixUser,
   observedAt: Date
 ) => {

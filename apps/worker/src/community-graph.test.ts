@@ -5,6 +5,17 @@ import { runGraphThread } from "./loops/community-map.js";
 const audience = (channelId: string, start: number, count: number) => Array.from({ length: count }, (_, index) => ({ channelId, chatterId: `user-${index + start}` }));
 
 describe("Community graph", () => {
+  it("includes lurkers with weaker connections and counts mixed evidence once", () => {
+    const lurkers = [...audience("a", 0, 10), ...audience("b", 0, 10)].map((row) => ({ ...row, weight: 0.25 }));
+    const presence = buildCommunityGraph({ memberships: lurkers, previous: null }).graph;
+    expect(presence.nodes.every((node) => node.participants === 10 && node.chatters === 0)).toBe(true);
+    expect(presence.edges).toEqual([{ source: "a", target: "b", shared: 10, score: 0.25 }]);
+    const mixed = buildCommunityGraph({ memberships: [...lurkers, ...audience("a", 0, 5), ...audience("b", 0, 5)], previous: null }).graph;
+    expect(mixed.nodes.every((node) => node.participants === 10 && node.chatters === 5)).toBe(true);
+    expect(mixed.edges[0]).toMatchObject({ shared: 10, score: 0.625 });
+    expect(buildCommunityGraph({ memberships: [...lurkers, ...audience("a", 0, 10)], previous: null }).graph.edges[0]!.score).toBe(0.25);
+    expect(JSON.stringify(mixed)).not.toContain("user-");
+  });
   it("counts distinct people, normalizes overlap, and retains isolated qualifying channels", () => {
     const memberships = [...audience("a", 0, 10), ...audience("b", 5, 20), ...audience("c", 100, 10), ...audience("small", 0, 9)];
     const { graph } = buildCommunityGraph({ memberships: [...memberships, ...memberships], previous: null });

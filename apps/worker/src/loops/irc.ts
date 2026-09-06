@@ -15,6 +15,7 @@ import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { resolveBotCredentialsPool, type ResolvedBotAccountCredentials } from "../bot-auth.js";
 import type { WorkerContext } from "../worker.js";
 import { startIntervalLoop } from "./common.js";
+import { findMembershipIdentity } from "./membership-identity.js";
 
 const staleJoiningTimeoutMs = 2 * 60 * 1000;
 const unavailableAfterConsecutiveDisconnects = 3;
@@ -385,7 +386,7 @@ const persistChatMessage = async (
   });
 };
 
-const persistMembershipEvent = async (
+export const persistMembershipEvent = async (
   db: DbClient,
   botAccountId: string,
   message: ParsedIrcMessage,
@@ -399,25 +400,37 @@ const persistMembershipEvent = async (
 
   const currentStream = await findCurrentStream(db, broadcaster.twitchUserId);
   const eventAt = new Date();
-  await db.insert(chatMembershipEvents).values({
-    broadcasterUserId: broadcaster.twitchUserId,
-    chatterLogin: getUserLogin(message),
-    twitchStreamId: currentStream?.twitchStreamId ?? null,
-    eventType: message.command === "JOIN" ? "join" : "part",
-    source: "irc_membership",
-    confidence: 70,
-    dedupeKey: membershipDedupeKey({
+  const chatterLogin = getUserLogin(message);
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`select id from community_map_state where id = 'current' for share`);
+    const restricted = await tx.execute(sql`
+      select 1 from subject_privacy_states p join twitch_users u on u.twitch_user_id = p.twitch_user_id
+      where u.login = ${chatterLogin} and (p.tracking_opted_out or p.data_deleted_at is not null) limit 1
+    `);
+    if (restricted.rows.length > 0) return;
+    const chatterUserId = await findMembershipIdentity(tx, chatterLogin, eventAt);
+    await tx.insert(chatMembershipEvents).values({
       broadcasterUserId: broadcaster.twitchUserId,
+      chatterLogin,
+      chatterUserId,
+      identityCheckedAt: chatterUserId == null ? null : eventAt,
       twitchStreamId: currentStream?.twitchStreamId ?? null,
       eventType: message.command === "JOIN" ? "join" : "part",
-      chatterLogin: getUserLogin(message),
-      eventAt
-    }),
-    eventAt,
-    receivedAt: eventAt,
-    rawIrcMessageId
-  }).onConflictDoNothing({
-    target: chatMembershipEvents.dedupeKey
+      source: "irc_membership",
+      confidence: 70,
+      dedupeKey: membershipDedupeKey({
+        broadcasterUserId: broadcaster.twitchUserId,
+        twitchStreamId: currentStream?.twitchStreamId ?? null,
+        eventType: message.command === "JOIN" ? "join" : "part",
+        chatterLogin: getUserLogin(message),
+        eventAt
+      }),
+      eventAt,
+      receivedAt: eventAt,
+      rawIrcMessageId
+    }).onConflictDoNothing({
+      target: chatMembershipEvents.dedupeKey
+    });
   });
 
   await touchAssignmentActivity(db, botAccountId, broadcaster.twitchUserId, {

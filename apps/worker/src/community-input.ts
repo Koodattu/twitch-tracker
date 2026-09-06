@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import type { CommunityBuildClaim, DbClient } from "@twitch-tracker/db";
 import type { CommunityCoverage } from "@twitch-tracker/shared";
 import { maxCommunityMemberships } from "./community-graph.js";
+import { readCommunityPresence } from "./community-presence.js";
 
 export async function readCommunityInput(db: DbClient, claim: CommunityBuildClaim) {
   return db.transaction(async (tx) => {
@@ -45,14 +46,24 @@ export async function readCommunityInput(db: DbClient, claim: CommunityBuildClai
         count(*) filter (where finnish and permitted and relayed)::int as "relayedMessages"
       from observed
     `);
+    const presence = await readCommunityPresence(tx, claim);
+    const combined = new Map(members.rows.map((row) => [`${row.chatterId}\0${row.channelId}`, { ...row, weight: 1 }]));
+    for (const row of presence.members) {
+      const key = `${row.chatterId}\0${row.channelId}`;
+      if (!combined.has(key)) {
+        combined.set(key, { ...row, weight: 0.25 });
+        presence.coverage.presenceOnlyMemberships++;
+      }
+    }
+    if (combined.size > maxCommunityMemberships) throw new Error("Community membership budget exceeded");
     let first: Date | null = null, last: Date | null = null;
-    for (const row of members.rows) {
+    for (const row of combined.values()) {
       const rowFirst = new Date(row.first), rowLast = new Date(row.last);
       if (first == null || rowFirst < first) first = rowFirst;
       if (last == null || rowLast > last) last = rowLast;
     }
-    const coverage: CommunityCoverage = { ...diagnostics.rows[0]!, qualifyingMemberships: members.rows.length,
+    const coverage: CommunityCoverage = { ...diagnostics.rows[0]!, qualifyingMemberships: combined.size, presence: presence.coverage,
       firstObservedAt: first?.toISOString() ?? null, lastObservedAt: last?.toISOString() ?? null };
-    return { memberships: members.rows.map(({ chatterId, channelId }) => ({ chatterId, channelId })), coverage };
+    return { memberships: [...combined.values()].map(({ chatterId, channelId, weight }) => ({ chatterId, channelId, weight })), coverage };
   }, { isolationLevel: "repeatable read", accessMode: "read only" });
 }

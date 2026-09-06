@@ -99,6 +99,13 @@
       "when": 1788710000000,
       "tag": "0013_community_maps",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1788726000000,
+      "tag": "0014_membership_identity",
+      "breakpoints": true
     }
   ]
 }

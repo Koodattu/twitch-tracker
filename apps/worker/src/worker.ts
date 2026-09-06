@@ -10,6 +10,7 @@ import { runIrcLoop } from "./loops/irc.js";
 import { runMaintenanceLoop } from "./loops/maintenance.js";
 import { runUserHydrationLoop } from "./loops/user-hydration.js";
 import { runCommunityMapLoop } from "./loops/community-map.js";
+import { runMembershipIdentityLoop } from "./loops/membership-identity.js";
 
 export type WorkerContext = {
   config: AppConfig;
@@ -44,6 +45,7 @@ export const createWorker = ({ config, db }: CreateWorkerInput) => {
         runUserHydrationLoop(context),
         runAssignmentLoop(context),
         runIrcLoop(context),
+        runMembershipIdentityLoop(context),
         runChattersReconciliationLoop(context),
         runEventSubProcessingLoop(context),
         runEventSubReconciliationLoop(context),

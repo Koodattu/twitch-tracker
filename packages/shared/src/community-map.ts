@@ -1,6 +1,8 @@
 export type CommunityNode = {
   id: string;
   chatters: number;
+  /** Distinct qualifying people, including repeated chat presence. Absent in v1 snapshots. */
+  participants?: number;
   community: string | null;
   x: number;
   y: number;
@@ -15,6 +17,15 @@ export type CommunityCoverage = {
   unknownSource: number;
   relayedMessages: number;
   qualifyingMemberships: number;
+  presence?: {
+    events: number;
+    unresolvedEvents: number;
+    recoveredEvents: number;
+    observedChannels: number;
+    snapshotChannels: number;
+    qualifyingMemberships: number;
+    presenceOnlyMemberships: number;
+  };
 };
 export type CommunityMap = {
   recipe: string;

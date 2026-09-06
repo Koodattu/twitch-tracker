@@ -8,6 +8,7 @@ import { Avatar, EmptyState } from "../ui";
 import { transformCamera, type MapView } from "./map-camera";
 
 type MapNode = CommunityMap["graph"]["nodes"][number];
+const participants = (node: MapNode) => node.participants ?? node.chatters;
 const name = (node: MapNode) => node.displayName ?? node.login ?? "Unnamed channel";
 function color(id: string | null) {
   if (id == null) return "#a7a1b4";
@@ -38,9 +39,9 @@ const MapArtwork = memo(function MapArtwork({ map, matches, selected, hovered, o
     })}</g>
     {map.graph.nodes.map((node) => {
       const highlighted = node.id === selected || node.id === hovered;
-      const radius = Math.min(17, 3 + Math.sqrt(node.chatters) * 0.6);
+      const radius = Math.min(17, 3 + Math.sqrt(participants(node)) * 0.6);
       return <g key={node.id} data-channel={node.id} className="community-node" role="button" tabIndex={node.id === selected ? 0 : -1}
-        aria-label={`${name(node)}, ${formatCount(node.chatters)} active chatters`} aria-pressed={node.id === selected}
+        aria-label={`${name(node)}, ${formatCount(participants(node))} people observed in chat`} aria-pressed={node.id === selected}
         onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect(node); } }}
         onMouseEnter={() => onHover(node.id)} onMouseLeave={() => onHover(null)}
         onFocus={() => onHover(node.id)} onBlur={() => onHover(null)} opacity={dimmed(node.id) ? 0.16 : 1}>
@@ -60,7 +61,7 @@ function MapLabels({ map, matches, selected, hovered, unit, limit }: {
   const placed: Array<{ node: MapNode; x: number; y: number; halfWidth: number }> = [];
   for (const node of candidates) {
     if (placed.length >= limit || placed.some((item) => item.node.id === node.id)) continue;
-    const y = node.y - Math.min(17, 3 + Math.sqrt(node.chatters) * 0.6) - 7;
+    const y = node.y - Math.min(17, 3 + Math.sqrt(participants(node)) * 0.6) - 7;
     const halfWidth = (name(node).length * 3.8 + 5) * unit;
     if (node.id !== selected && node.id !== hovered && placed.some((item) => Math.abs(item.x - node.x) < item.halfWidth + halfWidth && Math.abs(item.y - y) < 19 * unit)) continue;
     placed.push({ node, x: node.x, y, halfWidth });
@@ -91,7 +92,7 @@ export function CommunityExplorer({ map }: { map: CommunityMap }) {
       if (!result.has(node.community)) result.set(node.community, []);
       result.get(node.community)!.push(node);
     }
-    return [...result].map(([id, nodes]) => ({ id, nodes: nodes.sort((a, b) => b.chatters - a.chatters || name(a).localeCompare(name(b))) }))
+    return [...result].map(([id, nodes]) => ({ id, nodes: nodes.sort((a, b) => participants(b) - participants(a) || name(a).localeCompare(name(b))) }))
       .sort((a, b) => b.nodes.length - a.nodes.length || a.id.localeCompare(b.id));
   }, [map]);
   const labels = new Map(communities.map((item) => [item.id, item.nodes.slice(0, 2).map(name).join(" / ")]));
@@ -102,7 +103,7 @@ export function CommunityExplorer({ map }: { map: CommunityMap }) {
   const matches = useMemo(() => map.graph.nodes.filter((node) =>
     (group === "all" || (node.community ?? "ungrouped") === group) &&
     `${name(node)} ${node.login ?? ""}`.toLowerCase().includes(query.trim().toLowerCase()))
-    .sort((a, b) => b.chatters - a.chatters || name(a).localeCompare(name(b))), [map, group, query]);
+    .sort((a, b) => participants(b) - participants(a) || name(a).localeCompare(name(b))), [map, group, query]);
   const select = useCallback((node: MapNode) => {
     setSelected(node.id); setSearchOpen(false); setHelpOpen(false); setQuery(""); setGroup("all"); setPage(0);
     setView((current) => {
@@ -226,10 +227,10 @@ export function CommunityExplorer({ map }: { map: CommunityMap }) {
             {communities.map((item) => <option key={item.id} value={item.id}>{labels.get(item.id)} ({item.nodes.length})</option>)}
             <option value="ungrouped">Ungrouped channels</option>
           </select>
-          <div className="community-list-heading"><span aria-live="polite">{formatCount(matches.length)} {matches.length === 1 ? "channel" : "channels"}</span><span>Active chatters</span></div>
+          <div className="community-list-heading"><span aria-live="polite">{formatCount(matches.length)} {matches.length === 1 ? "channel" : "channels"}</span><span>People</span></div>
           {matches.length === 0 ? <p className="community-no-results">No matching channels. Try another name or community. Some channels may not have enough recorded chat activity yet.</p> :
             <ul className="community-channel-list">{matches.slice(page * 8, page * 8 + 8).map((node) => <li key={node.id}><button onClick={() => select(node)} aria-pressed={selected === node.id}>
-              <span className="community-color" style={{ background: color(node.community) }} /><span>{name(node)}</span><small>{formatCount(node.chatters)}</small>
+              <span className="community-color" style={{ background: color(node.community) }} /><span>{name(node)}</span><small>{formatCount(participants(node))}</small>
             </button></li>)}</ul>}
           {matches.length > 8 && <div className="community-pagination"><button disabled={page === 0} onClick={() => setPage(page - 1)}>Previous</button><span>{page + 1} / {Math.ceil(matches.length / 8)}</span>
             <button disabled={(page + 1) * 8 >= matches.length} onClick={() => setPage(page + 1)}>Next</button></div>}
@@ -239,14 +240,14 @@ export function CommunityExplorer({ map }: { map: CommunityMap }) {
     {selectedNode != null && <section className="community-details community-glass" aria-label="Selected channel">
       <div className="community-panel-heading"><span className="eyebrow">Channel connections</span><button className="community-icon-button" aria-label="Close channel details" onClick={() => { setSelected(null); svg.current?.focus(); }}>×</button></div>
       <div className="community-selected"><Avatar name={name(selectedNode)} src={selectedNode.profileImageUrl} size="small" /><h2>{name(selectedNode)}</h2></div>
-      <div className="community-selected-stats"><strong>{formatCount(selectedNode.chatters)}<span>active chatters</span></strong><strong>{formatCount(connections.length)}<span>connections</span></strong></div>
+      <div className="community-selected-stats"><strong>{formatCount(participants(selectedNode))}<span>people observed in chat</span></strong><strong>{formatCount(connections.length)}<span>connections</span></strong></div>
       <p className="community-group-name"><span className="community-color" style={{ background: color(selectedNode.community) }} />{selectedNode.community == null ? "Ungrouped channel" : labels.get(selectedNode.community)}</p>
       {selectedNode.login != null && <Link className="community-profile-link" href={`/channels/${encodeURIComponent(selectedNode.login)}`}>View channel profile <span aria-hidden="true">↗</span></Link>}
       <div className="community-connections"><h3>Strongest connections</h3>
-        <p>Shared chatters · share of {name(selectedNode)}’s chat</p>
-        {connections.length === 0 ? <p>No connections meet the shared-chatter threshold.</p> : <ul className="community-channel-list">
-          {connections.map((edge) => <li key={edge.node.id}><button onClick={() => select(edge.node)}><span className="community-color" style={{ background: color(edge.node.community) }} /><span>{name(edge.node)}<small>{formatCount(edge.shared)} shared chatters</small></span>
-            <strong>{Math.round(edge.shared / selectedNode.chatters * 100)}%</strong></button></li>)}
+        <p>Shared people · share of {name(selectedNode)}’s chat</p>
+        {connections.length === 0 ? <p>No connections meet the shared-person threshold.</p> : <ul className="community-channel-list">
+          {connections.map((edge) => <li key={edge.node.id}><button onClick={() => select(edge.node)}><span className="community-color" style={{ background: color(edge.node.community) }} /><span>{name(edge.node)}<small>{formatCount(edge.shared)} shared people</small></span>
+            <strong>{Math.round(edge.shared / participants(selectedNode) * 100)}%</strong></button></li>)}
         </ul>}
       </div>
     </section>}
@@ -260,9 +261,15 @@ export function CommunityExplorer({ map }: { map: CommunityMap }) {
     </div>
     {helpOpen && <section id="community-explanation" className="community-explanation community-glass" aria-labelledby="community-help-title">
       <div className="community-panel-heading"><h2 id="community-help-title">Reading the map</h2><button className="community-icon-button" aria-label="Close explanation" onClick={() => setHelpOpen(false)}>×</button></div>
-      <p><strong>Each dot is a channel.</strong> Larger dots have more active chatters. Lines connect channels with shared chatters, and colors show detected communities.</p>
+      <p><strong>Each dot is a channel.</strong> Larger dots have more people observed in chat. Lines connect channels with shared people, and colors show detected communities.</p>
       <p>These are recorded chat communities, not all viewers or followers. Position is not geographic, and connections do not establish friendship or affiliation.</p>
-      <p>People qualify after 3 messages in a channel. Channels need 10 qualifying chatters; connections need 5 shared chatters. Only the strongest connections are shown.</p>
+      <p>People qualify after 3 messages in a channel{map.coverage.presence != null ? ", or presence on at least two UTC dates at least six hours apart" : ""}. Channels need 10 qualifying people; connections need 5 shared people. Only the strongest connections are shown.</p>
+      {map.coverage.presence != null && <>
+        <p>Repeated presence includes people who do not write messages. It contributes one-quarter of the connection weight of messages. People seen through both sources count once.</p>
+        <p>Chat presence does not prove someone watched the video. JOIN/PART coverage is incomplete, especially in rooms above 1,000 users. Missing observations do not mean someone was absent. Accounts observed across more than 50 channels contribute through messages only.</p>
+        <p>Presence was recorded in {formatCount(map.coverage.presence.observedChannels)} channels; {formatCount(map.coverage.presence.presenceOnlyMemberships)} qualifying person–channel connections came from presence alone. Individual identities are never included in this map.</p>
+        {map.coverage.presence.unresolvedEvents > 0 && <p>Some older presence observations could not be linked reliably to an account and were excluded.</p>}
+      </>}
       <dl><dt>Reporting window</dt><dd>{map.windowStart.slice(0, 10)} – {reportingEnd} (UTC)</dd><dt>Last built</dt><dd>{formatDateTime(map.generatedAt)} · nightly at 03:00 UTC</dd>
         <dt>Qualifying observations</dt><dd>{formatDateTime(map.coverage.firstObservedAt)} – {formatDateTime(map.coverage.lastObservedAt)}</dd></dl>
       {map.coverage.unknownSource > 0 && <p>Some historical messages could not be verified as original channel messages and were excluded.</p>}
