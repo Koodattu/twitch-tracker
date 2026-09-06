@@ -14,6 +14,7 @@ export const startIntervalLoop = (input: {
   intervalMs: number;
   context: LoopContext;
   run: () => Promise<Record<string, unknown>>;
+  recordSuccess?: (summary: Record<string, unknown>) => boolean;
 }) => {
   let activeRun: Promise<void> | null = null;
 
@@ -27,7 +28,7 @@ export const startIntervalLoop = (input: {
       const summary = await input.run();
       await heartbeat(input.context.db, input.context.workerName, input.name, "ok", summary);
       return summary;
-    }).catch(async (error: unknown) => {
+    }, input.recordSuccess).catch(async (error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);
       await heartbeat(input.context.db, input.context.workerName, input.name, "error", { message });
       console.error(JSON.stringify({ level: "error", loop: input.name, message }));
@@ -115,7 +116,8 @@ export const heartbeat = async (
 export const runWithIngestionRecord = async (
   db: DbClient,
   jobType: string,
-  run: () => Promise<Record<string, unknown>>
+  run: () => Promise<Record<string, unknown>>,
+  recordSuccess?: (summary: Record<string, unknown>) => boolean
 ) => {
   const startedAt = new Date();
 
@@ -123,7 +125,7 @@ export const runWithIngestionRecord = async (
     const summary = await run();
     const finishedAt = new Date();
     const sample = successfulRunSamples.get(jobType);
-    if (sample != null && finishedAt.getTime() - sample.lastRecordedAt < successfulRunSampleIntervalMs) {
+    if (!recordSuccess?.(summary) && sample != null && finishedAt.getTime() - sample.lastRecordedAt < successfulRunSampleIntervalMs) {
       sample.unrecordedRuns += 1;
       return summary;
     }

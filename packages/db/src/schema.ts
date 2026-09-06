@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import type { CommunityGraph, CommunityCoverage, CommunityBuildStatus } from "@twitch-tracker/shared";
 import { index, integer, jsonb, pgEnum, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid, boolean } from "drizzle-orm/pg-core";
 
 export const appModeEnum = pgEnum("app_mode", ["local", "private_mvp", "production"]);
@@ -544,6 +545,35 @@ export const jobLocks = pgTable("job_locks", {
   lockedAt: timestamp("locked_at", { withTimezone: true }).defaultNow().notNull(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   ...timestamps
+});
+
+export const communityMapSnapshots = pgTable("community_map_snapshots", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  recipe: text("recipe").notNull(),
+  windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+  windowEnd: timestamp("window_end", { withTimezone: true }).notNull(),
+  generatedAt: timestamp("generated_at", { withTimezone: true }).defaultNow().notNull(),
+  privacyVersion: integer("privacy_version").notNull(),
+  valid: boolean("valid").default(true).notNull(),
+  graph: jsonb("graph").$type<CommunityGraph>(),
+  coverage: jsonb("coverage").$type<CommunityCoverage>()
+}, (table) => ({
+  windowIdx: uniqueIndex("community_map_snapshots_window_idx").on(table.recipe, table.windowEnd)
+}));
+
+export const communityMapState = pgTable("community_map_state", {
+  id: text("id").primaryKey(),
+  requestVersion: integer("request_version").default(0).notNull(),
+  completedVersion: integer("completed_version").default(0).notNull(),
+  privacyVersion: integer("privacy_version").default(0).notNull(),
+  status: text("status").$type<CommunityBuildStatus["status"]>().default("idle").notNull(),
+  snapshotId: uuid("snapshot_id").references(() => communityMapSnapshots.id),
+  requestedAt: timestamp("requested_at", { withTimezone: true }),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+  lastSuccessAt: timestamp("last_success_at", { withTimezone: true }),
+  retryAfter: timestamp("retry_after", { withTimezone: true }),
+  error: text("error")
 });
 
 export const rateLimitObservations = pgTable("rate_limit_observations", {

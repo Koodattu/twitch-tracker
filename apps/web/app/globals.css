@@ -27,6 +27,51 @@
   --shadow-panel-hover: 0 0 0 1px rgba(255, 255, 255, 0.13);
 }
 
+.community-period { color: var(--muted); margin: 0 0 18px; font-size: 13px; }
+.community-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; align-items: start; }
+.community-map { position: sticky; top: 20px; height: min(78vh, 900px); min-height: 540px; overflow: hidden; border: 1px solid var(--line-strong); border-radius: 16px; background: radial-gradient(ellipse at 50% 45%, #19122b 0%, #0b0a12 68%); }
+.community-map svg { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+.community-map svg:active { cursor: grabbing; }
+.community-map-caption { position: absolute; top: 22px; left: 24px; pointer-events: none; display: grid; gap: 5px; }
+.community-map-caption span { color: var(--muted); font-size: 12px; }
+.community-map-controls { position: absolute; bottom: 45px; right: 16px; display: flex; gap: 6px; }
+.community-map-controls .button { min-height: 38px; padding: 8px 13px; background: var(--panel); }
+.community-legend { position: absolute; bottom: 0; left: 20px; right: 20px; color: var(--muted); font-size: 11px; pointer-events: none; }
+.community-node { cursor: pointer; outline: none; }
+.community-node:focus-visible circle { stroke: white; stroke-width: 3; }
+.community-node-label { fill: var(--foreground); paint-order: stroke; stroke: #0b0a12; stroke-width: 3px; font-weight: 650; pointer-events: none; }
+.community-sidebar { display: grid; gap: 18px; }
+.community-sidebar .panel { padding: 22px; margin: 0; }
+.community-sidebar h2 { font-size: 17px; margin: 0 0 14px; }
+.community-sidebar h3 { font-size: 14px; margin-top: 24px; }
+.community-sidebar p { font-size: 13px; line-height: 1.65; }
+.community-input { display: block; width: 100%; margin: 8px 0 16px; min-width: 0; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 8px; color: var(--foreground); background: var(--background-soft); font: inherit; font-size: 13px; }
+.community-sidebar label { font-size: 12px; color: var(--muted); }
+.community-muted { color: var(--muted); }
+.community-channel-list { list-style: none; padding: 0; margin: 0; }
+.community-channel-list li + li { border-top: 1px solid var(--line); }
+.community-channel-list button { width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 0; text-align: left; border: 0; background: transparent; color: var(--foreground); cursor: pointer; font-size: 13px; }
+.community-channel-list button:hover, .community-channel-list button[aria-pressed="true"] { color: var(--accent-bright); }
+.community-channel-list button > span:not(.community-color) { flex: 1; overflow-wrap: anywhere; }
+.community-channel-list small { display: block; font-size: 11px; color: var(--muted); }
+.community-color { flex: 0 0 7px; height: 7px; border-radius: 50%; }
+.community-pagination { display: flex; justify-content: space-between; margin-top: 14px; gap: 8px; }
+.community-pagination .button { padding: 8px 12px; font-size: 12px; }
+.community-selected { display: flex; gap: 12px; align-items: center; }
+.community-selected h2 { margin: 0; }
+.community-explanation { margin-top: 24px; }
+.community-explanation p { max-width: 1000px; line-height: 1.75; font-size: 13px; }
+@media (max-width: 1050px) {
+  .community-layout { grid-template-columns: minmax(0, 1fr) 280px; gap: 14px; }
+}
+@media (max-width: 760px) {
+  .community-layout { grid-template-columns: 1fr; }
+  .community-map { position: relative; top: auto; min-height: 400px; height: 65vh; }
+  .community-map-caption { left: 16px; top: 16px; }
+  .community-map-caption span { max-width: 200px; }
+  .community-legend { font-size: 10px; left: 12px; right: 12px; }
+}
+
 * {
   box-sizing: border-box;
 }

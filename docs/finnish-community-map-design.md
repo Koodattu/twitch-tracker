@@ -1,6 +1,6 @@
 # Finnish community map
 
-Status: proposed design, 2026-09-06. The map is not implemented. Its prerequisite IRC source mapping and historical-source recovery migration are implemented with regression tests. Rollup boundaries and a one-time historical aggregate repair are also covered by PostgreSQL tests.
+Status: implemented, 2026-09-06. The worker, saved snapshots, public explorer, and admin build control are implemented with graph and PostgreSQL integration tests. Read-only production aggregate checks and isolated desktop/mobile checks are recorded in [the community map runbook](runbooks/community-map.md). The sections below preserve the design rationale; the runbook describes the shipped behavior and measured limits.
 
 ## Product
 
@@ -110,4 +110,4 @@ Extend the existing privacy completion transaction to invalidate affected map hi
 3. **Build the API and page.** Add the navigation item, saved graph endpoint, search, selection panel, community filter, zoom/reset, and accessible list. Verify that API JSON contains no chatter identity or message text, and hidden/deleted subjects cannot leak through metadata or cached snapshots.
 4. **Validate with a representative Finnish graph.** Confirm selected-channel counts against independent SQL calculations; exercise desktop/mobile keyboard and pointer controls; measure graph payload size, render responsiveness, nightly runtime, database impact, and uninterrupted ingestion. Run the affected tests, types, lint, and build before describing implementation as complete.
 
-The first release is complete when a scheduled job produces a reproducible, explainable Finnish channel map from real recorded activity, the page serves it without request-time aggregation, and failure/privacy behavior is verified. This document proposes that work; it does not claim the feature is implemented or benchmarked.
+The scheduled job produces a reproducible Finnish channel map from recorded activity, and the page serves saved results without request-time aggregation. Failure and privacy behavior are covered by integration tests. Production validation used read-only channel aggregates; publishing the first production snapshot is left to the worker after normal deployment.

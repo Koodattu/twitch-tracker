@@ -9,6 +9,7 @@ import { runEventSubProcessingLoop, runEventSubReconciliationLoop } from "./loop
 import { runIrcLoop } from "./loops/irc.js";
 import { runMaintenanceLoop } from "./loops/maintenance.js";
 import { runUserHydrationLoop } from "./loops/user-hydration.js";
+import { runCommunityMapLoop } from "./loops/community-map.js";
 
 export type WorkerContext = {
   config: AppConfig;
@@ -47,6 +48,7 @@ export const createWorker = ({ config, db }: CreateWorkerInput) => {
         runEventSubProcessingLoop(context),
         runEventSubReconciliationLoop(context),
         runAggregationLoop(context),
+        runCommunityMapLoop(context),
         runMaintenanceLoop(context)
       ];
     },

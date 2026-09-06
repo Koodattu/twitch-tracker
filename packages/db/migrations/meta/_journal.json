@@ -92,6 +92,13 @@
       "when": 1788699600000,
       "tag": "0012_recover_shared_chat_sources",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1788710000000,
+      "tag": "0013_community_maps",
+      "breakpoints": true
     }
   ]
 }

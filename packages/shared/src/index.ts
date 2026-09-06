@@ -1,5 +1,8 @@
 export type * from "./stream-detail.js";
 export type * from "./channel-detail.js";
+export type * from "./community-map.js";
+
+export const communityMapRecipe = "finnish-chat-v1";
 
 export const appModes = ["local", "private_mvp", "production"] as const;
 

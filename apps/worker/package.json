@@ -13,8 +13,12 @@
   "dependencies": {
     "@twitch-tracker/config": "workspace:*",
     "@twitch-tracker/db": "workspace:*",
+    "@twitch-tracker/shared": "workspace:*",
     "@twitch-tracker/twitch": "workspace:*",
     "drizzle-orm": "0.45.2",
+    "graphology": "0.26.0",
+    "graphology-communities-louvain": "2.0.2",
+    "graphology-layout-forceatlas2": "0.10.1",
     "zod": "4.4.3"
   },
   "devDependencies": {

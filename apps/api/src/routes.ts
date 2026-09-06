@@ -18,6 +18,8 @@ import {
   eventsubSubscriptions,
   getPermanentAssignmentErrorScope,
   ingestionRuns,
+  invalidateCommunityMaps,
+  requestCommunityBuild,
   isPermanentAssignmentError,
   oauthAccounts,
   rateLimitObservations,
@@ -44,6 +46,7 @@ import { z } from "zod";
 import { createVodThumbnailLookup } from "./vod-thumbnails.js";
 import { getStreamDetail, getStreamOverview, streamDetailQuerySchema } from "./stream-detail.js";
 import { channelDetailQuerySchema, getChannelDetail, getChannelOverview } from "./channel-detail.js";
+import { getCommunityMap, getCommunityBuildStatus } from "./community-map.js";
 
 type ApiBindings = {
   Variables: {
@@ -139,6 +142,25 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
         }
       }, 503);
     }
+  });
+
+  app.get("/api/communities", async (c) => {
+    c.header("Cache-Control", "no-store");
+    return c.json({ data: await getCommunityMap(c.get("db")) });
+  });
+
+  app.get("/api/internal/communities", requireAdmin, async (c) => {
+    c.header("Cache-Control", "no-store");
+    return c.json({ data: await getCommunityBuildStatus(c.get("db")) });
+  });
+
+  app.post("/api/internal/communities/build", requireAdmin, async (c) => {
+    if (c.req.header("origin") !== new URL(c.get("config").PUBLIC_WEB_URL).origin) {
+      return c.json({ error: { code: "forbidden", message: "Build the map from the administrator page." } }, 403);
+    }
+    await requestCommunityBuild(c.get("db"));
+    c.header("Cache-Control", "no-store");
+    return c.json({ data: await getCommunityBuildStatus(c.get("db")) }, 202);
   });
 
   app.get("/api/streams/live", async (c) => {
@@ -2057,39 +2079,43 @@ const completePrivacyRequest = async (
   requestId: string,
   actorAppUserId: string | null
 ): Promise<PrivacyRequestRow | null> => {
-  const [request] = await db.select().from(privacyRequests).where(eq(privacyRequests.id, requestId)).limit(1);
-  if (request == null) {
-    return null;
-  }
+  return db.transaction(async (tx) => {
+    const db = tx as unknown as DbClient;
+    const [request] = await db.select().from(privacyRequests).where(eq(privacyRequests.id, requestId)).limit(1).for("update");
+    if (request == null) {
+      return null;
+    }
 
-  if (request.status === "completed") {
-    return request;
-  }
+    if (request.status === "completed") {
+      return request;
+    }
 
-  const now = new Date();
-  await applyPrivacyRequestEffects(db, request, now);
+    const now = new Date();
+    await invalidateCommunityMaps(db);
+    await applyPrivacyRequestEffects(db, request, now);
 
-  const [updated] = await db
-    .update(privacyRequests)
-    .set({
-      status: "completed",
-      reviewedByAppUserId: actorAppUserId,
-      resolvedAt: now,
-      latestError: null,
-      updatedAt: now
-    })
-    .where(eq(privacyRequests.id, request.id))
-    .returning();
+    const [updated] = await db
+      .update(privacyRequests)
+      .set({
+        status: "completed",
+        reviewedByAppUserId: actorAppUserId,
+        resolvedAt: now,
+        latestError: null,
+        updatedAt: now
+      })
+      .where(eq(privacyRequests.id, request.id))
+      .returning();
 
-  await db.insert(privacyRequestEvents).values({
-    privacyRequestId: request.id,
-    eventType: "completed",
-    actorAppUserId,
-    details: {},
-    occurredAt: now
+    await db.insert(privacyRequestEvents).values({
+      privacyRequestId: request.id,
+      eventType: "completed",
+      actorAppUserId,
+      details: {},
+      occurredAt: now
+    });
+
+    return updated ?? request;
   });
-
-  return updated ?? request;
 };
 
 const applyPrivacyRequestEffects = async (db: DbClient, request: PrivacyRequestRow, now: Date) => {

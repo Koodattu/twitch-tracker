@@ -1,15 +1,19 @@
-import type { InternalIngestionStatus } from "@twitch-tracker/shared";
+import type { CommunityBuildStatus, InternalIngestionStatus } from "@twitch-tracker/shared";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { getApiData, getAuthenticatedApiInit } from "../../api-client";
 import { formatCount, formatDateTime, formatStatus } from "../../format";
 import { EmptyState, MetricCard, StatusPill } from "../../ui";
+import { CommunityBuild } from "./community-build";
 
 export const metadata: Metadata = { title: "Ingestion health" };
 
 export default async function IngestionPage() {
   const apiInit = await getAuthenticatedApiInit();
-  const status = await getApiData<InternalIngestionStatus>("/api/internal/ingestion", apiInit);
+  const [status, communityStatus] = await Promise.all([
+    getApiData<InternalIngestionStatus>("/api/internal/ingestion", apiInit),
+    getApiData<CommunityBuildStatus>("/api/internal/communities", apiInit)
+  ]);
 
   return (
     <>
@@ -22,6 +26,7 @@ export default async function IngestionPage() {
         <section className="panel"><EmptyState title="Ingestion status unavailable" description="Log in with an administrator account, or check the API and worker services." action={<Link className="button" href="/me">Go to login</Link>} /></section>
       ) : (
         <>
+          {communityStatus != null && <CommunityBuild initialStatus={communityStatus} />}
           <section className="stat-row" aria-label="Ingestion summary">
             <MetricCard label="Deployment mode" value={formatStatus(status.mode)} />
             <MetricCard label="Active assignments" value={formatCount(status.activeAssignments)} />

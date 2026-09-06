@@ -5,6 +5,7 @@ import * as schema from "./schema.js";
 export * from "./schema.js";
 export * from "./chat-assignments.js";
 export * from "./stream-sessions.js";
+export * from "./community-map.js";
 
 export const createPgPool = (connectionString: string): pg.Pool => {
   return new pg.Pool({ connectionString });

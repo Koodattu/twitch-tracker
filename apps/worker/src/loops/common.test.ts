@@ -41,6 +41,17 @@ describe("runWithIngestionRecord", () => {
     }));
   });
 
+  it("records completed community builds even when due checks were recently sampled", async () => {
+    const { db, values } = createDb();
+    const jobType = `community-${crypto.randomUUID()}`;
+    const recordBuild = (summary: Record<string, unknown>) => typeof summary.channels === "number";
+    await runWithIngestionRecord(db, jobType, async () => ({ skipped: "No build due" }), recordBuild);
+    await runWithIngestionRecord(db, jobType, async () => ({ channels: 12 }), recordBuild);
+    await runWithIngestionRecord(db, jobType, async () => ({ channels: 0 }), recordBuild);
+    expect(values).toHaveBeenCalledTimes(3);
+    expect(values).toHaveBeenLastCalledWith(expect.objectContaining({ summary: expect.objectContaining({ channels: 0 }) }));
+  });
+
   it("records every failed run", async () => {
     const { db, values } = createDb();
     const failure = new Error("test failure");
