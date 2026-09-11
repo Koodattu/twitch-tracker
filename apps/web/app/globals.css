@@ -1276,6 +1276,19 @@ li,
   max-width: 420px;
 }
 
+.blocked-channel-group + .blocked-channel-group { border-top: 1px solid var(--line); }
+.blocked-channel-group summary { display: flex; align-items: center; gap: 18px; padding: 18px; cursor: pointer; list-style: none; font-size: 13px; }
+.blocked-channel-group summary::-webkit-details-marker { display: none; }
+.blocked-channel-group summary::before { content: "›"; flex: 0 0 12px; color: var(--muted); font-size: 22px; text-align: center; }
+.blocked-channel-group[open] summary::before { transform: rotate(90deg); }
+.blocked-channel-group summary:hover { background: var(--panel-hover); }
+.blocked-channel-group summary:focus-visible { outline-offset: -3px; }
+.blocked-channel-group[open] { background: var(--panel-raised); }
+.blocked-channel-name { flex: 0 1 220px; min-width: 0; overflow-wrap: anywhere; }
+.blocked-channel-bots { display: flex; flex: 1; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.blocked-channel-detected { flex-shrink: 0; text-align: right; }
+.blocked-channel-link { padding: 0 18px 14px; font-size: 12px; }
+
 .search-bar {
   display: flex;
   align-items: center;
@@ -1525,6 +1538,11 @@ li,
 }
 
 @media (max-width: 720px) {
+  .blocked-channel-group summary { flex-wrap: wrap; gap: 12px; }
+  .blocked-channel-name { flex: 1; }
+  .blocked-channel-bots { flex-basis: 100%; padding-left: 24px; }
+  .blocked-channel-detected { width: 100%; padding-left: 24px; text-align: left; }
+
   .topbar-inner,
   .shell {
     width: min(100% - 28px, 1240px);

@@ -47,6 +47,15 @@ export default async function BotAccountsPage() {
     botAccountId: account.id,
     botLogin: account.login
   }))) ?? [];
+  const blocksByChannel = new Map<string, (typeof blockedChannels)[number] & { blocks: typeof blockedChannels }>();
+  for (const block of blockedChannels) {
+    const group = blocksByChannel.get(block.broadcasterUserId) ?? { ...block, blocks: [] };
+    group.blocks.push(block);
+    if (block.detectedAt > group.detectedAt) group.detectedAt = block.detectedAt;
+    blocksByChannel.set(block.broadcasterUserId, group);
+  }
+  const channelGroups = Array.from(blocksByChannel.values()).sort((a, b) => b.detectedAt.localeCompare(a.detectedAt));
+  for (const group of channelGroups) group.blocks.sort((a, b) => a.botLogin.localeCompare(b.botLogin));
 
   return (
     <>
@@ -63,7 +72,7 @@ export default async function BotAccountsPage() {
             <MetricCard label="Connected accounts" value={formatCount(accounts.length)} />
             <MetricCard label="Enabled accounts" value={formatCount(activeAccounts)} />
             <MetricCard label="Join capacity" value={formatCount(effectiveCapacity)} detail={`${formatCount(configuredCapacity)} rooms configured`} />
-            <MetricCard label="Blocked channels" value={formatCount(blockedChannels.length)} detail="Unique bot and channel pairs" />
+            <MetricCard label="Blocked channels" value={formatCount(channelGroups.length)} detail={`${formatCount(blockedChannels.length)} bot and channel pairs`} />
           </section>
 
           <section className="panel">
@@ -86,20 +95,39 @@ export default async function BotAccountsPage() {
           </section>
 
           <section className="panel">
-            <div className="panel-header"><div className="panel-heading"><h2>Blocked channels</h2><p>Permanent Twitch IRC restrictions are not retried</p></div><StatusPill tone={blockedChannels.length === 0 ? "success" : "danger"}>{formatCount(blockedChannels.length)} blocked</StatusPill></div>
+            <div className="panel-header"><div className="panel-heading"><h2>Blocked channels</h2><p>Grouped by channel, most recently detected first. Expand for restriction details and retry options.</p></div><StatusPill tone={channelGroups.length === 0 ? "success" : "danger"}>{formatCount(channelGroups.length)} channels</StatusPill></div>
             {blockedChannels.length === 0 ? <EmptyState title="No blocked channels" description="Twitch has not reported a permanent channel restriction for any connected bot." /> : (
-              <div className="table-scroll" role="region" aria-label="Blocked bot channels" tabIndex={0}><table className="table"><thead><tr><th scope="col">Bot</th><th scope="col">Channel</th><th scope="col">Scope</th><th scope="col">Twitch response</th><th scope="col">Last detected</th><th scope="col">Action</th></tr></thead><tbody>
-                {blockedChannels.map((channel) => (
-                  <tr key={`${channel.botLogin}:${channel.broadcasterUserId}`}>
-                    <td><strong>{channel.botLogin}</strong></td>
-                    <td><div className="cell-stack">{channel.broadcasterLogin == null ? <strong>{channel.broadcasterDisplayName ?? channel.broadcasterUserId}</strong> : <Link href={`/channels/${encodeURIComponent(channel.broadcasterLogin)}`}><strong>{channel.broadcasterDisplayName ?? channel.broadcasterLogin}</strong></Link>}<span>{channel.broadcasterLogin == null ? channel.broadcasterUserId : `@${channel.broadcasterLogin}`}</span></div></td>
-                    <td><StatusPill tone={channel.scope === "global" ? "danger" : "warning"}>{channel.scope === "global" ? "All bots" : "This bot"}</StatusPill></td>
-                    <td>{channel.reason ?? "Permanent IRC restriction"}</td>
-                    <td className="time-cell">{formatDateTime(channel.detectedAt)}</td>
-                    <td><form action={`/api/internal/bot-accounts/${encodeURIComponent(channel.botAccountId)}/blocked-channels/${encodeURIComponent(channel.broadcasterUserId)}/retry`} method="post"><button className="button button-secondary" type="submit">Retry</button></form></td>
-                  </tr>
+              <div className="blocked-channel-list">
+                {channelGroups.map((channel) => (
+                  <details className="blocked-channel-group" key={channel.broadcasterUserId}>
+                    <summary>
+                      <span className="cell-stack blocked-channel-name">
+                        <strong>{channel.broadcasterDisplayName ?? channel.broadcasterLogin ?? channel.broadcasterUserId}</strong>
+                        <span>{channel.broadcasterLogin == null ? channel.broadcasterUserId : `@${channel.broadcasterLogin}`}</span>
+                      </span>
+                      <span className="blocked-channel-bots" aria-label="Affected bots">
+                        {channel.blocks.map((block) => <StatusPill key={block.botAccountId} tone="warning">{block.botLogin}</StatusPill>)}
+                        {channel.blocks.some((block) => block.scope === "global") ? <StatusPill tone="danger">All bots restricted</StatusPill> : null}
+                      </span>
+                      <span className="cell-stack blocked-channel-detected"><span>Last detected</span><span>{formatDateTime(channel.detectedAt)}</span></span>
+                    </summary>
+                    {channel.broadcasterLogin == null ? null : <div className="blocked-channel-link"><Link className="text-link" href={`/channels/${encodeURIComponent(channel.broadcasterLogin)}`}>View channel →</Link></div>}
+                    <div className="table-scroll" role="region" aria-label={`Restrictions for ${channel.broadcasterDisplayName ?? channel.broadcasterLogin ?? channel.broadcasterUserId}`} tabIndex={0}>
+                      <table className="table"><thead><tr><th scope="col">Bot</th><th scope="col">Scope</th><th scope="col">Twitch response</th><th scope="col">Last detected</th><th scope="col">Action</th></tr></thead><tbody>
+                        {channel.blocks.map((block) => (
+                          <tr key={block.botAccountId}>
+                            <td><strong>{block.botLogin}</strong></td>
+                            <td><StatusPill tone={block.scope === "global" ? "danger" : "warning"}>{block.scope === "global" ? "All bots" : "This bot"}</StatusPill></td>
+                            <td>{block.reason ?? "Permanent IRC restriction"}</td>
+                            <td className="time-cell">{formatDateTime(block.detectedAt)}</td>
+                            <td><form action={`/api/internal/bot-accounts/${encodeURIComponent(block.botAccountId)}/blocked-channels/${encodeURIComponent(block.broadcasterUserId)}/retry`} method="post"><button className="button button-secondary" type="submit" aria-label={`Retry ${block.botLogin} in ${channel.broadcasterLogin ?? channel.broadcasterUserId}`}>Retry</button></form></td>
+                          </tr>
+                        ))}
+                      </tbody></table>
+                    </div>
+                  </details>
                 ))}
-              </tbody></table></div>
+              </div>
             )}
           </section>
           <p className="data-note">Retry only after confirming that Twitch or the broadcaster lifted the restriction. Join capacity is an operational limit, not permission to evade Twitch restrictions.</p>
