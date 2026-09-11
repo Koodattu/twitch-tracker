@@ -19,7 +19,7 @@
     "graphology": "0.26.0",
     "graphology-communities-louvain": "2.0.2",
     "graphology-layout-forceatlas2": "0.10.1",
-    "zod": "4.4.3"
+    "zod": "4.5.4"
   },
   "devDependencies": {
     "@types/node": "24.13.3",
