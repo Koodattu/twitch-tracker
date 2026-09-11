@@ -563,7 +563,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
       }
       c.header("Cache-Control", "private, no-store");
       const data = kind === "overview"
-        ? await getChannelOverview(c.get("db"), channel.twitchUserId)
+        ? await getChannelOverview(c.get("db"), channel.twitchUserId, Math.max(config.DISCOVERY_INTERVAL_MS, config.KNOWN_CHANNEL_DISCOVERY_INTERVAL_MS) * 2 / 1000)
         : await getChannelDetail(c.get("db"), channel.twitchUserId, kind, query.data.page);
       return c.json({ data });
     });

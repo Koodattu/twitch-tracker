@@ -1,13 +1,14 @@
 import { channelDailyStats, streamActivityBuckets, streamSessions, streamSnapshots, type DbClient } from "@twitch-tracker/db";
-import { and, desc, eq, gte, isNull, lte } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNull, lt, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 import { detailPage, detailPageNumberSchema, detailPageSize, viewerObservationFields } from "./detail-records.js";
+import { summarizeChannelPeriod } from "./channel-period.js";
 
 export const channelDetailQuerySchema = z.object({ page: detailPageNumberSchema });
 
 const sessionFields = {
   twitchStreamId: streamSessions.twitchStreamId, latestTitle: streamSessions.latestTitle,
-  latestCategoryName: streamSessions.latestCategoryName, startedAt: streamSessions.startedAt,
+  latestCategoryName: streamSessions.latestCategoryName, latestCategoryId: streamSessions.latestCategoryId, startedAt: streamSessions.startedAt,
   endedAt: streamSessions.endedAt, lastSeenLiveAt: streamSessions.lastSeenLiveAt
 };
 const dailyFields = {
@@ -16,29 +17,30 @@ const dailyFields = {
   messageCount: channelDailyStats.messageCount
 };
 
-export async function getChannelOverview(db: DbClient, broadcasterId: string) {
-  const toDay = new Date().toISOString().slice(0, 10);
+export async function getChannelOverview(db: DbClient, broadcasterId: string, maxGapSeconds = 360) {
+  const now = new Date();
+  const toDay = now.toISOString().slice(0, 10);
   const fromDay = new Date(Date.parse(toDay) - 29 * 86_400_000).toISOString().slice(0, 10);
-  const [daily, recentSessions, liveSessions] = await Promise.all([
+  const from = new Date(fromDay);
+  const [daily, recentSessions, liveSessions, periodSessions, samples] = await Promise.all([
     db.select(dailyFields).from(channelDailyStats)
       .where(and(eq(channelDailyStats.broadcasterUserId, broadcasterId), gte(channelDailyStats.day, fromDay), lte(channelDailyStats.day, toDay)))
       .orderBy(channelDailyStats.day),
     db.select(sessionFields).from(streamSessions).where(eq(streamSessions.broadcasterUserId, broadcasterId))
       .orderBy(desc(streamSessions.startedAt), desc(streamSessions.twitchStreamId)).limit(6),
     db.select(sessionFields).from(streamSessions).where(and(eq(streamSessions.broadcasterUserId, broadcasterId), isNull(streamSessions.endedAt)))
-      .orderBy(desc(streamSessions.startedAt), desc(streamSessions.twitchStreamId)).limit(1)
+      .orderBy(desc(streamSessions.startedAt), desc(streamSessions.twitchStreamId)).limit(1),
+    db.select(sessionFields).from(streamSessions).where(and(eq(streamSessions.broadcasterUserId, broadcasterId),
+      lt(streamSessions.startedAt, now), gte(sql`coalesce(${streamSessions.endedAt}, ${streamSessions.lastSeenLiveAt})`, from))),
+    db.select({ twitchStreamId: streamSnapshots.twitchStreamId, observedAt: streamSnapshots.observedAt,
+      viewerCount: streamSnapshots.viewerCount, categoryId: streamSnapshots.categoryId, categoryName: streamSnapshots.categoryName })
+      .from(streamSnapshots).where(and(eq(streamSnapshots.broadcasterUserId, broadcasterId),
+        gte(streamSnapshots.observedAt, new Date(from.getTime() - maxGapSeconds * 1000)), lt(streamSnapshots.observedAt, now)))
+      .orderBy(asc(streamSnapshots.twitchStreamId), asc(streamSnapshots.observedAt), asc(streamSnapshots.id))
   ]);
-  const averages = daily.flatMap((day) => day.viewerCountAvg == null ? [] : [day.viewerCountAvg]);
-  const peaks = daily.flatMap((day) => day.viewerCountMax == null ? [] : [day.viewerCountMax]);
   return {
-    fromDay, toDay, daily, recentSessions, liveSession: liveSessions[0] ?? null,
-    totals: daily.length === 0 ? null : {
-      streamCount: daily.reduce((total, day) => total + day.streamCount, 0),
-      liveSeconds: daily.reduce((total, day) => total + day.liveSeconds, 0),
-      messageCount: daily.reduce((total, day) => total + day.messageCount, 0),
-      viewerCountMax: peaks.length === 0 ? null : Math.max(...peaks),
-      viewerCountAvg: averages.length === 0 ? null : Math.round(averages.reduce((total, count) => total + count, 0) / averages.length)
-    }
+    fromDay, toDay, recentSessions, liveSession: liveSessions[0] ?? null,
+    ...summarizeChannelPeriod({ from, to: now, maxGapSeconds, sessions: periodSessions, samples, messages: daily })
   };
 }
 

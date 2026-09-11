@@ -12,6 +12,7 @@ export type ChannelSession = {
   twitchStreamId: string;
   latestTitle: string | null;
   latestCategoryName: string | null;
+  latestCategoryId: string | null;
   startedAt: string;
   endedAt: string | null;
   lastSeenLiveAt: string;
@@ -39,6 +40,18 @@ export type ChannelOverview = {
   } | null;
   liveSession: ChannelSession | null;
   recentSessions: ChannelSession[];
+  topCategories: ChannelCategory[];
+  categoryCount: number;
+  categorySeconds: number;
+  viewerSeconds: number;
+  observationGapSeconds: number;
+};
+
+export type ChannelCategory = {
+  id: string;
+  name: string;
+  liveSeconds: number;
+  viewerCountAvg: number | null;
 };
 
 export type ChannelObservation = StreamObservation & { twitchStreamId: string };

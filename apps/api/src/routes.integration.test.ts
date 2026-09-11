@@ -304,14 +304,17 @@ describe.skipIf(database == null)("Analytics routes with PostgreSQL", () => {
     expect((await publicApp.request("/api/private/streams/stream/messages", { headers })).status).toBe(200);
   });
 
-  it("loads a channel overview without querying snapshots, buckets, or raw chat", async () => {
+  it("bounds channel snapshot reads and does not query raw chat or activity buckets", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-06T12:00:00Z"));
     const querySpy = vi.spyOn(pool, "query");
     try {
       const response = await app.request("/api/channels/CHANNEL/overview");
       expect(response.status).toBe(200);
       const data = (await response.json()).data;
-      expect(data.totals).toBeNull();
-      expect(data.daily).toEqual([]);
+      expect(data.totals).toEqual({ streamCount: 1, liveSeconds: 180, messageCount: 0, viewerCountMax: null, viewerCountAvg: null });
+      expect(data.daily).toEqual([{ day: "2026-09-05", streamCount: 1, liveSeconds: 180, messageCount: 0, viewerCountMax: null, viewerCountAvg: null }]);
+      expect(data.topCategories).toEqual([]);
       expect(data.liveSession.twitchStreamId).toBe("stream");
       expect(data.recentSessions).toHaveLength(1);
       const queries = querySpy.mock.calls.map((call) => {
@@ -319,15 +322,32 @@ describe.skipIf(database == null)("Analytics routes with PostgreSQL", () => {
         return typeof query === "string" ? query : query != null && typeof query === "object" && "text" in query ? String(query.text) : "";
       }).join("\n");
       expect(queries).toContain("channel_daily_stats");
-      expect(queries).not.toMatch(/stream_snapshots|stream_activity_buckets|chat_messages|chat_membership_events|chat_presence_|raw_irc_messages|raw_eventsub_events/);
+      expect(queries).toContain('"stream_snapshots"."broadcaster_user_id" =');
+      expect(queries).toContain('"stream_snapshots"."observed_at" >=');
+      expect(queries).toContain('"stream_snapshots"."observed_at" <');
+      expect(queries).not.toMatch(/stream_activity_buckets|chat_messages|chat_membership_events|chat_presence_|raw_irc_messages|raw_eventsub_events/);
     } finally {
       querySpy.mockRestore();
+      vi.useRealTimers();
     }
   });
 
   it("uses the same 30 UTC calendar days for channel chart and totals", async () => {
     const today = new Date().toISOString().slice(0, 10);
     const dayAt = (offset: number) => new Date(Date.parse(today) + offset * 86_400_000).toISOString().slice(0, 10);
+    await db.update(streamSessions).set({ startedAt: new Date(dayAt(-31)), endedAt: new Date(dayAt(-30)) }).where(eq(streamSessions.twitchStreamId, "stream"));
+    await db.insert(streamSessions).values([
+      { twitchStreamId: "first-day", broadcasterUserId: "broadcaster", startedAt: new Date(`${dayAt(-29)}T10:00:00Z`), endedAt: new Date(`${dayAt(-29)}T11:00:00Z`) },
+      { twitchStreamId: "yesterday-one", broadcasterUserId: "broadcaster", startedAt: new Date(`${dayAt(-1)}T10:00:00Z`), endedAt: new Date(`${dayAt(-1)}T11:00:00Z`) },
+      { twitchStreamId: "yesterday-two", broadcasterUserId: "broadcaster", startedAt: new Date(`${dayAt(-1)}T11:00:00Z`), endedAt: new Date(`${dayAt(-1)}T12:00:00Z`) },
+      { twitchStreamId: "another-channel", broadcasterUserId: "chatter", startedAt: new Date(`${dayAt(-1)}T10:00:00Z`), endedAt: new Date(`${dayAt(-1)}T11:00:00Z`) }
+    ]);
+    await db.insert(streamSnapshots).values([
+      ...["10:00", "10:30", "11:00"].map((time) => ({ twitchStreamId: "first-day", broadcasterUserId: "broadcaster", observedAt: new Date(`${dayAt(-29)}T${time}:00Z`), viewerCount: time === "11:00" ? 30 : 10, categoryId: "game", categoryName: "Game" })),
+      ...["10:00", "10:30", "11:00"].map((time) => ({ twitchStreamId: "yesterday-one", broadcasterUserId: "broadcaster", observedAt: new Date(`${dayAt(-1)}T${time}:00Z`), viewerCount: time === "11:00" ? 50 : 20, categoryId: "game", categoryName: "Game" })),
+      ...["11:00", "11:30"].map((time) => ({ twitchStreamId: "yesterday-two", broadcasterUserId: "broadcaster", observedAt: new Date(`${dayAt(-1)}T${time}:00Z`), viewerCount: 20, categoryId: "chat", categoryName: "Just Chatting" })),
+      { twitchStreamId: "another-channel", broadcasterUserId: "chatter", observedAt: new Date(`${dayAt(-1)}T10:00:00Z`), viewerCount: 99999, categoryId: "other", categoryName: "Other" }
+    ]);
     await db.insert(channelDailyStats).values([
       { broadcasterUserId: "broadcaster", day: dayAt(-30), streamCount: 100, liveSeconds: 99999, viewerCountMax: 99999, viewerCountAvg: 99999, messageCount: 99999 },
       { broadcasterUserId: "broadcaster", day: dayAt(-29), streamCount: 1, liveSeconds: 3600, viewerCountMax: 30, viewerCountAvg: 10, messageCount: 50 },
@@ -342,8 +362,12 @@ describe.skipIf(database == null)("Analytics routes with PostgreSQL", () => {
     expect(data.fromDay).toBe(dayAt(-29));
     expect(data.toDay).toBe(today);
     expect(data.daily.map((day: { day: string }) => day.day)).toEqual([dayAt(-29), dayAt(-1), today]);
-    expect(data.daily[1].viewerCountAvg).toBeNull();
-    expect(data.totals).toEqual({ streamCount: 3, liveSeconds: 10800, messageCount: 155, viewerCountMax: 50, viewerCountAvg: 15 });
+    expect(data.daily[2].viewerCountAvg).toBeNull();
+    expect(data.totals).toEqual({ streamCount: 3, liveSeconds: 10800, messageCount: 155, viewerCountMax: 50, viewerCountAvg: 17 });
+    expect(data.topCategories).toEqual([
+      { id: "game", name: "Game", liveSeconds: 7200, viewerCountAvg: 15 },
+      { id: "chat", name: "Just Chatting", liveSeconds: 3600, viewerCountAvg: 20 }
+    ]);
   });
 
   it("bounds the recent channel preview and finds a live session outside it", async () => {
