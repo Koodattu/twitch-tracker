@@ -10,14 +10,14 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@hono/node-server": "2.1.0",
+    "@hono/node-server": "2.1.1",
     "@twitch-tracker/config": "workspace:*",
     "@twitch-tracker/db": "workspace:*",
     "@twitch-tracker/shared": "workspace:*",
     "@twitch-tracker/twitch": "workspace:*",
     "drizzle-orm": "0.45.2",
-    "hono": "4.13.5",
-    "zod": "4.4.3"
+    "hono": "4.13.7",
+    "zod": "4.5.4"
   },
   "devDependencies": {
     "@types/node": "24.13.3",
