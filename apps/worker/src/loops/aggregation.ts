@@ -25,7 +25,7 @@ export const runAggregationLoop = (context: WorkerContext) => {
       return {
         bucketMinutes,
         lookbackHours,
-        rollupsExecuted: 10
+        rollupsExecuted: 9
       };
     }
   });
@@ -36,8 +36,7 @@ const rollupBuckets = async (context: WorkerContext, bucketMinutes: number, look
   await rollupStreamMessageBuckets(context, bucketMinutes, lookbackHours);
   await rollupStreamMembershipBuckets(context, bucketMinutes, lookbackHours);
   await rollupStreamEventBuckets(context, bucketMinutes, lookbackHours);
-  await rollupChatterChannelMessageBuckets(context, bucketMinutes, lookbackHours);
-  await rollupChatterChannelMembershipBuckets(context, bucketMinutes, lookbackHours);
+  await rollupChatterChannelBuckets(context, bucketMinutes, lookbackHours);
 };
 
 const rollupDays = async (context: WorkerContext, lookbackHours: number) => {
@@ -319,108 +318,64 @@ const rollupChannelDailyMessages = async (context: WorkerContext, lookbackHours:
   `);
 };
 
-const rollupChatterChannelMessageBuckets = async (context: WorkerContext, bucketMinutes: number, lookbackHours: number) => {
+const rollupChatterChannelBuckets = async (context: WorkerContext, bucketMinutes: number, lookbackHours: number) => {
   await context.db.execute(sql`
-    insert into chatter_channel_activity_buckets (
-      chatter_user_id,
-      broadcaster_user_id,
-      bucket_start,
-      bucket_minutes,
-      message_count,
-      first_activity_at,
-      last_activity_at,
-      active_minutes,
-      updated_at
+    with activity as (
+      select chatter_user_id, broadcaster_user_id, coalesce(sent_at, received_at) as occurred_at,
+        'message'::text as kind
+      from chat_messages
+      where chatter_user_id is not null
+        and coalesce(sent_at, received_at) >= date_bin(make_interval(mins => ${bucketMinutes}), now() - make_interval(hours => ${lookbackHours}), timestamptz '1970-01-01')
+      union all
+      select chatter_user_id, broadcaster_user_id, coalesce(event_at, received_at), event_type::text
+      from chat_membership_events
+      where chatter_user_id is not null
+        and coalesce(event_at, received_at) >= date_bin(make_interval(mins => ${bucketMinutes}), now() - make_interval(hours => ${lookbackHours}), timestamptz '1970-01-01')
+    ), calculated as (
+      select chatter_user_id, broadcaster_user_id,
+        date_bin(make_interval(mins => ${bucketMinutes}), occurred_at, timestamptz '1970-01-01') as bucket_start,
+        ${bucketMinutes}::int as bucket_minutes,
+        count(*) filter (where kind = 'message')::int as message_count,
+        count(*) filter (where kind = 'join')::int as join_count,
+        count(*) filter (where kind = 'part')::int as part_count,
+        min(occurred_at) as first_activity_at, max(occurred_at) as last_activity_at,
+        count(distinct date_trunc('minute', occurred_at)) filter (where kind = 'message')::int as active_minutes
+      from activity
+      group by chatter_user_id, broadcaster_user_id, bucket_start
     )
-    select
-      chatter_user_id,
-      broadcaster_user_id,
-      date_bin(make_interval(mins => ${bucketMinutes}), coalesce(sent_at, received_at), timestamptz '1970-01-01') as bucket_start,
-      ${bucketMinutes} as bucket_minutes,
-      count(*)::int as message_count,
-      min(coalesce(sent_at, received_at)) as first_activity_at,
-      max(coalesce(sent_at, received_at)) as last_activity_at,
-      count(distinct date_trunc('minute', coalesce(sent_at, received_at)))::int as active_minutes,
-      now() as updated_at
-    from chat_messages
-    where chatter_user_id is not null
-      and coalesce(sent_at, received_at) >= date_bin(make_interval(mins => ${bucketMinutes}), now() - make_interval(hours => ${lookbackHours}), timestamptz '1970-01-01')
-    group by chatter_user_id, broadcaster_user_id, bucket_start
+    insert into chatter_channel_activity_buckets (
+      chatter_user_id, broadcaster_user_id, bucket_start, bucket_minutes,
+      message_count, join_count, part_count, first_activity_at, last_activity_at, active_minutes, updated_at
+    )
+    select c.chatter_user_id, c.broadcaster_user_id, c.bucket_start, c.bucket_minutes,
+      c.message_count, c.join_count, c.part_count, c.first_activity_at, c.last_activity_at, c.active_minutes, now()
+    from calculated c
+    left join chatter_channel_activity_buckets existing
+      using (chatter_user_id, broadcaster_user_id, bucket_start, bucket_minutes)
+    where existing.chatter_user_id is null or (
+      existing.message_count, existing.join_count, existing.part_count,
+      existing.first_activity_at, existing.last_activity_at, existing.active_minutes
+    ) is distinct from (
+      c.message_count, c.join_count, c.part_count, c.first_activity_at, c.last_activity_at, c.active_minutes
+    )
     on conflict (chatter_user_id, broadcaster_user_id, bucket_start, bucket_minutes) do update set
       message_count = excluded.message_count,
+      join_count = excluded.join_count,
+      part_count = excluded.part_count,
       first_activity_at = excluded.first_activity_at,
       last_activity_at = excluded.last_activity_at,
       active_minutes = excluded.active_minutes,
       updated_at = now()
     where (
       chatter_channel_activity_buckets.message_count,
+      chatter_channel_activity_buckets.join_count,
+      chatter_channel_activity_buckets.part_count,
       chatter_channel_activity_buckets.first_activity_at,
       chatter_channel_activity_buckets.last_activity_at,
       chatter_channel_activity_buckets.active_minutes
     ) is distinct from (
-      excluded.message_count,
-      excluded.first_activity_at,
-      excluded.last_activity_at,
-      excluded.active_minutes
-    )
-  `);
-};
-
-const rollupChatterChannelMembershipBuckets = async (context: WorkerContext, bucketMinutes: number, lookbackHours: number) => {
-  await context.db.execute(sql`
-    insert into chatter_channel_activity_buckets (
-      chatter_user_id,
-      broadcaster_user_id,
-      bucket_start,
-      bucket_minutes,
-      join_count,
-      part_count,
-      first_activity_at,
-      last_activity_at,
-      updated_at
-    )
-    select
-      chatter_user_id,
-      broadcaster_user_id,
-      date_bin(make_interval(mins => ${bucketMinutes}), coalesce(event_at, received_at), timestamptz '1970-01-01') as bucket_start,
-      ${bucketMinutes} as bucket_minutes,
-      count(*) filter (where event_type = 'join')::int as join_count,
-      count(*) filter (where event_type = 'part')::int as part_count,
-      min(coalesce(event_at, received_at)) as first_activity_at,
-      max(coalesce(event_at, received_at)) as last_activity_at,
-      now() as updated_at
-    from chat_membership_events
-    where chatter_user_id is not null
-      and coalesce(event_at, received_at) >= date_bin(make_interval(mins => ${bucketMinutes}), now() - make_interval(hours => ${lookbackHours}), timestamptz '1970-01-01')
-    group by chatter_user_id, broadcaster_user_id, bucket_start
-    on conflict (chatter_user_id, broadcaster_user_id, bucket_start, bucket_minutes) do update set
-      join_count = excluded.join_count,
-      part_count = excluded.part_count,
-      first_activity_at = least(
-        coalesce(chatter_channel_activity_buckets.first_activity_at, excluded.first_activity_at),
-        excluded.first_activity_at
-      ),
-      last_activity_at = greatest(
-        coalesce(chatter_channel_activity_buckets.last_activity_at, excluded.last_activity_at),
-        excluded.last_activity_at
-      ),
-      updated_at = now()
-    where (
-      chatter_channel_activity_buckets.join_count,
-      chatter_channel_activity_buckets.part_count,
-      chatter_channel_activity_buckets.first_activity_at,
-      chatter_channel_activity_buckets.last_activity_at
-    ) is distinct from (
-      excluded.join_count,
-      excluded.part_count,
-      least(
-        coalesce(chatter_channel_activity_buckets.first_activity_at, excluded.first_activity_at),
-        excluded.first_activity_at
-      ),
-      greatest(
-        coalesce(chatter_channel_activity_buckets.last_activity_at, excluded.last_activity_at),
-        excluded.last_activity_at
-      )
+      excluded.message_count, excluded.join_count, excluded.part_count,
+      excluded.first_activity_at, excluded.last_activity_at, excluded.active_minutes
     )
   `);
 };

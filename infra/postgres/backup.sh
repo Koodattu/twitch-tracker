@@ -43,7 +43,7 @@ if [ -z "${PGPASSWORD:-}" ]; then
 fi
 
 initial_delay=0
-if [ "${BACKUP_FORCE_NOW:-false}" != "true" ]; then
+if [ "${BACKUP_FORCE_NOW:-false}" != "true" ] && [ ! -e "$BACKUP_DIR/.last-failure" ]; then
   initial_delay="$(backup_seconds_until_due "$BACKUP_INTERVAL_SECONDS")"
 fi
 if [ "$initial_delay" -gt 0 ]; then
@@ -92,6 +92,7 @@ create_backup() {
   printf '%s %s %s %s\n' "$(date -u +%s)" "$timestamp" "$filename" "$size" > "$last_success_temp"
   mv "$last_success_temp" "${BACKUP_DIR}/.last-success"
   last_success_temp=""
+  rm -f "$BACKUP_DIR/.last-failure"
 
   backup_log "backup_created filename=$filename bytes=$size compression=${BACKUP_COMPRESSION:-gzip:6}"
   if ! prune_backups; then
@@ -102,15 +103,18 @@ create_backup() {
 
 while true; do
   result=0
+  delay_seconds="$BACKUP_INTERVAL_SECONDS"
   if ! create_backup; then
     result=1
     cleanup
-    backup_error "backup_attempt_failed retry_seconds=$BACKUP_INTERVAL_SECONDS"
+    date -u +%s > "$BACKUP_DIR/.last-failure"
+    if [ "$delay_seconds" -gt 300 ]; then delay_seconds=300; fi
+    backup_error "backup_attempt_failed retry_seconds=$delay_seconds"
   fi
 
   if [ "${BACKUP_RUN_ONCE:-false}" = "true" ]; then
     exit "$result"
   fi
 
-  sleep "$BACKUP_INTERVAL_SECONDS"
+  sleep "$delay_seconds"
 done

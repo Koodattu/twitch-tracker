@@ -39,7 +39,7 @@ describe.skipIf(database == null)("Community presence with PostgreSQL", () => {
       cross join (select 'person-' || n as person from generate_series(1,10) n union all select 'hidden' union all select 'bot') people
       cross join generate_series(1,2) day cross join generate_series(1,3) duplicate;
       insert into chat_messages (twitch_message_id, broadcaster_user_id, twitch_stream_id, chatter_user_id, received_at, shared_chat_source_channel_id)
-      select 'message-' || n, 'a', 'a', 'person-1', date_trunc('day', now()) - interval '1 day', 'a' from generate_series(1,3) n`);
+      select encode_chat_message_id(gen_random_uuid()::text), 'a', 'a', 'person-1', date_trunc('day', now()) - interval '1 day', 'a' from generate_series(1,3) n`);
     const input = await read();
     expect(input.memberships).toHaveLength(20);
     expect(input.memberships.find((m) => m.chatterId === "person-1" && m.channelId === "a")!.weight).toBe(1);
@@ -62,14 +62,14 @@ describe.skipIf(database == null)("Community presence with PostgreSQL", () => {
 
   it("recovers historical identities only from unambiguous same-day evidence, including name changes", async () => {
     await pool.query(`insert into chat_messages (twitch_message_id, broadcaster_user_id, twitch_stream_id, chatter_user_id, chatter_login, received_at)
-      select person || '-' || day, 'evidence','evidence', person,
+      select encode_chat_message_id(gen_random_uuid()::text), 'evidence','evidence', person,
         case when person = 'renamed' then 'name-' || day else person end,
         date_trunc('day', now()) - make_interval(days => day)
       from unnest(array['person-1','renamed','ambiguous']) person cross join generate_series(1,2) day;
       insert into chat_messages (twitch_message_id, broadcaster_user_id, twitch_stream_id, chatter_user_id, chatter_login, received_at)
-      values ('conflict','evidence','evidence','other','ambiguous',date_trunc('day', now()) - interval '1 day'),
-        ('recycled-old','evidence','evidence','recycled','reused',date_trunc('day', now()) - interval '2 days'),
-        ('recycled-new','evidence','evidence','other','reused',date_trunc('day', now()) - interval '1 day');
+      values (encode_chat_message_id(gen_random_uuid()::text),'evidence','evidence','other','ambiguous',date_trunc('day', now()) - interval '1 day'),
+        (encode_chat_message_id(gen_random_uuid()::text),'evidence','evidence','recycled','reused',date_trunc('day', now()) - interval '2 days'),
+        (encode_chat_message_id(gen_random_uuid()::text),'evidence','evidence','other','reused',date_trunc('day', now()) - interval '1 day');
       insert into chat_membership_events (broadcaster_user_id, twitch_stream_id, chatter_login, event_type, received_at)
       select 'a','a',case when login = 'renamed' then 'name-' || day else login end,'part',
         date_trunc('day', now()) - make_interval(days => day) + interval '1 hour'
@@ -105,7 +105,7 @@ describe.skipIf(database == null)("Community presence with PostgreSQL", () => {
       select 'room-' || n,'room-' || n,'person-1','join',date_trunc('day',now()) - make_interval(days => day)
       from generate_series(1,51) n cross join generate_series(1,2) day;
       insert into chat_messages (twitch_message_id, broadcaster_user_id, twitch_stream_id, chatter_user_id, received_at, shared_chat_source_channel_id)
-      select 'chat-' || n,'a','a','person-1',date_trunc('day',now()) - interval '1 day','a' from generate_series(1,3) n`);
+      select encode_chat_message_id(gen_random_uuid()::text),'a','a','person-1',date_trunc('day',now()) - interval '1 day','a' from generate_series(1,3) n`);
     expect((await read()).memberships).toEqual([{ chatterId: "person-1", channelId: "a", weight: 1 }]);
   });
 });

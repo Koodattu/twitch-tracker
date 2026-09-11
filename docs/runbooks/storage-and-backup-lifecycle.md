@@ -4,6 +4,9 @@ This runbook covers storage reporting, bounded local backup retention, off-host
 replication requirements, and the approval gates for database cleanup. It does
 not authorize deleting or rewriting production data.
 
+For migrations 0015/0016, raw IRC block storage, compact identifiers, and their
+rollback procedure, use [the storage compaction rollout](storage-compaction-rollout.md).
+
 ## Backup invariants
 
 The backup service creates a PostgreSQL custom-format archive with explicit
@@ -38,6 +41,11 @@ On service restart, the backup process waits for the remainder of the configured
 interval when the protected backup is still fresh. Application deployments
 therefore do not create another full dump merely because the container was
 recreated.
+
+A failed attempt records `.last-failure`, immediately fails the health check,
+and retries after at most five minutes. A validated replacement clears the
+failure marker; the previous good backup remains protected throughout. A
+restart with an outstanding failure retries immediately.
 
 `BACKUP_OFF_HOST_CONFIRMED=true` is an operator attestation. When it is false,
 backup creation continues but emits a warning. Set it to true only after

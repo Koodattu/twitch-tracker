@@ -17,6 +17,20 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16.14-alpine3.24@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+        env:
+          POSTGRES_USER: twitch_tracker
+          POSTGRES_PASSWORD: twitch_tracker_test
+          POSTGRES_DB: twitch_tracker_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U twitch_tracker -d twitch_tracker_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://twitch_tracker:twitch_tracker_test@localhost:5432/twitch_tracker_test
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -36,6 +50,7 @@ jobs:
 
       - name: Verify source and configuration
         run: |
+          DATABASE_URL="$TEST_DATABASE_URL" pnpm --filter @twitch-tracker/db db:migrate
           pnpm check:structure
           pnpm lint
           pnpm test
@@ -46,6 +61,7 @@ jobs:
           docker compose --env-file .env.production.example config --quiet
           for script in infra/postgres/*.sh; do sh -n "$script"; done
           sh infra/postgres/backup-retention.test.sh
+          sh infra/postgres/backup-retry.test.sh
 
   containers:
     runs-on: ubuntu-latest

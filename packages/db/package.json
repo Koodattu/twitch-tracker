@@ -19,6 +19,8 @@
     "build": "tsc -p tsconfig.json",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:compact": "node dist/compact-storage.js",
+    "db:verify-storage": "node dist/verify-storage.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

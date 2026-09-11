@@ -64,6 +64,23 @@ describe.skipIf(database == null)("Analytics routes with PostgreSQL", () => {
     vi.unstubAllGlobals();
   });
 
+  it("returns packed raw lines and erases their archived copies through the privacy API", async () => {
+    const wire = "@id=00112233-4455-6677-8899-aabbccddeeff :chatter PRIVMSG #channel :private fixture";
+    const raw = (await pool.query("insert into raw_irc_messages (raw_line, received_at) values ($1,$2) returning id", [wire, firstSeen])).rows[0];
+    await db.insert(chatMessages).values({ twitchMessageId: "00112233-4455-6677-8899-aabbccddeeff",
+      broadcasterUserId: "broadcaster", chatterUserId: "chatter", chatterLogin: "chatter", twitchStreamId: "stream", rawIrcMessageId: raw.id });
+    await pool.query("select compact_raw_irc_batch(now())");
+    const response = await app.request("/api/private/streams/stream/raw");
+    expect(response.status).toBe(200);
+    expect(JSON.stringify(await response.json())).toContain("private fixture");
+    await db.update(appUsers).set({ isAdmin: true }).where(eq(appUsers.twitchUserId, "chatter"));
+    const request = (await pool.query("insert into privacy_requests (request_type,subject_twitch_user_id) values ('data_deletion','chatter') returning id")).rows[0];
+    const completed = await app.request(`/api/internal/privacy-requests/${request.id}/complete`, { method: "POST", headers });
+    expect(completed.status).toBe(200);
+    expect((await pool.query("select count(*)::int as count from raw_irc_payload_blocks where $1=any(lines)", [wire])).rows[0].count).toBe(0);
+    expect((await pool.query("select read_raw_irc_line(raw_line,payload_block_id,payload_position) as line from raw_irc_messages where id=$1", [raw.id])).rows[0].line).toBe("[redacted by subject data deletion]");
+  });
+
   it.each([null, "https://example.com/current.jpg"])("returns the latest viewer sample with thumbnail %s", async (thumbnailUrl) => {
     await db.insert(streamSnapshots).values([
       {

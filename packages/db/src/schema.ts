@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
+import { compactMessageId, sha256Digest } from "./compact-types.js";
 import type { CommunityGraph, CommunityCoverage, CommunityBuildStatus } from "@twitch-tracker/shared";
-import { index, integer, jsonb, pgEnum, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid, boolean } from "drizzle-orm/pg-core";
+import { bigint, check, smallint, index, integer, jsonb, pgEnum, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid, boolean } from "drizzle-orm/pg-core";
 
 export const appModeEnum = pgEnum("app_mode", ["local", "private_mvp", "production"]);
 export const assignmentStatusEnum = pgEnum("assignment_status", ["desired", "joining", "joined", "leaving", "left", "failed"]);
@@ -210,9 +211,20 @@ export const rawHelixResponses = pgTable("raw_helix_responses", {
   ...timestamps
 });
 
+export const rawIrcPayloadBlocks = pgTable("raw_irc_payload_blocks", {
+  id: bigint("id", { mode: "bigint" }).generatedAlwaysAsIdentity().primaryKey(),
+  // Migration 0015 selects PostgreSQL's native PGLZ compression for this column.
+  lines: text("lines").array().notNull()
+}, (table) => ({
+  lineCount: check("raw_irc_payload_blocks_lines_check", sql`cardinality(${table.lines}) between 1 and 256`)
+}));
+
 export const rawIrcMessages = pgTable("raw_irc_messages", {
   id: uuid("id").defaultRandom().primaryKey(),
   rawLine: text("raw_line").notNull(),
+  payloadBlockId: bigint("payload_block_id", { mode: "bigint" }).references(() => rawIrcPayloadBlocks.id),
+  payloadPosition: smallint("payload_position"),
+  unrelayedSource: boolean("unrelayed_source"),
   parsedCommand: text("parsed_command"),
   tags: jsonb("tags").$type<Record<string, string>>().default({}).notNull(),
   channelLogin: text("channel_login"),
@@ -223,7 +235,10 @@ export const rawIrcMessages = pgTable("raw_irc_messages", {
   parseError: text("parse_error"),
   ...timestamps
 }, (table) => ({
-  receivedIdx: index("raw_irc_messages_received_idx").on(table.receivedAt)
+  receivedIdx: index("raw_irc_messages_received_idx").on(table.receivedAt),
+  unpackedIdx: index("raw_irc_messages_unpacked_idx").on(table.receivedAt).where(sql`${table.payloadBlockId} is null and ${table.rawLine} <> ''`),
+  payloadLocation: check("raw_irc_payload_location", sql`(${table.payloadBlockId} is null and ${table.payloadPosition} is null)
+    or (${table.payloadBlockId} is not null and ${table.payloadPosition} is not null and ${table.payloadPosition} between 1 and 256 and ${table.rawLine} = '')`)
 }));
 
 export const rawEventsubEvents = pgTable("raw_eventsub_events", {
@@ -266,7 +281,7 @@ export const eventsubSubscriptions = pgTable("eventsub_subscriptions", {
 }));
 
 export const chatMessages = pgTable("chat_messages", {
-  twitchMessageId: text("twitch_message_id").primaryKey(),
+  twitchMessageId: compactMessageId("twitch_message_id").primaryKey(),
   broadcasterUserId: text("broadcaster_user_id").notNull().references(() => twitchUsers.twitchUserId),
   twitchStreamId: text("twitch_stream_id").references(() => streamSessions.twitchStreamId),
   chatterUserId: text("chatter_user_id").references(() => twitchUsers.twitchUserId),
@@ -278,7 +293,7 @@ export const chatMessages = pgTable("chat_messages", {
   rawText: text("raw_text"),
   badges: jsonb("badges").$type<Record<string, string>>().default({}).notNull(),
   emotes: jsonb("emotes").$type<Record<string, unknown>>().default({}).notNull(),
-  replyParentMessageId: text("reply_parent_message_id"),
+  replyParentMessageId: compactMessageId("reply_parent_message_id"),
   sharedChatSourceChannelId: text("shared_chat_source_channel_id"),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
   clearedAt: timestamp("cleared_at", { withTimezone: true }),
@@ -289,7 +304,9 @@ export const chatMessages = pgTable("chat_messages", {
   receivedIdx: index("chat_messages_received_idx").on(table.receivedAt),
   streamReceivedIdx: index("chat_messages_stream_received_idx").on(table.twitchStreamId, table.receivedAt),
   channelReceivedIdx: index("chat_messages_channel_received_idx").on(table.broadcasterUserId, table.receivedAt),
-  chatterReceivedIdx: index("chat_messages_chatter_received_idx").on(table.chatterUserId, table.receivedAt)
+  chatterReceivedIdx: index("chat_messages_chatter_received_idx").on(table.chatterUserId, table.receivedAt),
+  messageIdEncoding: check("chat_message_id_encoding", sql`encode_chat_message_id(decode_chat_message_id(${table.twitchMessageId})) = ${table.twitchMessageId}`),
+  replyIdEncoding: check("chat_reply_id_encoding", sql`${table.replyParentMessageId} is null or encode_chat_message_id(decode_chat_message_id(${table.replyParentMessageId})) = ${table.replyParentMessageId}`)
 }));
 
 export const chatMembershipEvents = pgTable("chat_membership_events", {
@@ -302,7 +319,7 @@ export const chatMembershipEvents = pgTable("chat_membership_events", {
   eventType: chatMembershipEventTypeEnum("event_type").notNull(),
   source: text("source").default("irc_membership").notNull(),
   confidence: integer("confidence").default(70).notNull(),
-  dedupeKey: text("dedupe_key"),
+  dedupeKey: sha256Digest("dedupe_key"),
   eventAt: timestamp("event_at", { withTimezone: true }),
   receivedAt: timestamp("received_at", { withTimezone: true }).defaultNow().notNull(),
   ircConnectionId: uuid("irc_connection_id").references(() => ircConnections.id),
@@ -311,7 +328,8 @@ export const chatMembershipEvents = pgTable("chat_membership_events", {
 }, (table) => ({
   chatterReceivedIdx: index("chat_membership_events_chatter_received_idx").on(table.chatterUserId, table.receivedAt),
   unresolvedIdx: index("chat_membership_events_unresolved_idx").on(table.receivedAt).where(sql`${table.chatterUserId} is null and ${table.identityCheckedAt} is null and ${table.chatterLogin} is not null`),
-  dedupeKeyIdx: uniqueIndex("chat_membership_events_dedupe_key_idx").on(table.dedupeKey)
+  dedupeKeyIdx: uniqueIndex("chat_membership_events_dedupe_key_idx").on(table.dedupeKey),
+  digestLength: check("membership_digest_length", sql`${table.dedupeKey} is null or octet_length(${table.dedupeKey}) = 32`)
 }));
 
 export const chatPresenceSnapshots = pgTable("chat_presence_snapshots", {

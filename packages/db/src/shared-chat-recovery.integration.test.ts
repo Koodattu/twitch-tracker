@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { createDb } from "./index.js";
@@ -25,18 +26,18 @@ describe.skipIf(database == null)("Shared Chat source recovery with PostgreSQL",
       { id: "empty", line: "@source-room-id=;id=empty :chatter PRIVMSG #channel :Hello", source: null, expected: null },
       { id: "redacted", line: "[redacted by subject data deletion]", source: null, expected: null },
       { id: "deleted", line: "@source-room-id=100;id=deleted :chatter PRIVMSG #channel :Hello", source: null, expected: null }
-    ];
+    ].map((fixture) => ({ ...fixture, messageId: randomUUID() }));
     for (const fixture of fixtures) {
       const raw = await pool.query("insert into raw_irc_messages (raw_line) values ($1) returning id", [fixture.line]);
       await pool.query(`insert into chat_messages (twitch_message_id, broadcaster_user_id, chatter_user_id, shared_chat_source_channel_id, raw_irc_message_id)
-        values ($1, 'channel', $2, $3, $4)`, [fixture.id, fixture.id === "deleted" ? null : "chatter", fixture.source, raw.rows[0].id]);
+        values (encode_chat_message_id($1), 'channel', $2, $3, $4)`, [fixture.messageId, fixture.id === "deleted" ? null : "chatter", fixture.source, raw.rows[0].id]);
     }
     const migration = await readFile(new URL("../migrations/0012_recover_shared_chat_sources.sql", import.meta.url), "utf8");
     const first = await pool.query(migration);
     expect(first.rowCount).toBe(3);
-    const result = await pool.query("select twitch_message_id, shared_chat_source_channel_id from chat_messages");
+    const result = await pool.query("select decode_chat_message_id(twitch_message_id) as twitch_message_id, shared_chat_source_channel_id from chat_messages");
     expect(Object.fromEntries(result.rows.map((row) => [row.twitch_message_id, row.shared_chat_source_channel_id])))
-      .toEqual(Object.fromEntries(fixtures.map((fixture) => [fixture.id, fixture.expected])));
+      .toEqual(Object.fromEntries(fixtures.map((fixture) => [fixture.messageId, fixture.expected])));
     const repeat = await pool.query(migration);
     expect(repeat.rowCount).toBe(0);
   });

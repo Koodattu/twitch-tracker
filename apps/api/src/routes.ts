@@ -28,6 +28,7 @@ import {
   raids,
   rawEventsubEvents,
   rawIrcMessages,
+  readRawIrcLines,
   sessions,
   subjectPrivacyStates,
   streamActivityBuckets,
@@ -1848,8 +1849,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
         source: chatMessages.source,
         messageType: chatMessages.messageType,
         rawIrcMessageId: rawIrcMessages.id,
-        rawIrcCommand: rawIrcMessages.parsedCommand,
-        rawIrcLine: rawIrcMessages.rawLine
+        rawIrcCommand: rawIrcMessages.parsedCommand
       })
       .from(chatMessages)
       .leftJoin(twitchUsers, eq(chatMessages.chatterUserId, twitchUsers.twitchUserId))
@@ -1869,14 +1869,16 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
         eventAt: chatMembershipEvents.eventAt,
         receivedAt: chatMembershipEvents.receivedAt,
         rawIrcMessageId: rawIrcMessages.id,
-        rawIrcCommand: rawIrcMessages.parsedCommand,
-        rawIrcLine: rawIrcMessages.rawLine
+        rawIrcCommand: rawIrcMessages.parsedCommand
       })
       .from(chatMembershipEvents)
       .leftJoin(rawIrcMessages, eq(chatMembershipEvents.rawIrcMessageId, rawIrcMessages.id))
       .where(eq(chatMembershipEvents.twitchStreamId, params.streamId))
       .orderBy(desc(chatMembershipEvents.receivedAt))
       .limit(200);
+
+    const rawLines = await readRawIrcLines(db, [...messages, ...membershipEvents]
+      .flatMap((row) => row.rawIrcMessageId == null ? [] : [row.rawIrcMessageId]));
 
     const presenceSnapshots = await db
       .select({
@@ -1935,11 +1937,13 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
         },
         messages: messages.map((message) => ({
           ...message,
+          rawIrcLine: message.rawIrcMessageId == null ? null : rawLines.get(message.rawIrcMessageId) ?? null,
           sentAt: toIso(message.sentAt),
           receivedAt: message.receivedAt.toISOString()
         })),
         membershipEvents: membershipEvents.map((event) => ({
           ...event,
+          rawIrcLine: event.rawIrcMessageId == null ? null : rawLines.get(event.rawIrcMessageId) ?? null,
           eventAt: toIso(event.eventAt),
           receivedAt: event.receivedAt.toISOString()
         })),

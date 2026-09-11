@@ -15,7 +15,8 @@ export async function readCommunityInput(db: DbClient, claim: CommunityBuildClai
           coalesce(s.is_finnish_eligible, false) as finnish,
           m.shared_chat_source_channel_id is not null and m.shared_chat_source_channel_id <> m.broadcaster_user_id as relayed,
           m.shared_chat_source_channel_id is not null or (
-            r.raw_line like '@%' and split_part(r.raw_line, ' ', 1) !~ '(?:^@|;)source-room-id=[^;]+'
+            coalesce(r.unrelayed_source,
+              r.raw_line like '@%' and split_part(r.raw_line, ' ', 1) !~ '(?:^@|;)source-room-id=[^;]+')
           ) as known_source,
           not exists (select 1 from subject_privacy_states p
             where p.twitch_user_id = m.chatter_user_id

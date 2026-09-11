@@ -36,8 +36,22 @@ export const runMaintenanceLoop = (context: WorkerContext) => {
         observedAt: new Date()
       });
 
+      const compactedRawIrcMessages = await context.db.transaction(async (tx) => {
+        await tx.execute(sql`set local lock_timeout = '2s'`);
+        await tx.execute(sql`set local statement_timeout = '30s'`);
+        let total = 0;
+        for (let batch = 0; batch < 10; batch++) {
+          const result = await tx.execute<{ count: number }>(sql`select compact_raw_irc_batch(now() - interval '1 day', 256) as count`);
+          const count = result.rows[0]!.count;
+          total += count;
+          if (count === 0) break;
+        }
+        return total;
+      });
+
       return {
         rawPayloadRetentionDays,
+        compactedRawIrcMessages,
         staleAssignmentGraceMinutes,
         redactedRawHelixResponses: rowCount(redactedRawHelixResponses),
         closedStaleAssignments

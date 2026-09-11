@@ -72,7 +72,7 @@ describe.skipIf(database == null)("Community builds with PostgreSQL", () => {
       from unnest(array['100','200','300','400','500','600','700','800','900']) as id`);
     await pool.query("insert into bot_accounts (twitch_user_id, login) values ('bot','bot'); insert into subject_privacy_states (twitch_user_id, public_profile_hidden) values ('hidden',true),('800',true)");
     await pool.query(`insert into chat_messages (twitch_message_id, broadcaster_user_id, twitch_stream_id, chatter_user_id, received_at, shared_chat_source_channel_id)
-      select channel || '-' || person || '-' || message, channel, case when channel = '500' then null else channel end, person,
+      select encode_chat_message_id(gen_random_uuid()::text), channel, case when channel = '500' then null else channel end, person,
         date_trunc('day', now()) - interval '1 day', case when channel = '300' then '100' when channel = '600' then null else channel end
       from unnest(array['100','200','300','400','500','600','700','800','900']) as channel
       cross join unnest(array['bot','hidden','chatter-1','chatter-2','chatter-3','chatter-4','chatter-5','chatter-6','chatter-7','chatter-8','chatter-9','chatter-10']) as person
@@ -86,6 +86,8 @@ describe.skipIf(database == null)("Community builds with PostgreSQL", () => {
     expect(new Set(input.memberships.map((row) => row.channelId))).toEqual(new Set(["100", "200", "900"]));
     expect(input.memberships.every((row) => row.chatterId.startsWith("chatter-"))).toBe(true);
     expect(input.coverage).toMatchObject({ missingSession: 36, unknownSource: 30, relayedMessages: 30 });
+    await pool.query("select compact_raw_irc_batch(now())");
+    expect(await readCommunityInput(db, claim)).toEqual(input);
     await pool.query("delete from job_locks");
     const result = await runCommunityBuild({ config: loadConfig({ DATABASE_URL: url, SESSION_SECRET: "s".repeat(48) }), db,
       rest: new DisabledHelixAdapter(), workerName: "test", abortSignal: new AbortController().signal });

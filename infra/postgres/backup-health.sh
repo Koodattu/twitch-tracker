@@ -8,6 +8,11 @@ load_backup_settings
 now_epoch="$(date -u +%s)"
 backup_status "$now_epoch"
 
+if [ -e "$BACKUP_DIR/.last-failure" ]; then
+  backup_error "backup_health_failed reason=last_attempt_failed"
+  exit 1
+fi
+
 if [ "${BACKUP_OFF_HOST_CONFIRMED:-false}" != "true" ]; then
   backup_error "backup_warning reason=no_verified_off_host_copy"
 fi
