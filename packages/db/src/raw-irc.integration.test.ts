@@ -55,7 +55,7 @@ describe.skipIf(database == null)("Lossless raw IRC blocks with PostgreSQL", () 
     const client = await pool.connect();
     try {
       await client.query("begin");
-      await client.query("update raw_irc_messages set raw_line='[redacted by subject data deletion]',tags='{}'::jsonb where id=$1", [target.id]);
+      await client.query("update raw_irc_messages set raw_line='[redacted by subject data deletion]',tags=encode_compact_json('{}'::jsonb) where id=$1", [target.id]);
       expect((await client.query("select lines[$2::int] as line from raw_irc_payload_blocks where id=$1", [target.payload_block_id, target.payload_position])).rows[0].line).toBeNull();
       await client.query("rollback");
       expect((await pool.query("select lines from raw_irc_payload_blocks where id=$1", [target.payload_block_id])).rows[0].lines).toEqual(before);

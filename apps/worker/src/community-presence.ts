@@ -28,7 +28,7 @@ export async function readCommunityPresence(db: Pick<DbClient, "execute">, claim
       where m.received_at >= ${claim.windowStart} and m.received_at < ${claim.windowEnd}
         and s.is_finnish_eligible and m.received_at >= s.started_at
         and (s.ended_at is null or m.received_at <= s.ended_at)
-        and m.source = 'irc_membership'
+        and m.source = encode_common_label('irc_membership', 'irc_membership')
       union all
       select p.chatter_user_id, p.broadcaster_user_id, p.observed_at, false, true
       from chat_presence_observations p

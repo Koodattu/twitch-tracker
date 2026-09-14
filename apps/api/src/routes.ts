@@ -2211,7 +2211,7 @@ const redactSubjectData = async (db: DbClient, twitchUserId: string) => {
     redacted_irc as (
       update raw_irc_messages
       set raw_line = '[redacted by subject data deletion]',
-          tags = '{}'::jsonb,
+          tags = encode_compact_json('{}'::jsonb),
           parse_error = null,
           updated_at = now()
       where id in (select id from linked_raw_irc)
@@ -2229,8 +2229,8 @@ const redactSubjectData = async (db: DbClient, twitchUserId: string) => {
       set chatter_user_id = null,
           chatter_login = null,
           raw_text = null,
-          badges = '{}'::jsonb,
-          emotes = '{}'::jsonb,
+          badges = encode_compact_json('{}'::jsonb),
+          emotes = encode_compact_json('{}'::jsonb),
           updated_at = now()
       where chatter_user_id = ${twitchUserId}
         or (${subjectLogin} <> '' and chatter_login = ${subjectLogin})

@@ -120,6 +120,13 @@
       "when": 1789135300000,
       "tag": "0016_compact_chat_identifiers",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1789387200000,
+      "tag": "0017_compact_event_metadata",
+      "breakpoints": true
     }
   ]
 }

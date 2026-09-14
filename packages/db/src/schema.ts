@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { compactMessageId, sha256Digest } from "./compact-types.js";
+import { compactJson, compactLabel } from "./compact-metadata.js";
 import type { CommunityGraph, CommunityCoverage, CommunityBuildStatus } from "@twitch-tracker/shared";
 import { bigint, check, smallint, index, integer, jsonb, pgEnum, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid, boolean } from "drizzle-orm/pg-core";
 
@@ -225,8 +226,8 @@ export const rawIrcMessages = pgTable("raw_irc_messages", {
   payloadBlockId: bigint("payload_block_id", { mode: "bigint" }).references(() => rawIrcPayloadBlocks.id),
   payloadPosition: smallint("payload_position"),
   unrelayedSource: boolean("unrelayed_source"),
-  parsedCommand: text("parsed_command"),
-  tags: jsonb("tags").$type<Record<string, string>>().default({}).notNull(),
+  parsedCommand: compactLabel("PRIVMSG")("parsed_command"),
+  tags: compactJson<Record<string, string>>()("tags").default(sql`decode('00', 'hex')`).notNull(),
   channelLogin: text("channel_login"),
   botAccountId: uuid("bot_account_id").references(() => botAccounts.id),
   ircConnectionId: uuid("irc_connection_id").references(() => ircConnections.id),
@@ -237,6 +238,8 @@ export const rawIrcMessages = pgTable("raw_irc_messages", {
 }, (table) => ({
   receivedIdx: index("raw_irc_messages_received_idx").on(table.receivedAt),
   unpackedIdx: index("raw_irc_messages_unpacked_idx").on(table.receivedAt).where(sql`${table.payloadBlockId} is null and ${table.rawLine} <> ''`),
+  tagsEncoding: check("raw_irc_tags_encoding", sql`decode_compact_json(${table.tags}) is not null`),
+  commandEncoding: check("raw_irc_command_encoding", sql`${table.parsedCommand} is null or ${table.parsedCommand} = '' or left(${table.parsedCommand},1) = '!'`),
   payloadLocation: check("raw_irc_payload_location", sql`(${table.payloadBlockId} is null and ${table.payloadPosition} is null)
     or (${table.payloadBlockId} is not null and ${table.payloadPosition} is not null and ${table.payloadPosition} between 1 and 256 and ${table.rawLine} = '')`)
 }));
@@ -291,8 +294,8 @@ export const chatMessages = pgTable("chat_messages", {
   receivedAt: timestamp("received_at", { withTimezone: true }).defaultNow().notNull(),
   messageType: text("message_type").default("privmsg").notNull(),
   rawText: text("raw_text"),
-  badges: jsonb("badges").$type<Record<string, string>>().default({}).notNull(),
-  emotes: jsonb("emotes").$type<Record<string, unknown>>().default({}).notNull(),
+  badges: compactJson<Record<string, string>>()("badges").default(sql`decode('00', 'hex')`).notNull(),
+  emotes: compactJson<Record<string, unknown>>()("emotes").default(sql`decode('00', 'hex')`).notNull(),
   replyParentMessageId: compactMessageId("reply_parent_message_id"),
   sharedChatSourceChannelId: text("shared_chat_source_channel_id"),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
@@ -305,6 +308,8 @@ export const chatMessages = pgTable("chat_messages", {
   streamReceivedIdx: index("chat_messages_stream_received_idx").on(table.twitchStreamId, table.receivedAt),
   channelReceivedIdx: index("chat_messages_channel_received_idx").on(table.broadcasterUserId, table.receivedAt),
   chatterReceivedIdx: index("chat_messages_chatter_received_idx").on(table.chatterUserId, table.receivedAt),
+  badgesEncoding: check("chat_badges_encoding", sql`decode_compact_json(${table.badges}) is not null`),
+  emotesEncoding: check("chat_emotes_encoding", sql`decode_compact_json(${table.emotes}) is not null`),
   messageIdEncoding: check("chat_message_id_encoding", sql`encode_chat_message_id(decode_chat_message_id(${table.twitchMessageId})) = ${table.twitchMessageId}`),
   replyIdEncoding: check("chat_reply_id_encoding", sql`${table.replyParentMessageId} is null or encode_chat_message_id(decode_chat_message_id(${table.replyParentMessageId})) = ${table.replyParentMessageId}`)
 }));
@@ -317,7 +322,7 @@ export const chatMembershipEvents = pgTable("chat_membership_events", {
   identityCheckedAt: timestamp("identity_checked_at", { withTimezone: true }),
   twitchStreamId: text("twitch_stream_id").references(() => streamSessions.twitchStreamId),
   eventType: chatMembershipEventTypeEnum("event_type").notNull(),
-  source: text("source").default("irc_membership").notNull(),
+  source: compactLabel("irc_membership")("source").default(sql`''`).notNull(),
   confidence: integer("confidence").default(70).notNull(),
   dedupeKey: sha256Digest("dedupe_key"),
   eventAt: timestamp("event_at", { withTimezone: true }),
@@ -329,6 +334,7 @@ export const chatMembershipEvents = pgTable("chat_membership_events", {
   chatterReceivedIdx: index("chat_membership_events_chatter_received_idx").on(table.chatterUserId, table.receivedAt),
   unresolvedIdx: index("chat_membership_events_unresolved_idx").on(table.receivedAt).where(sql`${table.chatterUserId} is null and ${table.identityCheckedAt} is null and ${table.chatterLogin} is not null`),
   dedupeKeyIdx: uniqueIndex("chat_membership_events_dedupe_key_idx").on(table.dedupeKey),
+  sourceEncoding: check("membership_source_encoding", sql`${table.source} = '' or left(${table.source},1) = '!'`),
   digestLength: check("membership_digest_length", sql`${table.dedupeKey} is null or octet_length(${table.dedupeKey}) = 32`)
 }));
 
