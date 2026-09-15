@@ -7,6 +7,11 @@ const nextConfig = {
   output: "standalone",
   outputFileTracingRoot: workspaceRoot,
   reactStrictMode: true,
+  cacheMaxMemorySize: 50 * 1024 * 1024,
+  experimental: {
+    // The container's tmpfs cannot retain an unbounded fetch cache.
+    isrFlushToDisk: false
+  },
   turbopack: {
     root: workspaceRoot
   },
