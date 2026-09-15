@@ -14,7 +14,7 @@ $$;
 CREATE FUNCTION read_membership_key(channel_id text, stream_id text, kind chat_membership_event_type, login text, occurred_at timestamptz, stored_key bytea)
 RETURNS bytea LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
   SELECT CASE WHEN stored_key = decode('', 'hex')
-    THEN derive_membership_key(channel_id, stream_id, kind, login, occurred_at)
+    THEN public.derive_membership_key(channel_id, stream_id, kind, login, occurred_at)
     ELSE stored_key END
 $$;
 --> statement-breakpoint
@@ -43,9 +43,9 @@ BEGIN
     AND (NEW.broadcaster_user_id, NEW.twitch_stream_id, NEW.event_type, NEW.chatter_login, NEW.event_at)
       IS DISTINCT FROM (OLD.broadcaster_user_id, OLD.twitch_stream_id, OLD.event_type, OLD.chatter_login, OLD.event_at) THEN
     -- Identity repair and privacy redaction must not change the original dedupe key.
-    NEW.dedupe_key_storage := derive_membership_key(OLD.broadcaster_user_id, OLD.twitch_stream_id, OLD.event_type, OLD.chatter_login, OLD.event_at);
+    NEW.dedupe_key_storage := public.derive_membership_key(OLD.broadcaster_user_id, OLD.twitch_stream_id, OLD.event_type, OLD.chatter_login, OLD.event_at);
   END IF;
-  IF NEW.dedupe_key_storage = derive_membership_key(NEW.broadcaster_user_id, NEW.twitch_stream_id, NEW.event_type, NEW.chatter_login, NEW.event_at) THEN
+  IF NEW.dedupe_key_storage = public.derive_membership_key(NEW.broadcaster_user_id, NEW.twitch_stream_id, NEW.event_type, NEW.chatter_login, NEW.event_at) THEN
     NEW.dedupe_key_storage := decode('', 'hex');
   END IF;
   RETURN NEW;

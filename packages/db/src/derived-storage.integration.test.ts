@@ -83,6 +83,24 @@ describe.skipIf(database == null)("Derived membership keys and shared IRC contex
     await expect(pool.query("insert into chat_membership_events(broadcaster_user_id,event_type,dedupe_key_storage) values ('channel','join',$1)", [expected])).rejects.toThrow("chat_membership_events_dedupe_key_idx");
   });
 
+  it("supports index restoration and identity updates with pg_restore's empty search path", async () => {
+    const expected = key("person", "2026-09-15T10:12:13Z");
+    await pool.query("insert into chat_membership_events(broadcaster_user_id,chatter_login,event_type,event_at,dedupe_key_storage) values ('channel','person','join','2026-09-15T10:12:13Z',$1)", [expected]);
+    const client = await pool.connect();
+    try {
+      await client.query("begin");
+      await client.query("set local search_path = ''");
+      await client.query(`create index membership_restore_probe on public.chat_membership_events
+        (public.read_membership_key(broadcaster_user_id,twitch_stream_id,event_type,chatter_login,event_at,dedupe_key_storage))`);
+      const row = (await client.query("update public.chat_membership_events set chatter_login=null returning dedupe_key_storage")).rows[0];
+      expect(row.dedupe_key_storage).toEqual(expected);
+      const context = (await client.query("select public.get_raw_irc_context('restore-fixture',null,null) as id")).rows[0];
+      expect(context.id).toBeTypeOf("number");
+      expect((await client.query("select public.get_raw_irc_context('restore-fixture',null,null) as id")).rows[0].id).toBe(context.id);
+      await client.query("rollback");
+    } finally { await client.query("rollback"); client.release(); }
+  });
+
   it("normalizes exact context values including nulls and reuses them under concurrent first writes", async () => {
     const results = await Promise.all(Array.from({ length: 8 }, () => pool.query("select get_raw_irc_context($1,null,null) as id", ["room:ää😀"])));
     expect(new Set(results.map((result) => result.rows[0].id)).size).toBe(1);

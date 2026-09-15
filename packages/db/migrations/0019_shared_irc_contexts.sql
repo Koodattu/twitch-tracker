@@ -36,14 +36,14 @@ DECLARE context integer;
 BEGIN
   IF channel IS NULL AND bot_id IS NULL AND connection_id IS NULL THEN RETURN NULL; END IF;
   IF channel IS NULL THEN
-    SELECT id INTO context FROM raw_irc_contexts WHERE channel_login IS NULL
+    SELECT id INTO context FROM public.raw_irc_contexts WHERE channel_login IS NULL
       AND bot_account_id IS NOT DISTINCT FROM bot_id AND irc_connection_id IS NOT DISTINCT FROM connection_id;
   ELSE
-    SELECT id INTO context FROM raw_irc_contexts WHERE channel_login = channel
+    SELECT id INTO context FROM public.raw_irc_contexts WHERE channel_login = channel
       AND bot_account_id IS NOT DISTINCT FROM bot_id AND irc_connection_id IS NOT DISTINCT FROM connection_id;
   END IF;
   IF FOUND THEN RETURN context; END IF;
-  INSERT INTO raw_irc_contexts(channel_login, bot_account_id, irc_connection_id)
+  INSERT INTO public.raw_irc_contexts(channel_login, bot_account_id, irc_connection_id)
     VALUES(channel, bot_id, connection_id)
     ON CONFLICT ON CONSTRAINT raw_irc_contexts_identity DO UPDATE SET channel_login = raw_irc_contexts.channel_login
     RETURNING id INTO context;

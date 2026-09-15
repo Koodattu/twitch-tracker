@@ -22,6 +22,10 @@ expression index uses `read_membership_key`, so duplicates still conflict across
 both representations. The worker uses `ON CONFLICT DO NOTHING` because its
 pinned Drizzle version does not accept expression conflict targets.
 
+Function bodies qualify references to application helpers and tables with
+`public`, so index restoration and trigger execution also work with the empty
+search path used by `pg_restore`.
+
 The `membership_key_guard` trigger materializes the original digest before an
 update changes a derivation input. Privacy deletion and login/timestamp repairs
 therefore keep the original dedupe identity. Explicitly replacing the stored key
