@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import {
   botAccounts,
   chatMembershipEvents,
@@ -313,8 +312,7 @@ const persistRawIrcMessage = async (db: DbClient, botAccountId: string, botLogin
       parsedCommand: message.command,
       // The wire line already contains the IRCv3 tags verbatim.
       tags: {},
-      channelLogin,
-      botAccountId,
+      contextId: sql`get_raw_irc_context(${channelLogin}, ${botAccountId}::uuid, null)`,
       receivedAt: new Date(),
       processingStatus: "processed"
     })
@@ -450,19 +448,11 @@ export const persistMembershipEvent = async (
       eventType: message.command === "JOIN" ? "join" : "part",
       source: "irc_membership",
       confidence: 70,
-      dedupeKey: membershipDedupeKey({
-        broadcasterUserId: broadcaster.twitchUserId,
-        twitchStreamId: currentStream?.twitchStreamId ?? null,
-        eventType: message.command === "JOIN" ? "join" : "part",
-        chatterLogin: getUserLogin(message),
-        eventAt
-      }),
+      dedupeKeyStorage: "",
       eventAt,
       receivedAt: eventAt,
       rawIrcMessageId
-    }).onConflictDoNothing({
-      target: chatMembershipEvents.dedupeKey
-    });
+    }).onConflictDoNothing();
   });
 
   await touchAssignmentActivity(db, botAccountId, broadcaster.twitchUserId, {
@@ -665,25 +655,6 @@ const upsertObservedTwitchUser = async (
 
 const isAssignmentBlockingNotice = (msgId: string) => {
   return ["msg_banned", "msg_channel_blocked", "msg_channel_suspended", "tos_ban"].includes(msgId);
-};
-
-const membershipDedupeKey = (input: {
-  broadcasterUserId: string;
-  twitchStreamId: string | null;
-  eventType: "join" | "part";
-  chatterLogin: string | null;
-  eventAt: Date;
-}) => {
-  const eventSecond = new Date(Math.floor(input.eventAt.getTime() / 1000) * 1000).toISOString();
-  const identity = [
-    "irc_membership",
-    input.broadcasterUserId,
-    input.twitchStreamId ?? "no-stream",
-    input.eventType,
-    input.chatterLogin ?? "unknown",
-    eventSecond
-  ].join(":");
-  return createHash("sha256").update(identity).digest("base64url");
 };
 
 const findUserByLogin = async (db: DbClient, login: string | null) => {

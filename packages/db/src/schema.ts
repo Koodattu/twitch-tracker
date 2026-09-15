@@ -1,8 +1,8 @@
 import { sql } from "drizzle-orm";
-import { compactMessageId, sha256Digest } from "./compact-types.js";
+import { compactMessageId, membershipKeyStorage } from "./compact-types.js";
 import { compactJson, compactLabel } from "./compact-metadata.js";
 import type { CommunityGraph, CommunityCoverage, CommunityBuildStatus } from "@twitch-tracker/shared";
-import { bigint, check, smallint, index, integer, jsonb, pgEnum, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid, boolean } from "drizzle-orm/pg-core";
+import { bigint, check, smallint, index, integer, jsonb, pgEnum, pgTable, primaryKey, text, timestamp, unique, uniqueIndex, uuid, boolean } from "drizzle-orm/pg-core";
 
 export const appModeEnum = pgEnum("app_mode", ["local", "private_mvp", "production"]);
 export const assignmentStatusEnum = pgEnum("assignment_status", ["desired", "joining", "joined", "leaving", "left", "failed"]);
@@ -220,6 +220,15 @@ export const rawIrcPayloadBlocks = pgTable("raw_irc_payload_blocks", {
   lineCount: check("raw_irc_payload_blocks_lines_check", sql`cardinality(${table.lines}) between 1 and 256`)
 }));
 
+export const rawIrcContexts = pgTable("raw_irc_contexts", {
+  id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+  channelLogin: text("channel_login"),
+  botAccountId: uuid("bot_account_id").references(() => botAccounts.id),
+  ircConnectionId: uuid("irc_connection_id").references(() => ircConnections.id)
+}, (table) => ({
+  identity: unique("raw_irc_contexts_identity").on(table.channelLogin, table.botAccountId, table.ircConnectionId).nullsNotDistinct()
+}));
+
 export const rawIrcMessages = pgTable("raw_irc_messages", {
   id: uuid("id").defaultRandom().primaryKey(),
   rawLine: text("raw_line").notNull(),
@@ -228,9 +237,7 @@ export const rawIrcMessages = pgTable("raw_irc_messages", {
   unrelayedSource: boolean("unrelayed_source"),
   parsedCommand: compactLabel("PRIVMSG")("parsed_command"),
   tags: compactJson<Record<string, string>>()("tags").default(sql`decode('00', 'hex')`).notNull(),
-  channelLogin: text("channel_login"),
-  botAccountId: uuid("bot_account_id").references(() => botAccounts.id),
-  ircConnectionId: uuid("irc_connection_id").references(() => ircConnections.id),
+  contextId: integer("context_id").references(() => rawIrcContexts.id),
   receivedAt: timestamp("received_at", { withTimezone: true }).defaultNow().notNull(),
   processingStatus: rawProcessingStatusEnum("processing_status").default("pending").notNull(),
   parseError: text("parse_error"),
@@ -308,6 +315,7 @@ export const chatMessages = pgTable("chat_messages", {
   streamReceivedIdx: index("chat_messages_stream_received_idx").on(table.twitchStreamId, table.receivedAt),
   channelReceivedIdx: index("chat_messages_channel_received_idx").on(table.broadcasterUserId, table.receivedAt),
   chatterReceivedIdx: index("chat_messages_chatter_received_idx").on(table.chatterUserId, table.receivedAt),
+  eventTimeBrin: index("chat_messages_event_time_brin").using("brin", sql`coalesce(${table.sentAt}, ${table.receivedAt})`).with({ pages_per_range: 32, autosummarize: true }),
   badgesEncoding: check("chat_badges_encoding", sql`decode_compact_json(${table.badges}) is not null`),
   emotesEncoding: check("chat_emotes_encoding", sql`decode_compact_json(${table.emotes}) is not null`),
   messageIdEncoding: check("chat_message_id_encoding", sql`encode_chat_message_id(decode_chat_message_id(${table.twitchMessageId})) = ${table.twitchMessageId}`),
@@ -324,7 +332,8 @@ export const chatMembershipEvents = pgTable("chat_membership_events", {
   eventType: chatMembershipEventTypeEnum("event_type").notNull(),
   source: compactLabel("irc_membership")("source").default(sql`''`).notNull(),
   confidence: integer("confidence").default(70).notNull(),
-  dedupeKey: sha256Digest("dedupe_key"),
+  // An empty physical value means the original digest is derived from the event.
+  dedupeKeyStorage: membershipKeyStorage("dedupe_key_storage"),
   eventAt: timestamp("event_at", { withTimezone: true }),
   receivedAt: timestamp("received_at", { withTimezone: true }).defaultNow().notNull(),
   ircConnectionId: uuid("irc_connection_id").references(() => ircConnections.id),
@@ -333,10 +342,13 @@ export const chatMembershipEvents = pgTable("chat_membership_events", {
 }, (table) => ({
   chatterReceivedIdx: index("chat_membership_events_chatter_received_idx").on(table.chatterUserId, table.receivedAt),
   unresolvedIdx: index("chat_membership_events_unresolved_idx").on(table.receivedAt).where(sql`${table.chatterUserId} is null and ${table.identityCheckedAt} is null and ${table.chatterLogin} is not null`),
-  dedupeKeyIdx: uniqueIndex("chat_membership_events_dedupe_key_idx").on(table.dedupeKey),
+  dedupeKeyIdx: uniqueIndex("chat_membership_events_dedupe_key_idx").on(sql`read_membership_key(${table.broadcasterUserId}, ${table.twitchStreamId}, ${table.eventType}, ${table.chatterLogin}, ${table.eventAt}, ${table.dedupeKeyStorage})`),
+  timeBrin: index("chat_membership_events_time_brin").using("brin", table.receivedAt, sql`coalesce(${table.eventAt}, ${table.receivedAt})`).with({ pages_per_range: 32, autosummarize: true }),
   sourceEncoding: check("membership_source_encoding", sql`${table.source} = '' or left(${table.source},1) = '!'`),
-  digestLength: check("membership_digest_length", sql`${table.dedupeKey} is null or octet_length(${table.dedupeKey}) = 32`)
+  digestLength: check("membership_digest_length", sql`${table.dedupeKeyStorage} is null or octet_length(${table.dedupeKeyStorage}) = 32 or (octet_length(${table.dedupeKeyStorage}) = 0 and derive_membership_key(${table.broadcasterUserId}, ${table.twitchStreamId}, ${table.eventType}, ${table.chatterLogin}, ${table.eventAt}) is not null)`)
 }));
+
+export const membershipDedupeKeySql = sql`read_membership_key(${chatMembershipEvents.broadcasterUserId}, ${chatMembershipEvents.twitchStreamId}, ${chatMembershipEvents.eventType}, ${chatMembershipEvents.chatterLogin}, ${chatMembershipEvents.eventAt}, ${chatMembershipEvents.dedupeKeyStorage})`;
 
 export const chatPresenceSnapshots = pgTable("chat_presence_snapshots", {
   id: uuid("id").defaultRandom().primaryKey(),

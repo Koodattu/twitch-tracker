@@ -17,12 +17,12 @@ describe.skipIf(database == null)("Compact identifiers with PostgreSQL", () => {
 
   it("preserves every SHA-256 bit, the application string, and uniqueness", async () => {
     const digest = createHash("sha256").update("membership fixture").digest();
-    const value = { broadcasterUserId: "channel", eventType: "join" as const, dedupeKey: digest.toString("base64url") };
+    const value = { broadcasterUserId: "channel", eventType: "join" as const, dedupeKeyStorage: digest.toString("base64url") };
     const first = await db.insert(chatMembershipEvents).values(value).returning();
-    expect(first[0]!.dedupeKey).toBe(value.dedupeKey);
-    expect((await pool.query("select dedupe_key from chat_membership_events")).rows[0].dedupe_key).toEqual(digest);
+    expect(first[0]!.dedupeKeyStorage).toBe(value.dedupeKeyStorage);
+    expect((await pool.query("select dedupe_key_storage from chat_membership_events")).rows[0].dedupe_key_storage).toEqual(digest);
     expect(await db.insert(chatMembershipEvents).values(value).onConflictDoNothing().returning()).toEqual([]);
-    await expect(db.insert(chatMembershipEvents).values({ ...value, dedupeKey: "not-a-digest" }).returning()).rejects.toThrow("canonical SHA-256");
+    await expect(db.insert(chatMembershipEvents).values({ ...value, dedupeKeyStorage: "not-a-digest" }).returning()).rejects.toThrow("canonical SHA-256");
   });
 
   it.each(["00112233-4455-6677-8899-aabbccddeeff", "an-opaque-ID/😀", "00112233-4455-6677-8899-AABBCCDDEEFF", ""])("preserves external identifier %s and deduplication", async (messageId) => {

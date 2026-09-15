@@ -3,7 +3,7 @@ import * as fs from "node:fs/promises";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import nextConfig from "./next.config.mjs";
 
 const require = createRequire(import.meta.url);
@@ -12,6 +12,7 @@ const { default: FileSystemCache } = require("next/dist/server/lib/incremental-c
 // Exercise the pinned Next.js implementation: isrFlushToDisk is experimental.
 test("fetch cache evicts old entries without filling the container filesystem", async () => {
   const directory = await mkdtemp(join(tmpdir(), "twitch-web-cache-"));
+  const clock = vi.spyOn(Date, "now").mockReturnValue(1000);
   try {
     const cache = new FileSystemCache({
       fs,
@@ -36,9 +37,11 @@ test("fetch cache evicts old entries without filling the container filesystem", 
     expect((await cache.get("page-63", context))?.value).toEqual(value);
     expect(await readdir(directory)).toEqual([]);
 
+    clock.mockReturnValue(2000);
     await cache.revalidateTag("changed");
     expect(await cache.get("page-63", { ...context, tags: ["changed"] })).toBeNull();
   } finally {
+    clock.mockRestore();
     await rm(directory, { recursive: true, force: true });
   }
 });

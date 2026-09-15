@@ -89,7 +89,7 @@ describe.skipIf(database == null)("Aggregation boundaries with PostgreSQL", () =
         union all select 'early-stream', 'channel', day, 300 from fixture_times
       `);
       await tx.execute(sql`
-        insert into chat_membership_events (broadcaster_user_id, twitch_stream_id, chatter_user_id, event_type, event_at, received_at, dedupe_key)
+        insert into chat_membership_events (broadcaster_user_id, twitch_stream_id, chatter_user_id, event_type, event_at, received_at, dedupe_key_storage)
         select 'channel', 'stream', 'chatter', 'join'::chat_membership_event_type, bucket, bucket, decode(repeat('01',32),'hex') from fixture_times
         union all select 'channel', 'stream', 'chatter', 'part'::chat_membership_event_type, bucket + interval '5 minutes' - interval '1 microsecond', bucket + interval '5 minutes' - interval '1 microsecond', decode(repeat('02',32),'hex') from fixture_times
       `);

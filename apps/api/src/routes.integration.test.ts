@@ -66,9 +66,14 @@ describe.skipIf(database == null)("Analytics routes with PostgreSQL", () => {
 
   it("returns packed raw lines and erases their archived copies through the privacy API", async () => {
     const wire = "@id=00112233-4455-6677-8899-aabbccddeeff :chatter PRIVMSG #channel :private fixture";
-    const raw = (await pool.query("insert into raw_irc_messages (raw_line, received_at) values ($1,$2) returning id", [wire, firstSeen])).rows[0];
+    const raw = (await pool.query("insert into raw_irc_messages (raw_line, received_at,context_id) values ($1,$2,get_raw_irc_context('channel',null,null)) returning id", [wire, firstSeen])).rows[0];
     await db.insert(chatMessages).values({ twitchMessageId: "00112233-4455-6677-8899-aabbccddeeff",
       broadcasterUserId: "broadcaster", chatterUserId: "chatter", chatterLogin: "chatter", twitchStreamId: "stream", rawIrcMessageId: raw.id });
+    const membership = (await pool.query(`insert into chat_membership_events
+      (broadcaster_user_id,chatter_user_id,chatter_login,twitch_stream_id,event_type,event_at,dedupe_key_storage)
+      values ('broadcaster','chatter','chatter','stream','join',$1,derive_membership_key('broadcaster','stream','join','chatter',$1))
+      returning id,read_membership_key(broadcaster_user_id,twitch_stream_id,event_type,chatter_login,event_at,dedupe_key_storage) as key,octet_length(dedupe_key_storage) as stored_bytes`, [firstSeen])).rows[0];
+    expect(membership.stored_bytes).toBe(0);
     await pool.query("select compact_raw_irc_batch(now())");
     const response = await app.request("/api/private/streams/stream/raw");
     expect(response.status).toBe(200);
@@ -79,6 +84,10 @@ describe.skipIf(database == null)("Analytics routes with PostgreSQL", () => {
     expect(completed.status).toBe(200);
     expect((await pool.query("select count(*)::int as count from raw_irc_payload_blocks where $1=any(lines)", [wire])).rows[0].count).toBe(0);
     expect((await pool.query("select read_raw_irc_line(raw_line,payload_block_id,payload_position) as line from raw_irc_messages where id=$1", [raw.id])).rows[0].line).toBe("[redacted by subject data deletion]");
+    const redactedMembership = (await pool.query(`select chatter_user_id,chatter_login,
+      read_membership_key(broadcaster_user_id,twitch_stream_id,event_type,chatter_login,event_at,dedupe_key_storage) as key
+      from chat_membership_events where id=$1`, [membership.id])).rows[0];
+    expect(redactedMembership).toEqual({ chatter_user_id: null, chatter_login: null, key: membership.key });
   });
 
   it.each([null, "https://example.com/current.jpg"])("returns the latest viewer sample with thumbnail %s", async (thumbnailUrl) => {

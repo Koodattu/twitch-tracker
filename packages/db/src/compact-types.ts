@@ -15,9 +15,10 @@ export const compactMessageId = customType<{ data: string; driverData: Buffer }>
   }
 });
 
-export const sha256Digest = customType<{ data: string; driverData: Buffer }>({
+export const membershipKeyStorage = customType<{ data: string; driverData: Buffer }>({
   dataType: () => "bytea",
   toDriver(value) {
+    if (value === "") return Buffer.alloc(0);
     const bytes = Buffer.from(value, "base64url");
     if (bytes.length !== 32 || bytes.toString("base64url") !== value) {
       throw new Error("Membership dedupe key must be a canonical SHA-256 digest.");
