@@ -5,6 +5,7 @@ import { createPgPool } from "./index.js";
 const { values } = parseArgs({ options: {
   database: { type: "string" },
   layout: { type: "string", default: "compact" },
+  "membership-only": { type: "boolean", default: false },
   compare: { type: "string" }
 } });
 const connectionString = process.env.DATABASE_URL;
@@ -31,8 +32,8 @@ try {
   const metadata = (await client.query("select to_regprocedure('decode_compact_json(bytea)') is not null as compact")).rows[0].compact as boolean;
   const derivedKeys = (await client.query("select exists(select 1 from pg_attribute where attrelid='chat_membership_events'::regclass and attname='dedupe_key_storage' and not attisdropped) as enabled")).rows[0].enabled as boolean;
   const sharedContexts = (await client.query("select to_regclass('raw_irc_contexts') is not null as enabled")).rows[0].enabled as boolean;
-  const tables = ["raw_irc_messages", "chat_messages", "chat_membership_events", "stream_snapshots"];
-  if (values.layout === "metadata") tables.push("raw_irc_payload_blocks");
+  const tables = values["membership-only"] ? ["chat_membership_events"] : ["raw_irc_messages", "chat_messages", "chat_membership_events", "stream_snapshots"];
+  if (values.layout === "metadata" && !values["membership-only"]) tables.push("raw_irc_payload_blocks");
   for (const table of tables) {
     const compact = values.layout !== "inline";
     const raw = values.layout === "compact" && table === "raw_irc_messages";
@@ -67,7 +68,7 @@ try {
   await client.query("commit");
   const matchesBaseline = expected == null ? null : Object.entries(fingerprints).every(([table, actual]) =>
     actual.rows === expected.fingerprints[table]?.rows && actual.hash1 === expected.fingerprints[table]?.hash1 && actual.hash2 === expected.fingerprints[table]?.hash2);
-  console.log(JSON.stringify({ databaseName, layout: values.layout, databaseBytes, sizes, fingerprints, matchesBaseline }, null, 2));
+  console.log(JSON.stringify({ databaseName, layout: values.layout, scope: values["membership-only"] ? "membership" : "all", databaseBytes, sizes, fingerprints, matchesBaseline }, null, 2));
   if (matchesBaseline === false) throw new Error("Canonical row fingerprints differ from the baseline.");
 } finally {
   await client.query("rollback");

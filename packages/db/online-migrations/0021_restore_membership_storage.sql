@@ -13,9 +13,6 @@ DROP FUNCTION insert_membership_event(text,text,text,text,chat_membership_event_
 DROP VIEW chat_membership_events;
 DROP FUNCTION write_membership_event();
 DROP TABLE membership_event_rows;
-DROP TABLE membership_event_contexts;
-DROP TABLE membership_event_identities;
-DROP FUNCTION protect_membership_dictionary();
 ALTER TABLE membership_restored RENAME TO chat_membership_events;
 ALTER TABLE chat_membership_events
  ADD CONSTRAINT chat_membership_events_pkey PRIMARY KEY(id),

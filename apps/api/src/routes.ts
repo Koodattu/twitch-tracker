@@ -2305,11 +2305,6 @@ const redactSubjectData = async (db: DbClient, twitchUserId: string) => {
         updated_at = now()
     where twitch_user_id = ${twitchUserId}
   `);
-  await db.execute(sql`
-    delete from membership_event_identities i
-    where (i.chatter_user_id = ${twitchUserId} or (${subjectLogin} <> '' and i.chatter_login = ${subjectLogin}))
-      and not exists (select 1 from membership_event_rows r where r.identity_id = i.id)
-  `);
 };
 
 const requireInternal: MiddlewareHandler<ApiBindings> = async (c, next) => {

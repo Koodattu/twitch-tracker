@@ -146,7 +146,7 @@
       "idx": 20,
       "version": "7",
       "when": 1789646400000,
-      "tag": "0020_normalized_membership_events",
+      "tag": "0020_compact_membership_metadata",
       "breakpoints": true
     }
   ]

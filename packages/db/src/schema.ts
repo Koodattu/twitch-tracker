@@ -322,7 +322,7 @@ export const chatMessages = pgTable("chat_messages", {
   replyIdEncoding: check("chat_reply_id_encoding", sql`${table.replyParentMessageId} is null or encode_chat_message_id(decode_chat_message_id(${table.replyParentMessageId})) = ${table.replyParentMessageId}`)
 }));
 
-// Writable compatibility view over membership_event_rows and its dictionaries.
+// Writable compatibility view over compact membership_event_rows metadata.
 // Duplicate-tolerant ingestion uses insert_membership_event, not ON CONFLICT on this view.
 export const chatMembershipEvents = pgTable("chat_membership_events", {
   id: uuid("id").defaultRandom().primaryKey(),

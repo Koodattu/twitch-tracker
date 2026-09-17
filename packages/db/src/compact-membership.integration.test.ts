@@ -5,7 +5,7 @@ const url = process.env.TEST_DATABASE_URL;
 if (url != null && !new URL(url).pathname.toLowerCase().includes("test")) throw new Error("TEST_DATABASE_URL must name a dedicated test database.");
 const database = url == null ? null : createDb(url);
 
-describe.skipIf(database == null)("Normalized membership storage", () => {
+describe.skipIf(database == null)("Compact membership metadata", () => {
   if (database == null) return;
   const { pool } = database;
   beforeEach(async () => {
@@ -33,15 +33,12 @@ describe.skipIf(database == null)("Normalized membership storage", () => {
     }
   });
 
-  it("shares dictionaries while preserving unresolved identities and distinct logins", async () => {
+  it("preserves unresolved identities and distinct logins", async () => {
     for (const [person, login] of [[null, "person"], ["person", "person"], ["person", "old-name"], [null, null], [null, ""]]) {
       await pool.query("insert into chat_membership_events(broadcaster_user_id,chatter_user_id,chatter_login,event_type) values ('channel',$1,$2,'join'),('channel',$1,$2,'part')", [person, login]);
     }
-    expect((await pool.query("select count(*)::int as n from membership_event_contexts")).rows[0].n).toBe(1);
-    expect((await pool.query("select count(*)::int as n from membership_event_identities")).rows[0].n).toBe(5);
     expect((await pool.query("select count(*)::int as n from chat_membership_events")).rows[0].n).toBe(10);
-    await expect(pool.query("update membership_event_identities set chatter_login='changed'")).rejects.toThrow("immutable");
-    await expect(pool.query("delete from membership_event_contexts")).rejects.toThrow("foreign key");
+    expect((await pool.query("select count(*)::int as n from (select distinct chatter_user_id,chatter_login from chat_membership_events) identities")).rows[0].n).toBe(5);
   });
 
   it("suppresses concurrent duplicates while retaining ordinary insert errors", async () => {
@@ -49,7 +46,7 @@ describe.skipIf(database == null)("Normalized membership storage", () => {
     expect(calls.reduce((sum, result) => sum + result.rows.length, 0)).toBe(1);
     await expect(pool.query("insert into chat_membership_events(broadcaster_user_id,chatter_login,event_type,event_at,dedupe_key_storage) values ('channel','person','join','2026-09-17 10:00:00.999999+00',decode('','hex'))")).rejects.toThrow("chat_membership_events_dedupe_key_idx");
     await expect(pool.query("select * from insert_membership_event('missing',null,'person',null,'join',now(),null)")).rejects.toThrow("foreign key");
-    expect((await pool.query("select count(*)::int as n from membership_event_contexts")).rows[0].n).toBe(1);
+    expect((await pool.query("select count(*)::int as n from chat_membership_events")).rows[0].n).toBe(1);
   });
 
   it("preserves exact metadata updates and supports deletion and rollback", async () => {
