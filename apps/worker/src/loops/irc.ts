@@ -1,6 +1,5 @@
 import {
   botAccounts,
-  chatMembershipEvents,
   chatMessages,
   channelEvents,
   createChatAssignmentControl,
@@ -439,20 +438,11 @@ export const persistMembershipEvent = async (
     `);
     if (restricted.rows.length > 0) return;
     const chatterUserId = await findMembershipIdentity(tx, chatterLogin, eventAt);
-    await tx.insert(chatMembershipEvents).values({
-      broadcasterUserId: broadcaster.twitchUserId,
-      chatterLogin,
-      chatterUserId,
-      identityCheckedAt: chatterUserId == null ? null : eventAt,
-      twitchStreamId: currentStream?.twitchStreamId ?? null,
-      eventType: message.command === "JOIN" ? "join" : "part",
-      source: "irc_membership",
-      confidence: 70,
-      dedupeKeyStorage: "",
-      eventAt,
-      receivedAt: eventAt,
-      rawIrcMessageId
-    }).onConflictDoNothing();
+    await tx.execute(sql`select id from insert_membership_event(
+      ${broadcaster.twitchUserId}, ${chatterUserId}, ${chatterLogin}, ${currentStream?.twitchStreamId ?? null},
+      ${message.command === "JOIN" ? "join" : "part"}::chat_membership_event_type,
+      ${eventAt}::timestamptz, ${chatterUserId == null ? null : eventAt}::timestamptz, decode('','hex'), ${rawIrcMessageId}::uuid
+    )`);
   });
 
   await touchAssignmentActivity(db, botAccountId, broadcaster.twitchUserId, {

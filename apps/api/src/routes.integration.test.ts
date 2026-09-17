@@ -88,6 +88,7 @@ describe.skipIf(database == null)("Analytics routes with PostgreSQL", () => {
       read_membership_key(broadcaster_user_id,twitch_stream_id,event_type,chatter_login,event_at,dedupe_key_storage) as key
       from chat_membership_events where id=$1`, [membership.id])).rows[0];
     expect(redactedMembership).toEqual({ chatter_user_id: null, chatter_login: null, key: membership.key });
+    expect((await pool.query("select count(*)::int as count from membership_event_identities where chatter_user_id='chatter' or chatter_login='chatter'")).rows[0].count).toBe(0);
   });
 
   it.each([null, "https://example.com/current.jpg"])("returns the latest viewer sample with thumbnail %s", async (thumbnailUrl) => {

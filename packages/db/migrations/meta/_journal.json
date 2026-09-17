@@ -141,6 +141,13 @@
       "when": 1789489900000,
       "tag": "0019_shared_irc_contexts",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1789646400000,
+      "tag": "0020_normalized_membership_events",
+      "breakpoints": true
     }
   ]
 }

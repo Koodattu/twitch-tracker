@@ -21,7 +21,7 @@ describe.skipIf(database == null)("Compact identifiers with PostgreSQL", () => {
     const first = await db.insert(chatMembershipEvents).values(value).returning();
     expect(first[0]!.dedupeKeyStorage).toBe(value.dedupeKeyStorage);
     expect((await pool.query("select dedupe_key_storage from chat_membership_events")).rows[0].dedupe_key_storage).toEqual(digest);
-    expect(await db.insert(chatMembershipEvents).values(value).onConflictDoNothing().returning()).toEqual([]);
+    expect((await pool.query("select * from insert_membership_event('channel',null,null,null,'join',null,null,$1)", [digest])).rows).toEqual([]);
     await expect(db.insert(chatMembershipEvents).values({ ...value, dedupeKeyStorage: "not-a-digest" }).returning()).rejects.toThrow("canonical SHA-256");
   });
 

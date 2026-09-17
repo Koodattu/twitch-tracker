@@ -322,6 +322,8 @@ export const chatMessages = pgTable("chat_messages", {
   replyIdEncoding: check("chat_reply_id_encoding", sql`${table.replyParentMessageId} is null or encode_chat_message_id(decode_chat_message_id(${table.replyParentMessageId})) = ${table.replyParentMessageId}`)
 }));
 
+// Writable compatibility view over membership_event_rows and its dictionaries.
+// Duplicate-tolerant ingestion uses insert_membership_event, not ON CONFLICT on this view.
 export const chatMembershipEvents = pgTable("chat_membership_events", {
   id: uuid("id").defaultRandom().primaryKey(),
   broadcasterUserId: text("broadcaster_user_id").notNull().references(() => twitchUsers.twitchUserId),
@@ -339,14 +341,7 @@ export const chatMembershipEvents = pgTable("chat_membership_events", {
   ircConnectionId: uuid("irc_connection_id").references(() => ircConnections.id),
   rawIrcMessageId: uuid("raw_irc_message_id").references(() => rawIrcMessages.id),
   ...timestamps
-}, (table) => ({
-  chatterReceivedIdx: index("chat_membership_events_chatter_received_idx").on(table.chatterUserId, table.receivedAt),
-  unresolvedIdx: index("chat_membership_events_unresolved_idx").on(table.receivedAt).where(sql`${table.chatterUserId} is null and ${table.identityCheckedAt} is null and ${table.chatterLogin} is not null`),
-  dedupeKeyIdx: uniqueIndex("chat_membership_events_dedupe_key_idx").on(sql`read_membership_key(${table.broadcasterUserId}, ${table.twitchStreamId}, ${table.eventType}, ${table.chatterLogin}, ${table.eventAt}, ${table.dedupeKeyStorage})`),
-  timeBrin: index("chat_membership_events_time_brin").using("brin", table.receivedAt, sql`coalesce(${table.eventAt}, ${table.receivedAt})`).with({ pages_per_range: 32, autosummarize: true }),
-  sourceEncoding: check("membership_source_encoding", sql`${table.source} = '' or left(${table.source},1) = '!'`),
-  digestLength: check("membership_digest_length", sql`${table.dedupeKeyStorage} is null or octet_length(${table.dedupeKeyStorage}) = 32 or (octet_length(${table.dedupeKeyStorage}) = 0 and derive_membership_key(${table.broadcasterUserId}, ${table.twitchStreamId}, ${table.eventType}, ${table.chatterLogin}, ${table.eventAt}) is not null)`)
-}));
+});
 
 export const membershipDedupeKeySql = sql`read_membership_key(${chatMembershipEvents.broadcasterUserId}, ${chatMembershipEvents.twitchStreamId}, ${chatMembershipEvents.eventType}, ${chatMembershipEvents.chatterLogin}, ${chatMembershipEvents.eventAt}, ${chatMembershipEvents.dedupeKeyStorage})`;
 

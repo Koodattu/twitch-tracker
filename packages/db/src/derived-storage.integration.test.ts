@@ -53,14 +53,14 @@ describe.skipIf(database == null)("Derived membership keys and shared IRC contex
     await expect(pool.query("insert into chat_membership_events(broadcaster_user_id,event_type,dedupe_key_storage) values ('channel','join',decode('','hex'))")).rejects.toThrow("membership_digest_length");
   });
 
-  it("retains uniqueness and the worker's ON CONFLICT behavior across derived and stored digests", async () => {
+  it("retains uniqueness and duplicate-tolerant ingestion across derived and stored digests", async () => {
     const at = new Date("2026-09-15T10:12:13.456Z");
     const expected = key("person", at.toISOString());
     const value = { broadcasterUserId: "channel", eventType: "join" as const, chatterLogin: "person", eventAt: at, dedupeKeyStorage: expected.toString("base64url") };
     await db.insert(chatMembershipEvents).values(value);
-    expect(await db.insert(chatMembershipEvents).values({ ...value, dedupeKeyStorage: "" }).onConflictDoNothing().returning()).toEqual([]);
-    expect(await db.insert(chatMembershipEvents).values(value).onConflictDoNothing().returning()).toEqual([]);
-    expect(await db.insert(chatMembershipEvents).values({ ...value, chatterLogin: "different" }).onConflictDoNothing().returning()).toEqual([]);
+    for (const [login, digest] of [["person", Buffer.alloc(0)], ["person", expected], ["different", expected]] as const) {
+      expect((await pool.query("select * from insert_membership_event('channel',null,$1,null,'join',$2,null,$3)", [login, at, digest])).rows).toEqual([]);
+    }
     const selected = await db.select({ key: membershipDedupeKeySql }).from(chatMembershipEvents);
     expect(selected[0]!.key).toEqual(expected);
   });
@@ -90,8 +90,7 @@ describe.skipIf(database == null)("Derived membership keys and shared IRC contex
     try {
       await client.query("begin");
       await client.query("set local search_path = ''");
-      await client.query(`create index membership_restore_probe on public.chat_membership_events
-        (public.read_membership_key(broadcaster_user_id,twitch_stream_id,event_type,chatter_login,event_at,dedupe_key_storage))`);
+      await client.query("create index membership_restore_probe on public.membership_event_rows(dedupe_key)");
       const row = (await client.query("update public.chat_membership_events set chatter_login=null returning dedupe_key_storage")).rows[0];
       expect(row.dedupe_key_storage).toEqual(expected);
       const context = (await client.query("select public.get_raw_irc_context('restore-fixture',null,null) as id")).rows[0];
