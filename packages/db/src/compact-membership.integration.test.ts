@@ -59,7 +59,7 @@ describe.skipIf(database == null)("Compact membership metadata", () => {
       expect(updated).toMatchObject({ chatter_user_id: "person", chatter_login: "person", event_type: "part", source: "!manual", confidence: 99 });
       expect(updated.identity_checked_at).toEqual(updated.received_at);
       await client.query("delete from chat_membership_events where id=$1", [inserted.id]);
-      expect((await client.query("select count(*)::int as n from membership_event_rows")).rows[0].n).toBe(0);
+      expect((await client.query("select count(*)::int as n from membership_events")).rows[0].n).toBe(0);
       await client.query("rollback");
     } finally { await client.query("rollback"); client.release(); }
     expect((await pool.query("select event_type from chat_membership_events where id=$1", [inserted.id])).rows[0].event_type).toBe("join");

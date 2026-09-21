@@ -2305,6 +2305,7 @@ const redactSubjectData = async (db: DbClient, twitchUserId: string) => {
         updated_at = now()
     where twitch_user_id = ${twitchUserId}
   `);
+  await db.execute(sql`select prune_membership_subject(${twitchUserId},${subjectLogin})`);
 };
 
 const requireInternal: MiddlewareHandler<ApiBindings> = async (c, next) => {

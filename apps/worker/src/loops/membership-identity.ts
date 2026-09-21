@@ -51,14 +51,9 @@ export async function resolveMembershipIdentities(context: WorkerContext) {
       with identities as (
         select * from jsonb_to_recordset(${JSON.stringify(permitted.map((user) => ({ login: user.login, id: user.id })))}::jsonb)
           as i(login text, id text)
-      ), updated as (
-        update chat_membership_events m set chatter_user_id = i.id, identity_checked_at = ${now}, updated_at = now()
-        from (select requested.login, identities.id from jsonb_array_elements_text(${JSON.stringify(logins)}::jsonb) requested(login)
-          left join identities using (login)) i
-        where m.chatter_user_id is null and m.identity_checked_at is null and m.chatter_login = i.login
-          and m.received_at >= ${since} and m.received_at <= ${now}
-        returning m.chatter_user_id
-      ) select count(chatter_user_id)::int as resolved from updated
+      ) select coalesce(sum(resolve_membership_identity(requested.login,identities.id,${since},${now},${now},now())),0)::int as resolved
+        from jsonb_array_elements_text(${JSON.stringify(logins)}::jsonb) requested(login)
+        left join identities using (login)
     `);
     return { checkedLogins: logins.length, resolvedEvents: resolved.rows[0]!.resolved };
   });

@@ -90,10 +90,8 @@ describe.skipIf(database == null)("Derived membership keys and shared IRC contex
     try {
       await client.query("begin");
       await client.query("set local search_path = ''");
-      await client.query(`create index membership_restore_probe on public.membership_event_rows
-        (public.read_membership_key(broadcaster_user_id,twitch_stream_id,
-        case when is_join then 'join'::public.chat_membership_event_type else 'part'::public.chat_membership_event_type end,
-        chatter_login,case event_time_kind when 0 then received_at when 1 then event_at_override else null end,dedupe_key_storage))`);
+      await client.query(`create index membership_restore_probe on public.membership_events
+        (public.membership_digest_bucket(dedupe_key_storage)) where octet_length(dedupe_key_storage)=32`);
       const row = (await client.query("update public.chat_membership_events set chatter_login=null returning dedupe_key_storage")).rows[0];
       expect(row.dedupe_key_storage).toEqual(expected);
       const context = (await client.query("select public.get_raw_irc_context('restore-fixture',null,null) as id")).rows[0];

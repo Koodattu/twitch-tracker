@@ -148,6 +148,13 @@
       "when": 1789646400000,
       "tag": "0020_compact_membership_metadata",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1789981200000,
+      "tag": "0021_normalized_membership_storage",
+      "breakpoints": true
     }
   ]
 }
