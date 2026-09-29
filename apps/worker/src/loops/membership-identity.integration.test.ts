@@ -63,6 +63,21 @@ describe.skipIf(database == null)("Membership identity with PostgreSQL", () => {
     expect((await resolveMembershipIdentities(context)).resolvedEvents).toBe(1);
   });
 
+  it("finds unchecked immutable identities and skips checked events sharing that identity", async () => {
+    await pool.query(`insert into chat_membership_events
+      (broadcaster_user_id, chatter_login, event_type, received_at, created_at, updated_at, identity_checked_at)
+      values ('channel','legacy','join',now() - interval '2 hours',now() - interval '2 hours',now(),null),
+        ('channel','legacy','part',now() - interval '1 hour',now() - interval '1 hour',now(),now())`);
+    const checkedBefore = (await pool.query(`select to_jsonb(e) as event from chat_membership_events e
+      where identity_checked_at is not null`)).rows;
+    response([user("legacy-id", "legacy")]);
+    expect(await resolveMembershipIdentities(context)).toEqual({ checkedLogins: 1, resolvedEvents: 1 });
+    expect(getUsers).toHaveBeenCalledTimes(1);
+    expect((await pool.query(`select to_jsonb(e) as event from chat_membership_events e
+      where chatter_user_id is null`)).rows).toEqual(checkedBefore);
+    expect(await resolveMembershipIdentities(context)).toEqual({ checkedLogins: 0, resolvedEvents: 0 });
+  });
+
   it("does not reattach deleted identities, resolve redacted events, or ingest opted-out members", async () => {
     await event("known"); await event("redacted");
     await pool.query(`insert into subject_privacy_states (twitch_user_id, tracking_opted_out, data_deleted_at) values ('known',true,now());

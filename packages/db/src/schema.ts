@@ -457,24 +457,6 @@ export const channelDailyStats = pgTable("channel_daily_stats", {
   pk: primaryKey({ columns: [table.broadcasterUserId, table.day] })
 }));
 
-export const chatterChannelActivityBuckets = pgTable("chatter_channel_activity_buckets", {
-  chatterUserId: text("chatter_user_id").notNull().references(() => twitchUsers.twitchUserId),
-  broadcasterUserId: text("broadcaster_user_id").notNull().references(() => twitchUsers.twitchUserId),
-  bucketStart: timestamp("bucket_start", { withTimezone: true }).notNull(),
-  bucketMinutes: integer("bucket_minutes").notNull(),
-  messageCount: integer("message_count").default(0).notNull(),
-  firstActivityAt: timestamp("first_activity_at", { withTimezone: true }),
-  lastActivityAt: timestamp("last_activity_at", { withTimezone: true }),
-  activeMinutes: integer("active_minutes").default(0).notNull(),
-  joinCount: integer("join_count").default(0).notNull(),
-  partCount: integer("part_count").default(0).notNull(),
-  emoteCounts: jsonb("emote_counts").$type<Record<string, number>>().default({}).notNull(),
-  badgeObservations: jsonb("badge_observations").$type<Record<string, string>>().default({}).notNull(),
-  ...timestamps
-}, (table) => ({
-  pk: primaryKey({ columns: [table.chatterUserId, table.broadcasterUserId, table.bucketStart, table.bucketMinutes] })
-}));
-
 export const chatterDailyStats = pgTable("chatter_daily_stats", {
   chatterUserId: text("chatter_user_id").notNull().references(() => twitchUsers.twitchUserId),
   day: text("day").notNull(),

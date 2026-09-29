@@ -22,12 +22,15 @@ export async function resolveMembershipIdentities(context: WorkerContext) {
   if (!context.config.ENABLE_TWITCH_INGESTION || context.config.TWITCH_CLIENT_ID === "") return { skipped: "Twitch ingestion is disabled." };
   const now = new Date();
   const since = new Date(now.getTime() - 86_400_000);
+  // A resolved cohort leaves its event flags unchanged. Start with unchecked
+  // identities, including immutable historical records, then apply event bounds.
   const pending = await context.db.execute<{ login: string }>(sql`
     select chatter_login as login from (
-      select chatter_login, received_at from chat_membership_events
-      where chatter_user_id is null and identity_checked_at is null and chatter_login is not null
-        and received_at >= ${since} and received_at <= ${now}
-      order by received_at limit 10000
+      select i.chatter_login, e.received_at
+      from membership_event_identities i join membership_events e on e.identity_id = i.id
+      where i.chatter_user_id is null and i.resolved_at is null and i.chatter_login is not null
+        and e.identity_time_kind = 0 and e.received_at >= ${since} and e.received_at <= ${now}
+      order by e.received_at limit 10000
     ) recent group by chatter_login order by min(received_at), chatter_login limit 100
   `);
   if (pending.rows.length === 0) return { checkedLogins: 0, resolvedEvents: 0 };

@@ -2271,11 +2271,6 @@ const redactSubjectData = async (db: DbClient, twitchUserId: string) => {
          or target_broadcaster_user_id = ${twitchUserId}
       returning 1
     ),
-    deleted_chatter_channel_buckets as (
-      delete from chatter_channel_activity_buckets
-      where chatter_user_id = ${twitchUserId}
-      returning 1
-    ),
     deleted_chatter_daily_stats as (
       delete from chatter_daily_stats
       where chatter_user_id = ${twitchUserId}

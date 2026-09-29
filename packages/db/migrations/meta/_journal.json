@@ -155,6 +155,20 @@
       "when": 1789981200000,
       "tag": "0021_normalized_membership_storage",
       "breakpoints": true
+    },
+    {
+      "version": "7",
+      "idx": 22,
+      "breakpoints": true,
+      "tag": "0022_retire_unused_chatter_rollups",
+      "when": 1790658000000
+    },
+    {
+      "version": "7",
+      "idx": 23,
+      "breakpoints": true,
+      "tag": "0023_pending_membership_identities",
+      "when": 1790658001000
     }
   ]
 }

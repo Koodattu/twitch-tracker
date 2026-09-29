@@ -621,11 +621,10 @@ points, and moderation events when product requirements and scopes justify them.
 - stores stream count, live duration, viewer stats, category stats, message
   counts, and aggregate engagement
 
-`chatter_channel_activity_buckets`
-
-- per chatter/channel/time bucket
-- stores message counts, first/last observed activity, active minutes, join/part
-  counts, emote counts, and badge observations
+The former `chatter_channel_activity_buckets` materialization is retired in
+migration 0022. No product reader used it; chatter/channel activity remains
+available from retained message and membership events. Stream buckets and daily
+statistics remain materialized for their existing readers.
 
 `chatter_daily_stats`
 

@@ -30,7 +30,7 @@ Do not include historical playback, live animation, inferred community names, or
 | Existing area | Use and limitation |
 | --- | --- |
 | `packages/db/src/schema.ts`: `chat_messages` | Stable chatter/channel IDs, session ID, and timestamps. The IRC writer maps the shared-chat source tag into the existing column; migration 0012 recovers available historical tags. Source coverage still needs measurement where raw records are unavailable. |
-| `chatter_channel_activity_buckets` and `apps/worker/src/loops/aggregation.ts` | Already aggregate chatter/channel activity. However, these buckets also contain membership activity and do not retain session ID or shared-chat origin. They are not sufficient for the first version's exact filtering. |
+| `apps/worker/src/loops/aggregation.ts` | Maintains stream and daily statistics. The unused chatter/channel bucket materialization was retired in migration 0022; community input continues to use source observations with session and shared-chat provenance. |
 | `stream_sessions.is_finnish_eligible` | Reuse recorded stream eligibility as defined in ADR 0018. Filter eligible sessions within the reporting window, rather than all historical activity of a channel once seen speaking Finnish. |
 | `apps/worker/src/loops/common.ts` | Existing interval-loop, heartbeat, and ingestion-run infrastructure. Local overlap prevention already exists; cross-process scheduling still needs database coordination. |
 | `job_locks` | Existing coordination table; inspected code does not currently provide a reusable lease implementation. |
