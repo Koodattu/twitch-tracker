@@ -50,6 +50,7 @@ import { createVodThumbnailLookup } from "./vod-thumbnails.js";
 import { getStreamDetail, getStreamOverview, streamDetailQuerySchema } from "./stream-detail.js";
 import { channelDetailQuerySchema, channelOverviewQuerySchema, getChannelDetail, getChannelOverview } from "./channel-detail.js";
 import { getCommunityMap, getCommunityBuildStatus } from "./community-map.js";
+import { getCommunityChatterActivity } from "./community-chatter.js";
 import { detailPage, detailPageNumberSchema, detailPageSize } from "./detail-records.js";
 
 type ApiBindings = {
@@ -577,6 +578,13 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
       .limit(detailPageSize + 1).offset((query.page - 1) * detailPageSize);
     c.header("Cache-Control", "private, no-store");
     return c.json({ data: { ...detailPage(rows, query.page), pageSize: detailPageSize } });
+  });
+
+  app.get("/api/internal/communities/chatters/:login", requireAdmin, async (c) => {
+    c.header("Cache-Control", "no-store");
+    const login = z.string().regex(/^[a-z0-9_]{1,25}$/i).parse(c.req.param("login")).toLowerCase();
+    const expectedMap = z.string().datetime().optional().parse(c.req.query("map"));
+    return c.json({ data: await getCommunityChatterActivity(c.get("db"), login, expectedMap) });
   });
 
   app.get("/api/channels/:login", async (c) => {

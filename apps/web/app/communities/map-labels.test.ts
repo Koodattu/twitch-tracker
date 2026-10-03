@@ -16,11 +16,11 @@ describe("Community map label placement", () => {
     const nodes = [node("offscreen",2000,2000),node("visible",500,500),node("wide-margin",-200,500)];
     expect(placeMapLabels(nodes,{x:0,y:0,size:1000},1800,1000).map((label) => label.id)).toEqual(["visible","wide-margin"]);
   });
-  it("does not promote labels when higher ranked channels leave the viewport during a pan", () => {
+  it("keeps non-colliding labels visible regardless of larger off-screen channels", () => {
     const nodes = Array.from({length:14},(_,i)=>node(`large-${i}`,100+i*140,100,1000));
     nodes.push(node("small",800,700));
     for (const x of [0,200,400,600]) {
-      expect(placeMapLabels(nodes,{x,y:0,size:1140},1000,1000).some((label)=>label.id === "small")).toBe(false);
+      expect(placeMapLabels(nodes,{x,y:0,size:1140},1000,1000).some((label)=>label.id === "small")).toBe(true);
     }
   });
   it("keeps a colliding smaller label hidden when its larger competitor crosses a viewport boundary", () => {
@@ -31,5 +31,11 @@ describe("Community map label placement", () => {
   it("uses measured text width to keep long channel names apart", () => {
     const nodes = [{...node("long",500,500,100),width:220},node("nearby",630,500),node("distant",800,500)];
     expect(placeMapLabels(nodes,{x:0,y:0,size:1000},1000,1000).map((label) => label.id)).toEqual(["long","distant"]);
+  });
+  it("labels every channel with space even when 200 larger channels are off screen", () => {
+    const nodes = Array.from({ length: 200 }, (_, i) => node(`offscreen-${i}`, 2000 + i * 100, 2000, 1000));
+    const visible = Array.from({ length: 12 }, (_, i) => node(`visible-${i}`, 400 + i % 4 * 50, 400 + Math.floor(i / 4) * 50));
+    const result = placeMapLabels([...nodes, ...visible], { x: 350, y: 350, size: 250 }, 1000, 1000);
+    expect(result.map(label => label.id).sort()).toEqual(visible.map(node => node.id).sort());
   });
 });

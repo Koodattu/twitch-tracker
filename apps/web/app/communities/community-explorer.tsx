@@ -1,25 +1,19 @@
 "use client";
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { communityNodeRadius, type CommunityMap } from "@twitch-tracker/shared";
+import { communityNodeRadius, type CommunityMap, type CommunityChatterActivity } from "@twitch-tracker/shared";
 import { formatCount, formatDateTime } from "../format";
-import { Avatar, EmptyState } from "../ui";
+import { EmptyState } from "../ui";
 import { fitCommunityView, transformCamera, type MapView } from "./map-camera";
 import { placeMapLabels } from "./map-labels";
 import { summarizeCommunityCategories } from "./map-categories";
+import { channelName as name, communityColor as color, participants, connectionCounts, communityArea, type MapNode } from "./map-data";
+import { ChannelDetails } from "./channel-details";
+import { ChatterLookup } from "./chatter-lookup";
 
-type MapNode = CommunityMap["graph"]["nodes"][number];
-const participants = (node: MapNode) => node.participants ?? node.chatters;
 const nodeRadius = (node: MapNode) => communityNodeRadius(participants(node));
-const name = (node: MapNode) => node.displayName ?? node.login ?? "Unnamed channel";
-function color(id: string | null) {
-  if (id == null) return "#a7a1b4";
-  let hash = 0;
-  for (const char of id) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
-  return `hsl(${hash % 360} 78% 68%)`;
-}
+type CategoryArea = { id: string; title: string; x: number; y: number; radius: number };
 
 function setSelected(id: string | null) {
   const url = new URL(window.location.href);
@@ -35,59 +29,46 @@ function locateChannel(node: MapNode, size: number, bounds: { width: number; hei
   return transformCamera(view, { ...bounds, left: 0, top: 0 }, center, { ...center, y: bounds.height * 0.38 });
 }
 
-function ShareMapLink() {
-  const [share, setShare] = useState<{ url: string; copied: boolean } | null>(null);
-  const copy = async () => {
-    const url = window.location.href;
-    try { await navigator.clipboard.writeText(url); setShare({ url, copied: true }); }
-    catch { setShare({ url, copied: false }); }
-  };
-  return <div className="community-share">
-    <button type="button" className="button button-secondary" onClick={copy}>Copy map link</button>
-    <p>Opens this channel in the latest 30-day map.</p>
-    {share != null && <div role="status">{share.copied ? "Map link copied." : <label>Copy this map link<input className="search-input" readOnly value={share.url} onFocus={(event) => event.currentTarget.select()} /></label>}</div>}
-  </div>;
-}
-
 // Camera movement only changes the SVG viewBox, leaving the graph artwork intact.
-const MapArtwork = memo(function MapArtwork({ map, matches, selected, hovered, hideUnconnected, onHover, onSelect }: {
+const MapArtwork = memo(function MapArtwork({ map, matches, selected, hovered, showConnections, highlighted, onHover, onSelect }: {
   map: CommunityMap; matches: MapNode[]; selected: string | null; hovered: string | null;
-  hideUnconnected: boolean;
+  showConnections: boolean; highlighted: Set<string> | null;
   onHover: (id: string | null) => void; onSelect: (node: MapNode) => void;
 }) {
   const byId = new Map(map.graph.nodes.map((node) => [node.id, node]));
   const matching = new Set(matches.map((node) => node.id));
   const neighbors = new Set(map.graph.edges.filter((edge) => edge.source === selected || edge.target === selected)
     .flatMap((edge) => [edge.source, edge.target]));
-  const dimmed = (id: string) => !matching.has(id) || (selected != null && id !== selected && !neighbors.has(id));
+  const dimmed = (id: string) => !matching.has(id) || (highlighted != null ? !highlighted.has(id) && id !== selected
+    : selected != null && id !== selected && !neighbors.has(id));
   return <>
-    <g aria-hidden="true">{map.graph.edges.map((edge) => {
+    {showConnections && <g aria-hidden="true" data-community-connections>{map.graph.edges.map((edge) => {
       const a = byId.get(edge.source)!, b = byId.get(edge.target)!;
       const highlighted = selected != null && (edge.source === selected || edge.target === selected);
       return <line key={`${edge.source}-${edge.target}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
         stroke={color(highlighted ? byId.get(selected!)!.community : a.community)}
         strokeOpacity={highlighted ? 0.75 : dimmed(a.id) || dimmed(b.id) ? 0.025 : 0.16}
         strokeWidth={highlighted ? 1.2 + edge.score * 1.5 : 0.35 + edge.score} />;
-    })}</g>
+    })}</g>}
     {map.graph.nodes.map((node) => {
-      if (hideUnconnected && node.community == null && node.id !== selected) return null;
-      const highlighted = node.id === selected || node.id === hovered;
+      const emphasized = node.id === selected || node.id === hovered;
+      const chatterMatch = highlighted?.has(node.id) === true;
       const radius = nodeRadius(node);
-      return <g key={node.id} data-channel={node.id} className="community-node" style={{ "--community-node-radius": `${radius}px` } as CSSProperties} role="button" tabIndex={node.id === selected ? 0 : -1}
+      return <g key={node.id} data-channel={node.id} data-chatter-match={chatterMatch || undefined} className="community-node" style={{ "--community-node-radius": `${radius}px` } as CSSProperties} role="button" tabIndex={node.id === selected ? 0 : -1}
         aria-label={`${name(node)}, ${formatCount(participants(node))} people observed in chat`} aria-pressed={node.id === selected}
         onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect(node); } }}
         onFocus={() => onHover(node.id)} onBlur={() => onHover(null)} opacity={dimmed(node.id) ? 0.16 : 1}>
         <circle className="community-node-hit" cx={node.x} cy={node.y} r={radius + 7} fill="transparent" />
-        {highlighted && <circle className="community-node-halo" cx={node.x} cy={node.y} r={radius + 5} fill="none" stroke={color(node.community)} strokeOpacity={0.6} />}
-        <circle className="community-node-dot" cx={node.x} cy={node.y} r={radius} fill={color(node.community)} stroke={highlighted ? "#fff" : "none"} strokeWidth={1.5} />
+        {(emphasized || chatterMatch) && <circle className="community-node-halo" cx={node.x} cy={node.y} r={radius + 5} fill="none" stroke={chatterMatch ? "#fff" : color(node.community)} strokeOpacity={chatterMatch ? 1 : 0.6} />}
+        <circle className="community-node-dot" cx={node.x} cy={node.y} r={radius} fill={color(node.community)} stroke={emphasized ? "#fff" : "none"} strokeWidth={1.5} />
       </g>;
     })}
   </>;
 });
 
-function MapLabels({ map, matches, selected, view, width, height, hideUnconnected, referenceSize }: {
+function MapLabels({ map, matches, selected, view, width, height, highlighted, areas }: {
   map: CommunityMap; matches: MapNode[]; selected: string | null;
-  view: MapView; width: number; height: number; hideUnconnected: boolean; referenceSize: number;
+  view: MapView; width: number; height: number; highlighted: Set<string> | null; areas: CategoryArea[];
 }) {
   const [textWidths, setTextWidths] = useState(new Map<string, number>());
   const layer = useRef<SVGGElement>(null);
@@ -95,29 +76,46 @@ function MapLabels({ map, matches, selected, view, width, height, hideUnconnecte
     const context = document.createElement("canvas").getContext("2d");
     if (context == null || layer.current == null) return;
     context.font = `650 12px ${getComputedStyle(layer.current).fontFamily}`;
-    setTextWidths(new Map(map.graph.nodes.map((node) => [node.id, context.measureText(name(node)).width])));
-  }, [map]);
+    const widths = new Map(map.graph.nodes.map((node) => [node.id, context.measureText(name(node)).width]));
+    context.font = `650 13px ${getComputedStyle(layer.current).fontFamily}`;
+    for (const area of areas) widths.set(`area:${area.id}`, context.measureText(area.title).width);
+    setTextWidths(widths);
+  }, [map, areas]);
   const neighbors = new Set(map.graph.edges.filter((edge) => edge.source === selected || edge.target === selected)
     .flatMap((edge) => [edge.source, edge.target]));
-  const candidates = matches.filter((node) =>
-    (!hideUnconnected || node.community != null || node.id === selected) &&
-    (selected == null || neighbors.has(node.id) || node.id === selected));
+  const visible = new Set(map.graph.nodes.map(node => node.id));
+  const candidates = matches.filter(node => visible.has(node.id));
   const byId = new Map(candidates.map((node) => [node.id, node]));
-  const placed = placeMapLabels(candidates.map((node) => ({ id: node.id, x: node.x, y: node.y,
+  const areaById = new Map(areas.map(area => [`area:${area.id}`, area]));
+  const placed = placeMapLabels([...candidates.map((node) => ({ id: node.id, x: node.x, y: node.y,
     radius: nodeRadius(node), width: textWidths.get(node.id) ?? name(node).length * 7.2,
-    audience: participants(node), priority: node.id === selected ? 3 : 1 })), view, width, height, referenceSize);
-  return <g ref={layer} aria-hidden="true">{placed.map(({ id, x, y }) =>
-    <text key={id} data-label-channel={id} x={x} y={y} textAnchor="middle" className="community-node-label">{name(byId.get(id)!)}</text>
-  )}</g>;
+    audience: participants(node), priority: node.id === selected ? 3 : neighbors.has(node.id) || highlighted?.has(node.id) ? 2 : 1 })),
+    ...areas.map(area => ({ id: `area:${area.id}`, x: area.x, y: area.y - area.radius, radius: 0,
+      width: textWidths.get(`area:${area.id}`) ?? area.title.length * 8, audience: 0, priority: 4 }))], view, width, height);
+  return <g ref={layer} aria-hidden="true">{placed.map(({ id, x, y }) => {
+    const area = areaById.get(id);
+    return area != null ? <text key={id} x={x} y={y} textAnchor="middle" className="community-area-label">{area.title}</text>
+      : <text key={id} data-label-channel={id} x={x} y={y} textAnchor="middle" className="community-node-label"
+        opacity={highlighted != null && !highlighted.has(id) && id !== selected ? 0.28 : 1}>{name(byId.get(id)!)}</text>;
+  })}</g>;
 }
 
-export function CommunityExplorer({ map }: { map: CommunityMap }) {
+export function CommunityExplorer({ map, canLookupChatter = false }: { map: CommunityMap; canLookupChatter?: boolean }) {
   const params = useSearchParams();
   const requested = params.getAll("channel");
   const byId = useMemo(() => new Map(map.graph.nodes.map((node) => [node.id, node])), [map]);
   const selected = requested.length === 1 && byId.has(requested[0]!) ? requested[0]! : null;
   const selectedNode = selected == null ? null : byId.get(selected)!;
   const thresholds = map.coverage.thresholds ?? { channelPeople: 10, sharedPeople: 5 };
+  const degrees = useMemo(() => connectionCounts(map), [map]);
+  const hasDenseChannels = [...degrees.values()].some(degree => degree >= 3);
+  const [hideSparse, setHideSparse] = useState(hasDenseChannels);
+  const [showConnections, setShowConnections] = useState(true);
+  const [showAreas, setShowAreas] = useState(false);
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const [lookupOpen, setLookupOpen] = useState(false);
+  const [chatter, setChatter] = useState<CommunityChatterActivity | null>(null);
+  const highlighted = useMemo(() => chatter == null || chatter.channels.length === 0 ? null : new Set(chatter.channels.map(channel => channel.channelId)), [chatter]);
   const [query, setQuery] = useState("");
   const [group, setGroup] = useState("all");
   const [hovered, setHovered] = useState<string | null>(null);
@@ -126,6 +124,13 @@ export function CommunityExplorer({ map }: { map: CommunityMap }) {
   const [page, setPage] = useState(0);
   const hasConnectedChannels = map.graph.nodes.some((node) => node.community != null);
   const [hideUnconnected, setHideUnconnected] = useState(hasConnectedChannels);
+  const sparseCount = [...degrees.values()].filter(degree => degree > 0 && degree < 3).length;
+  const visibleMap = useMemo(() => {
+    const nodes = map.graph.nodes.filter(node => node.id === selected || highlighted?.has(node.id)
+      || ((!hideUnconnected || (degrees.get(node.id) ?? 0) > 0) && (!hideSparse || (degrees.get(node.id) ?? 0) === 0 || (degrees.get(node.id) ?? 0) >= 3)));
+    const visible = new Set(nodes.map(node => node.id));
+    return { ...map, graph: { nodes, edges: map.graph.edges.filter(edge => visible.has(edge.source) && visible.has(edge.target)) } };
+  }, [map, selected, highlighted, hideUnconnected, hideSparse, degrees]);
   const connectedView = useMemo(() => fitCommunityView(map.graph.nodes.filter((node) => node.community != null)), [map]);
   const allView = useMemo(() => fitCommunityView(map.graph.nodes), [map]);
   const homeView = hideUnconnected ? connectedView : allView;
@@ -154,10 +159,12 @@ export function CommunityExplorer({ map }: { map: CommunityMap }) {
   }, [map]);
   const labels = new Map(communities.map((item) => [item.id, item.nodes.slice(0, 2).map(name).join(" / ")]));
   const categorySummaries = useMemo(() => new Map(communities.map((item) => [item.id, summarizeCommunityCategories(item.nodes)])), [communities]);
-  const categorySummary = selectedNode?.community == null ? null : categorySummaries.get(selectedNode.community);
+  const areas = useMemo(() => showAreas ? communities.filter(community => group === "all" || group === community.id).flatMap(community => {
+    const area = communityArea(community.nodes);
+    return area == null ? [] : [{ ...area, id: community.id, title: categorySummaries.get(community.id)?.title ?? "Category unknown" }];
+  }) : [], [showAreas, communities, categorySummaries, group]);
   const connections = useMemo(() => selected == null ? [] : map.graph.edges.filter((edge) => edge.source === selected || edge.target === selected)
-    .map((edge) => ({ ...edge, node: byId.get(edge.source === selected ? edge.target : edge.source)! }))
-    .sort((a, b) => b.score - a.score || b.shared - a.shared || name(a.node).localeCompare(name(b.node))), [map, selected, byId]);
+    .map((edge) => ({ ...edge, node: byId.get(edge.source === selected ? edge.target : edge.source)! })), [map, selected, byId]);
   const matches = useMemo(() => map.graph.nodes.filter((node) =>
     (group === "all" || (node.community ?? "ungrouped") === group) &&
     `${name(node)} ${node.login ?? ""}`.toLowerCase().includes(query.trim().toLowerCase()))
@@ -167,7 +174,7 @@ export function CommunityExplorer({ map }: { map: CommunityMap }) {
       const currentView = current?.selected === selected ? current.view : initialView;
       return { selected: node.id, view: locate ? locateChannel(node, Math.min(currentView.size, 650), mapSize) : currentView };
     });
-    setSelected(node.id); setSearchOpen(false); setHelpOpen(false); setQuery(""); setGroup("all"); setPage(0);
+    setSelected(node.id); setSearchOpen(false); setHelpOpen(false); setOptionsOpen(false); setLookupOpen(false); setQuery(""); setGroup("all"); setPage(0);
     svg.current?.focus({ preventScroll: true });
   }, [selected, initialView, mapSize]);
   const zoom = (factor: number) => setView((current) => {
@@ -176,7 +183,7 @@ export function CommunityExplorer({ map }: { map: CommunityMap }) {
     const center = { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 };
     return transformCamera(current, bounds, center, center, factor, homeView.size * 2);
   });
-  const reset = () => { setCamera(null); setSelected(null); setHovered(null); setQuery(""); setGroup("all"); setHideUnconnected(hasConnectedChannels); setSearchOpen(false); setPage(0); };
+  const reset = () => { setCamera(null); setSelected(null); setHovered(null); setQuery(""); setGroup("all"); setHideUnconnected(hasConnectedChannels); setHideSparse(hasDenseChannels); setChatter(null); setSearchOpen(false); setOptionsOpen(false); setLookupOpen(false); setPage(0); };
   useEffect(() => {
     const element = svg.current;
     if (element == null) return;
@@ -201,8 +208,8 @@ export function CommunityExplorer({ map }: { map: CommunityMap }) {
   }, []);
   const reportingEnd = new Date(new Date(map.windowEnd).getTime() - 1).toISOString().slice(0, 10);
 
-  return <div className="community-explorer" onKeyDown={(event) => {
-    if (event.key === "Escape") { setSelected(null); setSearchOpen(false); setHelpOpen(false); svg.current?.focus({ preventScroll: true }); }
+  return <div className="community-explorer" data-search-open={searchOpen || optionsOpen || lookupOpen} onKeyDown={(event) => {
+    if (event.key === "Escape") { setSelected(null); setSearchOpen(false); setHelpOpen(false); setOptionsOpen(false); setLookupOpen(false); svg.current?.focus({ preventScroll: true }); }
   }}>
     <svg className="community-canvas" ref={svg} viewBox={`${view.x} ${view.y} ${view.size} ${view.size}`} tabIndex={0}
       style={{ "--community-unit": `${view.size / mapSide}px`, "--community-label-size": `${view.size / mapSide * 12}px` } as CSSProperties}
@@ -257,27 +264,48 @@ export function CommunityExplorer({ map }: { map: CommunityMap }) {
           else { setSelected(null); setSearchOpen(false); setHelpOpen(false); }
         }
       }} onPointerLeave={() => setHovered(null)} onPointerCancel={() => { pointers.current.clear(); drag.current = null; }}>
-      <MapArtwork map={map} matches={matches} selected={selected} hovered={hovered} hideUnconnected={hideUnconnected} onHover={setHovered} onSelect={select} />
-      <MapLabels map={map} matches={matches} selected={selected} view={view}
-        width={mapSize.width} height={mapSize.height} hideUnconnected={hideUnconnected} referenceSize={homeView.size} />
+      {showAreas && <g className="community-areas" aria-hidden="true">{areas.map(area =>
+        <circle key={area.id} cx={area.x} cy={area.y} r={area.radius} fill={color(area.id)} fillOpacity={0.045} stroke={color(area.id)} strokeOpacity={0.4} vectorEffect="non-scaling-stroke" />
+      )}</g>}
+      <MapArtwork map={visibleMap} matches={matches} selected={selected} hovered={hovered} showConnections={showConnections} highlighted={highlighted} onHover={setHovered} onSelect={select} />
+      <MapLabels map={visibleMap} matches={matches} selected={selected} view={view} highlighted={highlighted} areas={areas}
+        width={mapSize.width} height={mapSize.height} />
     </svg>
 
-    <div className="community-heading"><span className="eyebrow">Discover · Finnish Twitch</span><h1>Chat communities</h1>
-      <p>{formatCount(map.graph.nodes.length)} channels <span>·</span> {formatCount(communities.length)} {communities.length === 1 ? "community" : "communities"}</p></div>
+    <div className="community-heading"><h1>Chat communities</h1>
+      <p>{formatCount(visibleMap.graph.nodes.length)} of {formatCount(map.graph.nodes.length)} channels shown <span>·</span> {formatCount(communities.length)} communities</p></div>
     <div className="community-date"><strong>30-day map</strong><span>Updated {formatDateTime(map.generatedAt)}</span></div>
 
     {map.graph.nodes.length === 0 ? <div className="community-empty community-glass"><EmptyState title="Not enough recorded chat activity" description="No channels meet the activity threshold for this reporting window yet." /></div> :
       <section className="community-search community-glass" aria-label="Find a channel">
         <div className="community-search-bar"><span aria-hidden="true">⌕</span>
           <input ref={search} id="community-search" type="search" placeholder="Find a channel…" aria-label="Search channels" value={query}
-            onFocus={() => { setSearchOpen(true); setHelpOpen(false); setSelected(null); }}
+            onFocus={() => { setSearchOpen(true); setHelpOpen(false); setOptionsOpen(false); setLookupOpen(false); setSelected(null); }}
             onChange={(event) => { setQuery(event.target.value); setPage(0); setSelected(null); setSearchOpen(true); }} />
           <button className="community-icon-button" aria-label={searchOpen ? "Collapse channel search" : "Browse channels"} aria-expanded={searchOpen} aria-controls="community-search-results"
-            onClick={() => { setSearchOpen(!searchOpen); setHelpOpen(false); }}>{searchOpen ? "−" : "+"}</button>
+            onClick={() => { setSearchOpen(!searchOpen); setHelpOpen(false); setOptionsOpen(false); setLookupOpen(false); }}>{searchOpen ? "−" : "+"}</button>
         </div>
-        {unconnectedCount > 0 && <label className="community-ring-control"><input type="checkbox" checked={hideUnconnected}
+        <div className="community-search-tools"><button className="community-text-button" aria-expanded={optionsOpen} aria-controls="community-options" onClick={() => { setOptionsOpen(!optionsOpen); setSearchOpen(false); setHelpOpen(false); setLookupOpen(false); }}>Map options</button>
+          {canLookupChatter && <button className="community-text-button" aria-expanded={lookupOpen} aria-controls="community-chatter-lookup" onClick={() => {
+            setLookupOpen(!lookupOpen); setSearchOpen(false); setOptionsOpen(false); setHelpOpen(false);
+            if (!lookupOpen) { setQuery(""); setGroup("all"); setPage(0); }
+          }}>Find a chatter</button>}</div>
+        {optionsOpen && <section id="community-options" className="community-options" aria-label="Map options">
+          <label><input type="checkbox" checked={showConnections} onChange={event => setShowConnections(event.target.checked)} />Show connection lines</label>
+          <label><input type="checkbox" checked={showAreas} onChange={event => setShowAreas(event.target.checked)} />Show community category areas</label>
+          <p>Circles mark the central area of each community. Labels describe recorded streaming categories, not why people watch.</p>
+          {sparseCount > 0 && <label><input type="checkbox" checked={hideSparse} onChange={event => setHideSparse(event.target.checked)} />Hide sparse channels ({formatCount(sparseCount)})</label>}
+          {sparseCount > 0 && <p>Sparse means one or two connections on this map. These channels still belong to communities; search can reveal them.</p>}
+        {unconnectedCount > 0 && <label><input type="checkbox" checked={hideUnconnected}
           onChange={(event) => { setHideUnconnected(event.target.checked); setView(event.target.checked ? connectedView : allView); if (event.target.checked && selectedNode?.community == null) setSelected(null); }} />
           Hide unconnected channels ({formatCount(unconnectedCount)})</label>}
+        </section>}
+        {lookupOpen && canLookupChatter && <ChatterLookup map={map} result={chatter} onResult={result => {
+          setChatter(result);
+          const nodes = result == null ? [] : result.channels.flatMap(channel => byId.get(channel.channelId) ?? []);
+          if (nodes.length > 0) { setSelected(null); setCamera({ selected: null, view: fitCommunityView(nodes) }); }
+        }} onSelect={node => select(node, true)} />}
+        {chatter != null && !lookupOpen && <div className="community-highlight-status"><span>{chatter.displayName ?? chatter.login}: {chatter.channels.length} highlighted</span><button className="community-text-button" onClick={() => setChatter(null)}>Clear</button></div>}
         {searchOpen && <div id="community-search-results" className="community-search-results">
           <label htmlFor="community-filter">Community</label>
           <select id="community-filter" className="community-input" value={group} onChange={(event) => {
@@ -306,30 +334,12 @@ export function CommunityExplorer({ map }: { map: CommunityMap }) {
       </section>}
 
     {requested.length > 0 && selectedNode == null && <div className="community-details community-glass" role="status"><p>The linked channel is unavailable in this 30-day map. Find another channel or use Fit map to reset.</p></div>}
-    {selectedNode != null && <section className="community-details community-glass" aria-label="Selected channel">
-      <div className="community-panel-heading"><span className="eyebrow">Channel connections</span><button className="community-icon-button" aria-label="Close channel details" onClick={() => { setSelected(null); svg.current?.focus(); }}>×</button></div>
-      <div className="community-selected"><Avatar name={name(selectedNode)} src={selectedNode.profileImageUrl} size="small" /><h2>{name(selectedNode)}</h2></div>
-      <div className="community-selected-stats"><strong>{formatCount(participants(selectedNode))}<span>people observed in chat</span></strong><strong>{formatCount(connections.length)}<span>connections</span></strong></div>
-      <p className="community-group-name"><span className="community-color" style={{ background: color(selectedNode.community) }} />{selectedNode.community == null ? "No qualifying connections" : labels.get(selectedNode.community)}</p>
-      {categorySummary != null && <section className="community-category-summary" aria-label="Community categories">
-        <h3>{categorySummary.title}</h3>
-        <ul>{categorySummary.categories.map((category) => <li key={category.id}><span>{category.name}</span><span>{category.channels} / {categorySummary.known} channels</span></li>)}</ul>
-        {categorySummary.mixed > 0 && <p>{categorySummary.mixed} {categorySummary.mixed === 1 ? "channel splits" : "channels split"} time across categories.</p>}
-        <p>Based on recorded category time in this 30-day window. Each channel counts once. Shared people determine the connections.</p>
-        {categorySummary.known < categorySummary.total && <p>Category information covers {categorySummary.known} of {categorySummary.total} channels.</p>}
-      </section>}
-      {selectedNode.login != null && <Link className="community-profile-link" href={`/channels/${encodeURIComponent(selectedNode.login)}`}>View channel profile <span aria-hidden="true">↗</span></Link>}
-      <div className="community-connections"><h3>Strongest connections</h3>
-        <p>Shared people · share of {name(selectedNode)}’s chat</p>
-        {connections.length === 0 ? <p>This channel meets the {thresholds.channelPeople}-person threshold, but shares fewer than {thresholds.sharedPeople} qualifying people with every other qualifying channel in this window. The outer ring keeps it searchable; its position does not represent distance from a community.</p> : <ul className="community-channel-list">
-          {connections.map((edge) => <li key={edge.node.id}><button onClick={() => select(edge.node, true)}><span className="community-color" style={{ background: color(edge.node.community) }} /><span>{name(edge.node)}<small>{formatCount(edge.shared)} shared people</small></span>
-            <strong>{Math.round(edge.shared / participants(selectedNode) * 100)}%</strong></button></li>)}
-        </ul>}
-      </div>
-      <ShareMapLink key={selectedNode.id} />
-    </section>}
+    {selectedNode != null && <ChannelDetails key={selectedNode.id} node={selectedNode} connections={connections}
+      community={communities.find(item => item.id === selectedNode.community)?.nodes ?? []}
+      onSelect={node => select(node, true)} onClose={() => { setSelected(null); svg.current?.focus(); }} />}
 
-    <div className="community-bottom-bar"><button className="community-help-button community-glass" aria-expanded={helpOpen} aria-controls="community-explanation" onClick={() => { setHelpOpen(!helpOpen); setSearchOpen(false); }}>How it works <span aria-hidden="true">?</span></button>
+
+    <div className="community-bottom-bar"><button className="community-help-button community-glass" aria-expanded={helpOpen} aria-controls="community-explanation" onClick={() => { setHelpOpen(!helpOpen); setSearchOpen(false); setOptionsOpen(false); setLookupOpen(false); }}>How it works <span aria-hidden="true">?</span></button>
       <span className="community-hint">Scroll to zoom · Drag to explore · Select a channel</span></div>
     <div className="community-map-controls community-glass" aria-label="Map controls">
       <button aria-label="Zoom in" title="Zoom in (+)" onClick={() => zoom(0.8)}>+</button><button aria-label="Zoom out" title="Zoom out (−)" onClick={() => zoom(1.25)}>−</button>
@@ -341,9 +351,9 @@ export function CommunityExplorer({ map }: { map: CommunityMap }) {
       <p><strong>Each dot is a channel.</strong> Larger dots have more people observed in chat. Lines connect channels with shared people, and colors show detected communities.</p>
       <p>These are recorded chat communities, not all viewers or followers. Position is not geographic, and connections do not establish friendship or affiliation.</p>
       <p>People qualify after 3 messages in a channel{map.coverage.presence != null ? ", or presence on at least two UTC dates at least six hours apart" : ""}. Channels need {thresholds.channelPeople} qualifying people; connections need {thresholds.sharedPeople} shared people. Each channel keeps its 10 strongest connections; a connection is shown when either endpoint keeps it.</p>
-      <p>Larger channels get labels first. Selecting a channel shows names for its connections; zoom in to reveal smaller names as space opens up.</p>
-      <p>Community category descriptions summarize recorded streaming time. A channel mainly streams a category when it accounts for at least 60% of its known category time. “Mostly” requires 60% of channels with category information to share that main category. Mixed categories can reflect variety streamers or different interests within a community; categories do not prove why people move between channels.</p>
-      <p>The gray outer ring contains channels with no retained connections. They meet the {thresholds.channelPeople}-person threshold, but no other qualifying channel shares at least {thresholds.sharedPeople} qualifying people with them. Their position is only a way to keep them visible. You can hide them with the checkbox below search.</p>
+      <p>Channel names appear wherever they fit without overlapping. Zooming opens more space; off-screen channels do not limit the number of names. Selecting a channel prioritizes its connections without hiding other names.</p>
+      <p>Optional category areas are circles around the central 80% of each community, not exact boundaries. Community category descriptions summarize recorded streaming time. A channel mainly streams a category when it accounts for at least 60% of its known category time. “Mostly” requires 60% of channels with category information to share that main category. Mixed categories can reflect variety streamers or different interests within a community; categories do not prove why people move between channels.</p>
+      <p>The gray outer ring contains channels with no retained connections. They meet the {thresholds.channelPeople}-person threshold, but no other qualifying channel shares at least {thresholds.sharedPeople} qualifying people with them. Their position is only a way to keep them visible. Map options can hide them. Sparse channels have one or two retained connections and are hidden initially when denser groups exist; they still have a community. Search and chatter highlights can reveal hidden channels.</p>
       {map.coverage.presence != null && <>
         <p>Repeated presence includes people who do not write messages. It contributes one-quarter of the connection weight of messages. People seen through both sources count once.</p>
         <p>Chat presence does not prove someone watched the video. JOIN/PART coverage is incomplete, especially in rooms above 1,000 users. Missing observations do not mean someone was absent. Accounts observed across more than 50 channels contribute through messages only.</p>

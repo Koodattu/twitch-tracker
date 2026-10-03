@@ -48,3 +48,13 @@ export type CommunityBuildStatus = {
   lastSuccessAt: string | null;
   error: string | null;
 };
+
+/** Admin-only, bounded to the current map; never a video-viewing history. */
+export type CommunityChatterActivity = {
+  login: string;
+  displayName: string | null;
+  mapGeneratedAt: string;
+  windowStart: string;
+  windowEnd: string;
+  channels: Array<{ channelId: string; messages: number; messageDays: number; presenceDays: number; lastObservedAt: string }>;
+};

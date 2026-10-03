@@ -37,7 +37,7 @@ try {
       await page.goBack();
       assert.ok(await details.getByRole("heading", { name: "AuroraPelaa", exact: true }).isVisible());
       await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-      await details.getByRole("button", { name: "Copy map link", exact: true }).click();
+      await details.getByRole("button", { name: "Copy channel map link", exact: true }).click();
       assert.match(await details.getByRole("status").innerText(), /Map link copied/);
       const shared = await page.evaluate(() => navigator.clipboard.readText());
       const copy = await context.newPage();
@@ -73,7 +73,7 @@ try {
       assert.ok(await page.locator(`.community-node[data-channel="${new URL(unconnectedUrl).searchParams.get("channel")}"]`).isVisible());
       if (width === 1440) {
         await page.evaluate(() => { Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async () => { throw new Error("Synthetic denied clipboard"); } } }); });
-        await details.getByRole("button", { name: "Copy map link", exact: true }).click();
+        await details.getByRole("button", { name: "Copy channel map link", exact: true }).click();
         assert.equal(await details.getByLabel("Copy this map link", { exact: true }).inputValue(), page.url());
       }
       await page.getByRole("button", { name: "Fit map", exact: true }).click();
