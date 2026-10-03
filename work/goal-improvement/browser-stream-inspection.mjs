@@ -1,0 +1,177 @@
+import assert from "node:assert/strict";
+import { createRequire } from "node:module";
+import { mkdir, writeFile, rm } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { at, streamId, pool, seed, cleanup } from "./stream-inspection-fixture.mjs";
+
+const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE ?? join(homedir(), ".cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright"));
+const phase = process.argv[2] ?? "built";
+assert.ok(["before","after","built"].includes(phase));
+const evidence = new URL("./evidence/round5/", import.meta.url);
+await mkdir(evidence,{recursive:true});
+await seed();
+const browser = await chromium.launch({headless:true});
+const checks = [];
+try {
+  for (const width of [1440,768,390,320]) {
+    const context = await browser.newContext({viewport:{width,height:960},reducedMotion:"reduce",hasTouch:width<500});
+    const page = await context.newPage();
+    await page.context().addCookies([{name:"goal-qa",value:"synthetic",url:"http://127.0.0.1:3300"}]);
+    const errors = [];
+    page.on("pageerror", error=>errors.push(error.message));
+    page.on("console", message=>{if(message.type()==="error") errors.push(message.text());});
+    const base = `http://127.0.0.1:3300/streams/${streamId}`;
+    await page.goto(base);
+    await page.waitForLoadState("networkidle");
+    const slider = page.getByRole("slider",{name:"Inspect an interval"});
+    await page.getByRole("button",{name:/Busiest chat interval/}).click();
+    const selected = await slider.inputValue();
+    assert.equal(selected,"12");
+    const selectedUrl = page.url();
+    await page.reload();
+    await page.waitForLoadState("networkidle");
+    const restored = await slider.inputValue();
+    if(phase==="before") assert.equal(restored,"0");
+    else { assert.equal(restored,"12"); assert.equal(new URL(selectedUrl).searchParams.get("at"),at); }
+    if (phase !== "before") {
+      const viewers = page.getByRole("button",{name:"Viewers (average / peak)",exact:true});
+      await viewers.click();
+      assert.equal(await viewers.getAttribute("aria-pressed"),"false");
+      const withMetrics = page.url();
+      await page.reload();
+      await page.waitForLoadState("networkidle");
+      assert.equal(await viewers.getAttribute("aria-pressed"),"false");
+      assert.equal(await slider.inputValue(),"12");
+      await viewers.click();
+      await page.goBack();
+      assert.equal(page.url(),withMetrics);
+      assert.equal(await viewers.getAttribute("aria-pressed"),"false");
+      await viewers.click();
+      const chart = page.getByRole("img",{name:/Stream activity/});
+      assert.equal(await chart.locator(".stream-chart-lane-label").count(),3);
+      const chartBox = await chart.boundingBox();
+      await page.mouse.move(chartBox.x+60,chartBox.y+60);
+      const committedUrl = page.url();
+      await page.mouse.move(2,2);
+      assert.equal(page.url(),committedUrl,"Hover is not persisted");
+      assert.equal(await slider.inputValue(),"12");
+      await page.context().grantPermissions(["clipboard-read","clipboard-write"]);
+      await page.getByRole("button",{name:"Copy view link",exact:true}).click();
+      assert.match(await page.getByRole("status").innerText(),/View link copied/);
+      const shared = await page.evaluate(()=>navigator.clipboard.readText());
+      const copy = await page.context().newPage();
+      await copy.goto(shared);
+      await copy.waitForLoadState("networkidle");
+      assert.equal(await copy.getByRole("slider").inputValue(),"12");
+      await copy.close();
+      await page.getByRole("link",{name:"Events in this interval",exact:true}).click();
+      await page.getByRole("heading",{name:"Channel events",exact:true}).waitFor();
+      await page.waitForLoadState("networkidle");
+      assert.equal(await page.locator(".stream-event-list li").count(),50);
+      assert.equal(new URL(page.url()).searchParams.get("from"),"2026-09-20T11:00:00.000");
+      await page.getByRole("link",{name:"Load older",exact:true}).click();
+      await page.waitForURL(/page=2/);
+      await page.waitForLoadState("networkidle");
+      assert.equal(await page.locator(".stream-event-list li").count(),6);
+      assert.equal(new URL(page.url()).searchParams.get("at"),at);
+      await page.getByRole("link",{name:"Overview",exact:true}).click();
+      await slider.waitFor();
+      await page.waitForLoadState("networkidle");
+      assert.equal(await slider.inputValue(),"12");
+      await page.getByRole("link",{name:"Data",exact:true}).click();
+      await page.getByRole("heading",{name:"Viewer observations",exact:true}).waitFor();
+      await page.getByRole("link",{name:"Activity detail",exact:true}).click();
+      await page.getByRole("heading",{name:"Activity detail",exact:true}).waitFor();
+      await page.getByRole("link",{name:"Overview",exact:true}).click();
+      await slider.waitFor();
+      assert.equal(await slider.inputValue(),"12","Data subviews retain the selected stream moment");
+      await page.getByText("Interval figures · 24 intervals",{exact:true}).click();
+      const table = page.getByRole("region",{name:"Stream interval figures"});
+      assert.equal(await table.locator("tbody tr").count(),24);
+      assert.match(await table.locator("tbody tr").nth(1).innerText(),/0\s+0/);
+      assert.match(await table.locator("tbody tr").nth(7).innerText(),/— \/ —/);
+      assert.match(await table.locator("tbody tr").nth(8).innerText(),/Gap or partial interval/);
+      await table.locator("tbody tr").nth(1).getByRole("link").click();
+      await page.getByRole("heading",{name:"No events in this range",exact:true}).waitFor();
+      await page.waitForLoadState("networkidle");
+      assert.ok(await page.getByRole("heading",{name:"No events in this range",exact:true}).isVisible());
+      await page.getByRole("link",{name:"Show all events",exact:true}).click();
+      await page.waitForURL(url=>!url.searchParams.has("from"));
+      await page.waitForLoadState("networkidle");
+      assert.equal(new URL(page.url()).searchParams.has("from"),false);
+      await page.getByLabel("From (UTC)",{exact:true}).fill("2026-09-20T11:00");
+      await page.getByLabel("Before (UTC)",{exact:true}).fill("2026-09-20T11:05");
+      await page.getByRole("button",{name:"Filter events",exact:true}).click();
+      await page.waitForURL(url=>url.searchParams.get("from")==="2026-09-20T11:00");
+      await page.waitForLoadState("networkidle");
+      assert.equal(await page.locator(".stream-event-list li").count(),50);
+      assert.equal(new URL(page.url()).searchParams.has("page"),false);
+      if(width===390) await page.screenshot({path:fileURLToPath(new URL(`${phase}-events-${width}.png`,evidence))});
+      await page.goto(`${base}/events?from=2026-02-31T10%3A00&to=2026-03-03T10%3A00`);
+      await page.waitForLoadState("networkidle");
+      assert.ok(await page.getByRole("heading",{name:"Check the time range",exact:true}).isVisible());
+      await page.goto(`${base}?at=invalid&series=unknown`);
+      await page.waitForLoadState("networkidle");
+      assert.match(await page.getByRole("status").innerText(),/linked time or chart options are unavailable/);
+      await page.getByRole("button",{name:"Reset view",exact:true}).click();
+      assert.equal(page.url(),base);
+      for(const name of ["Viewers (average / peak)","Messages / min","Peak active chatters"]) await page.getByRole("button",{name,exact:true}).click();
+      assert.ok(await page.getByRole("heading",{name:"Choose a metric",exact:true}).isVisible());
+      await page.reload();
+      await page.waitForLoadState("networkidle");
+      assert.ok(await page.getByRole("heading",{name:"Choose a metric",exact:true}).isVisible());
+      await page.getByRole("button",{name:"Reset view",exact:true}).click();
+      await slider.focus();
+      await page.keyboard.press("End");
+      assert.equal(await slider.inputValue(),"23");
+      await page.keyboard.press("Home");
+      assert.equal(await slider.inputValue(),"0");
+      if(width<500) await slider.tap();
+      assert.ok((await slider.boundingBox()).height>=44);
+      await page.getByRole("button",{name:/Busiest chat interval/}).click();
+      const failureFlag = new URL("../../.temp/goal-api-failure",import.meta.url);
+      const selectedRange = `at=${encodeURIComponent(at)}&from=2026-09-20T11%3A00&to=2026-09-20T11%3A05`;
+      for (const scenario of [
+        {suffix:`?at=${encodeURIComponent(at)}`,api:"overview",heading:"Activity unavailable"},
+        {suffix:`/events?${selectedRange}`,api:"events",heading:"Details unavailable"}
+      ]) {
+        await writeFile(failureFlag,`/api/streams/${streamId}/${scenario.api}`);
+        await page.goto(`${base}${scenario.suffix}`);
+        await page.getByRole("heading",{name:scenario.heading,exact:true}).waitFor();
+        await rm(failureFlag);
+        await page.getByRole("button",{name:"Try again",exact:true}).click();
+        await page.getByRole("heading",{name:scenario.heading,exact:true}).waitFor({state:"hidden"});
+        if(scenario.api==="overview") assert.equal(await slider.inputValue(),"12");
+        else assert.equal(await page.locator(".stream-event-list li").count(),50);
+        assert.equal(new URL(page.url()).searchParams.get("at"),at);
+      }
+      await page.goto(`${base}?at=${encodeURIComponent(at)}`);
+      await page.waitForLoadState("networkidle");
+      if(width===1440) {
+        await page.evaluate(()=>{ document.body.style.zoom="2"; });
+        assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+        await chart.scrollIntoViewIfNeeded();
+        await page.screenshot({path:fileURLToPath(new URL(`${phase}-stream-zoom.png`,evidence))});
+        await page.evaluate(()=>{document.body.style.zoom="";});
+        await page.evaluate(()=>{ Object.defineProperty(navigator,"clipboard",{configurable:true,value:{writeText:async()=>{throw new Error("Synthetic denied clipboard");}}}); });
+        await page.getByRole("button",{name:"Copy view link",exact:true}).click();
+        assert.equal(await page.getByLabel("Copy this view link",{exact:true}).inputValue(),page.url());
+      }
+    }
+    await page.getByRole("img",{name:/Stream activity/}).scrollIntoViewIfNeeded();
+    await page.screenshot({path:fileURLToPath(new URL(`${phase}-stream-${width}.png`,evidence))});
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+    assert.deepEqual(errors,[]);
+    checks.push({width,selected,selectedUrl,restored,copyReloadBack:phase!=="before",intervalValuesAndEvents:phase!=="before",dataSubviews:phase!=="before",rangeValidation:phase!=="before",keyboardTouch:phase!=="before",real503Recovery:phase!=="before",overflow:false,errors});
+    await context.close();
+  }
+} finally {
+  await rm(new URL("../../.temp/goal-api-failure",import.meta.url),{force:true});
+  await browser.close();
+  await cleanup();
+  await pool.end();
+  await writeFile(new URL(`${phase}-stream-inspection.json`,evidence),JSON.stringify(checks,null,2)+"\n");
+}
+console.log(JSON.stringify(checks,null,2));

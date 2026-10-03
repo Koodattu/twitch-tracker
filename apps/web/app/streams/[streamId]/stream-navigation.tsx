@@ -5,5 +5,5 @@ export function StreamNavigation({ streamId, canInspectRaw }: { streamId: string
   const links = [{ path: base, label: "Overview" },
     ...(canInspectRaw ? [{ path: `${base}/chat`, label: "Chat" }] : []),
     { path: `${base}/events`, label: "Events" }, { path: `${base}/data`, label: "Data" }];
-  return <DetailNavigation label="Stream pages" links={links} />;
+  return <DetailNavigation label="Stream pages" links={links} preserveSearch={["at", "series"]} />;
 }

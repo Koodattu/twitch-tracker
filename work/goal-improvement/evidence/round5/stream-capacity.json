@@ -1,0 +1,37 @@
+{
+  "environment": "Windows Node 24.19, localhost HTTP, dedicated PostgreSQL 16.14 Docker (2 CPUs, 1GiB), synthetic only",
+  "workload": {
+    "activityBuckets": 23,
+    "chartIntervals": 24,
+    "channelEvents": 6057,
+    "raids": 1
+  },
+  "iterations": "1 first request + 15 warm per endpoint",
+  "results": [
+    {
+      "label": "overview",
+      "firstRequestMs": 53.23680000000002,
+      "warmMedianMs": 16.22230000000002,
+      "warmP95Ms": 26.2586,
+      "bytes": 4380,
+      "items": 24
+    },
+    {
+      "label": "all-events",
+      "firstRequestMs": 15.300299999999993,
+      "warmMedianMs": 15.777500000000032,
+      "warmP95Ms": 22.61500000000001,
+      "bytes": 8594,
+      "items": 50
+    },
+    {
+      "label": "selected-interval",
+      "firstRequestMs": 19.428499999999985,
+      "warmMedianMs": 15.713100000000054,
+      "warmP95Ms": 16.968900000000076,
+      "bytes": 8594,
+      "items": 50
+    }
+  ],
+  "conclusion": "Capacity measurement; no before/after speed or production performance claim."
+}

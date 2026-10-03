@@ -1,0 +1,42 @@
+[
+  {
+    "width": 1440,
+    "messages": 55,
+    "recovery": [
+      {
+        "failure": "/api/me",
+        "canRetry": true
+      },
+      {
+        "failure": "/api/me/data",
+        "canRetry": true
+      },
+      {
+        "failure": "/api/me/privacy",
+        "canRetry": true
+      }
+    ],
+    "failureCopy": "Privacy request could not be confirmed\n\nCheck its status below before trying again.",
+    "errors": []
+  },
+  {
+    "width": 390,
+    "messages": 55,
+    "recovery": [
+      {
+        "failure": "/api/me",
+        "canRetry": true
+      },
+      {
+        "failure": "/api/me/data",
+        "canRetry": true
+      },
+      {
+        "failure": "/api/me/privacy",
+        "canRetry": true
+      }
+    ],
+    "failureCopy": "Privacy request could not be confirmed\n\nCheck its status below before trying again.",
+    "errors": []
+  }
+]

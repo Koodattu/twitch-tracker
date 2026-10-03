@@ -354,7 +354,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
     const path = `${isPrivate ? "/api/private/streams" : "/api/streams"}/:streamId/${kind}`;
     const handler: MiddlewareHandler<ApiBindings> = async (c) => {
       const query = streamDetailQuerySchema.safeParse(c.req.query());
-      if (!query.success) {
+      if (!query.success || (kind === "events" && ["from", "to"].some((key) => (c.req.queries(key)?.length ?? 0) > 1))) {
         return c.json({ error: { code: "invalid_query", message: "Check the page number and time filters." } }, 400);
       }
       return c.json({ data: await getStreamDetail(c.get("db"), c.req.param("streamId")!, kind, query.data) });

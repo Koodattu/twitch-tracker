@@ -21,7 +21,7 @@ export default async function StreamPage({ params }: { params: Promise<{ streamI
       <MetricCard label="Messages captured" value={formatCount(activity.totals.messageCount)} />
       <MetricCard label="Peak active chatters" value={formatCount(activity.totals.activeChatterCountMax)} detail="Distinct speakers in one activity interval" />
     </section>
-    <StreamActivityChart activity={activity} />
+    <StreamActivityChart activity={activity} streamId={streamId} />
     <section className="panel">
       <div className="panel-header"><div className="panel-heading"><h2>Recent events</h2><p>Latest channel events and raids</p></div><Link className="button button-secondary button-compact" href={`/streams/${encodeURIComponent(streamId)}/events`} prefetch={false}>View all events</Link></div>
       <EventTimeline events={activity.events} />

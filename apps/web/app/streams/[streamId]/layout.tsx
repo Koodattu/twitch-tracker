@@ -12,13 +12,13 @@ export default async function StreamLayout({ params, children }: { params: Promi
   const name = stream.broadcasterDisplayName ?? stream.broadcasterLogin ?? "Unknown channel";
   const duration = Math.max(0, (new Date(stream.endedAt ?? stream.lastSeenLiveAt).getTime() - new Date(stream.startedAt).getTime()) / 1000);
   return <>
-    <section className="page-title page-title-wide">
+    <section className="page-title page-title-wide stream-page-title">
       <div className="breadcrumbs"><Link href="/">Live streams</Link><span>/</span>{stream.broadcasterLogin == null ? <span>{name}</span> : <Link href={`/channels/${stream.broadcasterLogin}`}>{name}</Link>}<span>/</span><span>Stream session</span></div>
       <div className="page-heading-row">
-        <div className="identity-heading"><Avatar name={name} src={stream.broadcasterProfileImageUrl} size="large" /><div><span className="eyebrow">{stream.latestCategoryName ?? "Stream session"}</span><h1>{stream.latestTitle ?? "Stream session"}</h1></div></div>
+        <h1>{stream.latestTitle ?? "Stream session"}</h1>
         <StatusPill tone={stream.endedAt == null ? "success" : "neutral"}>{stream.endedAt == null ? "Live" : "Ended"}</StatusPill>
       </div>
-      <p>{name} · {formatDateTime(stream.startedAt)} · {formatDuration(duration)} {stream.endedAt == null ? "observed" : "duration"}</p>
+      <div className="stream-session-context"><Avatar name={name} src={stream.broadcasterProfileImageUrl} size="small" /><p>{name}{stream.latestCategoryName == null ? "" : ` · ${stream.latestCategoryName}`} · {formatDateTime(stream.startedAt)} · {formatDuration(duration)} {stream.endedAt == null ? "observed" : "duration"}</p></div>
       <details className="stream-session-details"><summary>Session details</summary><dl>
         <div><dt>Twitch started</dt><dd>{formatDateTime(stream.startedAt)}</dd></div>
         <div><dt>First discovered</dt><dd>{formatDateTime(stream.firstSeenAt)}</dd></div>

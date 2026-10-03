@@ -2,6 +2,7 @@
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { communityNodeRadius, type CommunityMap } from "@twitch-tracker/shared";
 import { formatCount, formatDateTime } from "../format";
 import { Avatar, EmptyState } from "../ui";
@@ -18,6 +19,34 @@ function color(id: string | null) {
   let hash = 0;
   for (const char of id) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
   return `hsl(${hash % 360} 78% 68%)`;
+}
+
+function setSelected(id: string | null) {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("channel");
+  if (id != null) url.searchParams.set("channel", id);
+  if (url.href !== window.location.href) window.history.pushState(null, "", url);
+}
+
+function locateChannel(node: MapNode, size: number, bounds: { width: number; height: number }): MapView {
+  const view = { size, x: node.x - size / 2, y: node.y - size / 2 };
+  if (bounds.width > 760) return view;
+  const center = { x: bounds.width / 2, y: bounds.height / 2 };
+  return transformCamera(view, { ...bounds, left: 0, top: 0 }, center, { ...center, y: bounds.height * 0.38 });
+}
+
+function ShareMapLink() {
+  const [share, setShare] = useState<{ url: string; copied: boolean } | null>(null);
+  const copy = async () => {
+    const url = window.location.href;
+    try { await navigator.clipboard.writeText(url); setShare({ url, copied: true }); }
+    catch { setShare({ url, copied: false }); }
+  };
+  return <div className="community-share">
+    <button type="button" className="button button-secondary" onClick={copy}>Copy map link</button>
+    <p>Opens this channel in the latest 30-day map.</p>
+    {share != null && <div role="status">{share.copied ? "Map link copied." : <label>Copy this map link<input className="search-input" readOnly value={share.url} onFocus={(event) => event.currentTarget.select()} /></label>}</div>}
+  </div>;
 }
 
 // Camera movement only changes the SVG viewBox, leaving the graph artwork intact.
@@ -83,10 +112,14 @@ function MapLabels({ map, matches, selected, view, width, height, hideUnconnecte
 }
 
 export function CommunityExplorer({ map }: { map: CommunityMap }) {
+  const params = useSearchParams();
+  const requested = params.getAll("channel");
+  const byId = useMemo(() => new Map(map.graph.nodes.map((node) => [node.id, node])), [map]);
+  const selected = requested.length === 1 && byId.has(requested[0]!) ? requested[0]! : null;
+  const selectedNode = selected == null ? null : byId.get(selected)!;
   const thresholds = map.coverage.thresholds ?? { channelPeople: 10, sharedPeople: 5 };
   const [query, setQuery] = useState("");
   const [group, setGroup] = useState("all");
-  const [selected, setSelected] = useState<string | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -96,15 +129,20 @@ export function CommunityExplorer({ map }: { map: CommunityMap }) {
   const connectedView = useMemo(() => fitCommunityView(map.graph.nodes.filter((node) => node.community != null)), [map]);
   const allView = useMemo(() => fitCommunityView(map.graph.nodes), [map]);
   const homeView = hideUnconnected ? connectedView : allView;
-  const [view, setView] = useState(homeView);
   const [mapSize, setMapSize] = useState({ width: 1000, height: 1000 });
+  const initialView = useMemo(() => selectedNode == null ? homeView : locateChannel(selectedNode, 650, mapSize), [selectedNode, homeView, mapSize]);
+  // Keep gestures local to their selected channel; history restores a useful neighborhood.
+  const [camera, setCamera] = useState<{ selected: string | null; view: MapView } | null>(null);
+  const view = camera?.selected === selected ? camera.view : initialView;
+  const setView = useCallback((next: MapView | ((current: MapView) => MapView)) => {
+    setCamera((current) => ({ selected, view: typeof next === "function" ? next(current?.selected === selected ? current.view : initialView) : next }));
+  }, [selected, initialView]);
   const mapSide = Math.max(1, Math.min(mapSize.width, mapSize.height));
   const unconnectedCount = map.graph.nodes.filter((node) => node.community == null).length;
   const svg = useRef<SVGSVGElement>(null);
   const search = useRef<HTMLInputElement>(null);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const drag = useRef<{ x: number; y: number; moved: boolean; id: string | null } | null>(null);
-  const byId = useMemo(() => new Map(map.graph.nodes.map((node) => [node.id, node])), [map]);
   const communities = useMemo(() => {
     const result = new Map<string, MapNode[]>();
     for (const node of map.graph.nodes) if (node.community != null) {
@@ -116,7 +154,6 @@ export function CommunityExplorer({ map }: { map: CommunityMap }) {
   }, [map]);
   const labels = new Map(communities.map((item) => [item.id, item.nodes.slice(0, 2).map(name).join(" / ")]));
   const categorySummaries = useMemo(() => new Map(communities.map((item) => [item.id, summarizeCommunityCategories(item.nodes)])), [communities]);
-  const selectedNode = selected == null ? null : byId.get(selected);
   const categorySummary = selectedNode?.community == null ? null : categorySummaries.get(selectedNode.community);
   const connections = useMemo(() => selected == null ? [] : map.graph.edges.filter((edge) => edge.source === selected || edge.target === selected)
     .map((edge) => ({ ...edge, node: byId.get(edge.source === selected ? edge.target : edge.source)! }))
@@ -126,24 +163,20 @@ export function CommunityExplorer({ map }: { map: CommunityMap }) {
     `${name(node)} ${node.login ?? ""}`.toLowerCase().includes(query.trim().toLowerCase()))
     .sort((a, b) => participants(b) - participants(a) || name(a).localeCompare(name(b))), [map, group, query]);
   const select = useCallback((node: MapNode, locate = false) => {
-    setSelected(node.id); setSearchOpen(false); setHelpOpen(false); setQuery(""); setGroup("all"); setPage(0);
-    if (locate) setView((current) => {
-      const size = Math.min(current.size, 650);
-      const next = { size, x: node.x - size / 2, y: node.y - size / 2 };
-      const bounds = svg.current?.getBoundingClientRect();
-      if (bounds == null || bounds.width > 760) return next;
-      const center = { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 };
-      return transformCamera(next, bounds, center, { ...center, y: bounds.top + bounds.height * 0.38 });
+    setCamera((current) => {
+      const currentView = current?.selected === selected ? current.view : initialView;
+      return { selected: node.id, view: locate ? locateChannel(node, Math.min(currentView.size, 650), mapSize) : currentView };
     });
+    setSelected(node.id); setSearchOpen(false); setHelpOpen(false); setQuery(""); setGroup("all"); setPage(0);
     svg.current?.focus({ preventScroll: true });
-  }, []);
+  }, [selected, initialView, mapSize]);
   const zoom = (factor: number) => setView((current) => {
     const bounds = svg.current?.getBoundingClientRect();
     if (bounds == null) return current;
     const center = { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 };
     return transformCamera(current, bounds, center, center, factor, homeView.size * 2);
   });
-  const reset = () => { setView(hasConnectedChannels ? connectedView : allView); setSelected(null); setHovered(null); setQuery(""); setGroup("all"); setHideUnconnected(hasConnectedChannels); setSearchOpen(false); setPage(0); };
+  const reset = () => { setCamera(null); setSelected(null); setHovered(null); setQuery(""); setGroup("all"); setHideUnconnected(hasConnectedChannels); setSearchOpen(false); setPage(0); };
   useEffect(() => {
     const element = svg.current;
     if (element == null) return;
@@ -155,12 +188,17 @@ export function CommunityExplorer({ map }: { map: CommunityMap }) {
       setView((current) => transformCamera(current, bounds, cursor, cursor, Math.exp(Math.max(-120, Math.min(120, delta)) * 0.0025), homeView.size * 2));
     };
     element.addEventListener("wheel", wheel, { passive: false });
+    return () => element.removeEventListener("wheel", wheel);
+  }, [homeView.size, setView]);
+  useEffect(() => {
+    const element = svg.current;
+    if (element == null) return;
     const resize = new ResizeObserver(([entry]) => {
       if (entry != null) setMapSize({ width: entry.contentRect.width, height: entry.contentRect.height });
     });
     resize.observe(element);
-    return () => { element.removeEventListener("wheel", wheel); resize.disconnect(); };
-  }, [homeView.size]);
+    return () => resize.disconnect();
+  }, []);
   const reportingEnd = new Date(new Date(map.windowEnd).getTime() - 1).toISOString().slice(0, 10);
 
   return <div className="community-explorer" onKeyDown={(event) => {
@@ -267,6 +305,7 @@ export function CommunityExplorer({ map }: { map: CommunityMap }) {
         </div>}
       </section>}
 
+    {requested.length > 0 && selectedNode == null && <div className="community-details community-glass" role="status"><p>The linked channel is unavailable in this 30-day map. Find another channel or use Fit map to reset.</p></div>}
     {selectedNode != null && <section className="community-details community-glass" aria-label="Selected channel">
       <div className="community-panel-heading"><span className="eyebrow">Channel connections</span><button className="community-icon-button" aria-label="Close channel details" onClick={() => { setSelected(null); svg.current?.focus(); }}>×</button></div>
       <div className="community-selected"><Avatar name={name(selectedNode)} src={selectedNode.profileImageUrl} size="small" /><h2>{name(selectedNode)}</h2></div>
@@ -287,6 +326,7 @@ export function CommunityExplorer({ map }: { map: CommunityMap }) {
             <strong>{Math.round(edge.shared / participants(selectedNode) * 100)}%</strong></button></li>)}
         </ul>}
       </div>
+      <ShareMapLink key={selectedNode.id} />
     </section>}
 
     <div className="community-bottom-bar"><button className="community-help-button community-glass" aria-expanded={helpOpen} aria-controls="community-explanation" onClick={() => { setHelpOpen(!helpOpen); setSearchOpen(false); }}>How it works <span aria-hidden="true">?</span></button>

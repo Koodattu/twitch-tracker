@@ -10,7 +10,7 @@ const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE ?? join(homedir(), ".cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright"));
 const phase = process.argv[2] ?? "after";
 assert.match(phase, /^(before|after|built)$/);
-const evidence = new URL("./evidence/round2/", import.meta.url);
+const evidence = new URL(process.env.GOAL_EVIDENCE_DIR ?? "./evidence/round2/", import.meta.url);
 const failureFlag = new URL("../../.temp/goal-api-failure", import.meta.url);
 await mkdir(evidence, { recursive: true });
 await mkdir(new URL("../../.temp/", import.meta.url), { recursive: true });

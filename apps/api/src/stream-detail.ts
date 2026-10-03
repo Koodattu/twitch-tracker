@@ -13,7 +13,7 @@ export const streamDetailQuerySchema = z.object({
   message: "The end time must be after the start time."
 });
 
-export async function getStreamEvents(db: DbClient, streamId: string, limit: number, offset = 0) {
+export async function getStreamEvents(db: DbClient, streamId: string, limit: number, offset = 0, range: { from?: string | undefined; to?: string | undefined } = {}) {
   const result = await db.execute<StreamEvent>(sql`
     select id, event_type as "eventType", occurred_at as "occurredAt", source, actor, viewer_count as "viewerCount"
     from (
@@ -35,6 +35,8 @@ export async function getStreamEvents(db: DbClient, streamId: string, limit: num
         then r.source_broadcaster_user_id else r.target_broadcaster_user_id end
       where r.source_stream_id = ${streamId} or r.target_stream_id = ${streamId}
     ) events
+    where ${range.from == null ? sql`true` : sql`occurred_at >= ${new Date(range.from)}`}
+      and ${range.to == null ? sql`true` : sql`occurred_at < ${new Date(range.to)}`}
     order by occurred_at desc, id desc
     limit ${limit} offset ${offset}
   `);
@@ -95,7 +97,7 @@ export async function getStreamDetail(db: DbClient, streamId: string, kind: "obs
   const limit = pageSize + 1;
   const offset = (query.page - 1) * pageSize;
   switch (kind) {
-    case "events": return streamDetailPage(await getStreamEvents(db, streamId, limit, offset), query.page);
+    case "events": return streamDetailPage(await getStreamEvents(db, streamId, limit, offset, query), query.page);
     case "observations": return streamDetailPage(await db.select(viewerObservationFields).from(streamSnapshots).where(eq(streamSnapshots.twitchStreamId, streamId))
       .orderBy(desc(streamSnapshots.observedAt), desc(streamSnapshots.id)).limit(limit).offset(offset), query.page);
     case "buckets": return streamDetailPage(await db.select({

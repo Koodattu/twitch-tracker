@@ -8,7 +8,7 @@ import { fixtureUrl } from "./fixture.mjs";
 const { Pool } = createRequire(new URL("../../packages/db/package.json", import.meta.url))("pg");
 const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE ?? join(homedir(), ".cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright"));
 const pool = new Pool({ connectionString: fixtureUrl });
-const evidence = new URL("./evidence/round2/", import.meta.url);
+const evidence = new URL(process.env.GOAL_EVIDENCE_DIR ?? "./evidence/round2/", import.meta.url);
 const phase = process.argv[2] ?? "built";
 assert.match(phase, /^(before|after|built)$/);
 const streamId = `goal-round2-chart-${Date.now()}`;

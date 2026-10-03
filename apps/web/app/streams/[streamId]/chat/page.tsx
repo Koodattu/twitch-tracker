@@ -6,15 +6,17 @@ import { formatDateTime, formatStatus } from "../../../format";
 import { EmptyState, StatusPill } from "../../../ui";
 import { DetailPagination, DetailUnavailable } from "../detail-ui";
 import { getDetailPageNumber, getStreamSession } from "../stream-data";
+import { streamViewParams } from "../stream-view";
 
 export const metadata: Metadata = { title: "Stream chat" };
 
-export default async function StreamChatPage({ params, searchParams }: { params: Promise<{ streamId: string }>; searchParams: Promise<{ page?: string; chatter?: string | string[]; from?: string | string[]; to?: string | string[] }> }) {
+export default async function StreamChatPage({ params, searchParams }: { params: Promise<{ streamId: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { streamId } = await params;
   const stream = await getStreamSession(streamId);
   if (!stream?.canInspectRaw) return <section className="panel"><DetailUnavailable privateData /></section>;
   const search = await searchParams;
-  const page = getDetailPageNumber(search.page);
+  const page = getDetailPageNumber(typeof search.page === "string" ? search.page : undefined);
+  const inspection = streamViewParams(search);
   const filterValue = (value: string | string[] | undefined) => typeof value === "string" ? value : "";
   const filters = { chatter: filterValue(search.chatter).trim().slice(0, 100), from: filterValue(search.from), to: filterValue(search.to) };
   const query = new URLSearchParams({ page: String(page), chatter: filters.chatter });
@@ -31,10 +33,11 @@ export default async function StreamChatPage({ params, searchParams }: { params:
   const pathname = `/streams/${encodeURIComponent(streamId)}/chat`;
   return <>
     <form className="stream-filters" action={pathname} method="get">
+      {[...inspection].map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
       <label>Chatter login<input className="search-input" name="chatter" defaultValue={filters.chatter} maxLength={100} placeholder="Any chatter" /></label>
       <label>Captured from (UTC)<input className="search-input" type="datetime-local" name="from" defaultValue={filters.from} /></label>
       <label>Captured before (UTC)<input className="search-input" type="datetime-local" name="to" defaultValue={filters.to} /></label>
-      <button className="button" type="submit">Filter chat</button><Link className="button button-secondary" href={pathname} prefetch={false}>Clear</Link>
+      <button className="button" type="submit">Filter chat</button><Link className="button button-secondary" href={inspection.size === 0 ? pathname : `${pathname}?${inspection}`} prefetch={false}>Clear</Link>
     </form>
     <section className="panel">
       <div className="panel-header"><div className="panel-heading"><h2>Captured messages</h2><p>Newest captured messages first</p></div><StatusPill tone="accent">Private detail</StatusPill></div>
@@ -43,7 +46,7 @@ export default async function StreamChatPage({ params, searchParams }: { params:
           <div className="message-meta"><strong>{message.chatterLogin == null ? "Unknown chatter" : <Link href={`/chatters/${message.chatterLogin}`} prefetch={false}>{message.chatterDisplayName ?? message.chatterLogin}</Link>}</strong><time dateTime={message.sentAt ?? message.receivedAt}>{formatDateTime(message.sentAt ?? message.receivedAt)}</time><span>{formatStatus(message.source)} · {formatStatus(message.messageType)}</span></div>
           <p className="message-body">{message.rawText ?? "Message text has been redacted."}</p>
         </article>)}</div>}
-        <DetailPagination page={messages.page} hasMore={messages.hasMore} pathname={pathname} filters={filters} />
+        <DetailPagination page={messages.page} hasMore={messages.hasMore} pathname={pathname} filters={{ ...filters, ...Object.fromEntries(inspection) }} />
       </>}
     </section>
     <p className="data-note">Messages are available only where chat was captured and records are still retained. Time filters use capture time; message timestamps show send time when available.</p>

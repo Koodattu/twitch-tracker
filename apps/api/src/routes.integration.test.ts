@@ -367,6 +367,21 @@ describe.skipIf(database == null)("Analytics routes with PostgreSQL", () => {
     }
   });
 
+  it("filters stream events and raids to the selected UTC interval before pagination", async () => {
+    await db.insert(channelEvents).values([
+      { twitchStreamId: "stream", eventType: "before", occurredAt: new Date("2026-09-05T09:59:59Z"), source: "eventsub" },
+      { twitchStreamId: "stream", eventType: "at_start", occurredAt: firstSeen, source: "eventsub" },
+      { twitchStreamId: "stream", eventType: "at_end", occurredAt: latestSeen, source: "eventsub" }
+    ]);
+    await db.insert(raids).values([
+      { targetStreamId: "stream", sourceBroadcasterUserId: "chatter", viewerCount: 50, occurredAt: new Date("2026-09-05T10:01:00Z") },
+      { sourceStreamId: "stream", targetBroadcasterUserId: "chatter", viewerCount: 10, occurredAt: latestSeen }
+    ]);
+    const response = await app.request("/api/streams/stream/events?from=2026-09-05T10:00:00Z&to=2026-09-05T10:03:00Z");
+    expect(response.status).toBe(200);
+    expect((await response.json()).data.items.map((item: { eventType: string }) => item.eventType)).toEqual(["incoming_raid", "at_start"]);
+  });
+
   it("merges raids and events in time order without duplicate EventSub raids", async () => {
     const [raw] = await db.insert(rawEventsubEvents).values({ eventType: "channel.raid", payload: {} }).returning();
     await db.insert(channelEvents).values([
@@ -381,6 +396,31 @@ describe.skipIf(database == null)("Analytics routes with PostgreSQL", () => {
     expect(data.items[1]).toMatchObject({ actor: "chatter", viewerCount: 50 });
     const overview = await app.request("/api/streams/stream/overview");
     expect((await overview.json()).data.largestRaid.viewers).toBe(50);
+  });
+
+  it("pages a filtered stream event set and accepts equivalent offset times", async () => {
+    await db.insert(channelEvents).values(Array.from({ length: 55 }, (_, i) => ({
+      twitchStreamId: "stream", eventType: "channel.update", occurredAt: new Date(firstSeen.getTime() + i * 1000), source: "eventsub" as const
+    })));
+    await db.insert(channelEvents).values({ twitchStreamId: "stream", eventType: "outside", occurredAt: latestSeen, source: "eventsub" });
+    const range = "from=2026-09-05T13%3A00%3A00%2B03%3A00&to=2026-09-05T10%3A01%3A00Z";
+    const first = (await (await app.request(`/api/streams/stream/events?${range}`)).json()).data;
+    const second = (await (await app.request(`/api/streams/stream/events?${range}&page=2`)).json()).data;
+    expect(first.items).toHaveLength(50);
+    expect(first.hasMore).toBe(true);
+    expect(second.items).toHaveLength(5);
+    expect(second.hasMore).toBe(false);
+    expect(new Set([...first.items, ...second.items].map((item: { id: string }) => item.id)).size).toBe(55);
+    expect([...first.items, ...second.items].every((item: { eventType: string }) => item.eventType === "channel.update")).toBe(true);
+    expect((await (await app.request("/api/streams/stream/events?from=2026-09-06T00:00:00Z")).json()).data.items).toEqual([]);
+  });
+
+  it.each([
+    "from=2026-02-31T10:00:00Z", "from=2026-09-05T10:00:00Z&to=2026-09-05T10:00:00Z",
+    "from=2026-09-05T10:00:00Z&from=2026-09-06T10:00:00Z",
+    "to=2026-09-05T10:00:00Z&to=2026-09-06T10:00:00Z"
+  ])("rejects invalid or ambiguous event time filters: %s", async (query) => {
+    expect((await app.request(`/api/streams/stream/events?${query}`)).status).toBe(400);
   });
 
   it.each(["observations", "buckets", "events", "messages", "membership", "presence"])("paginates %s independently with a stable tie order", async (kind) => {

@@ -12,7 +12,7 @@ const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODUL
 const phase = process.argv[2] ?? "after";
 assert.match(phase, /^(before|after|built)$/);
 const pool = new Pool({ connectionString: fixtureUrl });
-const evidence = new URL("./evidence/round2/", import.meta.url);
+const evidence = new URL(process.env.GOAL_EVIDENCE_DIR ?? "./evidence/round2/", import.meta.url);
 const failureFlag = new URL("../../.temp/goal-api-failure", import.meta.url);
 const secret = "synthetic-local-goal-test-session-secret-only";
 const token = "round2-synthetic-account-session-only";

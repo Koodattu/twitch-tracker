@@ -1,0 +1,30 @@
+[
+  {
+    "name": "Repeated chatter query does not crash the page",
+    "passed": true
+  },
+  {
+    "name": "Impossible calendar date is reported as invalid",
+    "passed": true
+  },
+  {
+    "name": "Map shows qualifying channels when none have connections",
+    "passed": true
+  },
+  {
+    "name": "Fit map keeps unconnected channels visible",
+    "passed": true
+  },
+  {
+    "name": "Keyboard map focus has a visible outline",
+    "passed": true,
+    "actual": {
+      "style": "solid",
+      "width": 3
+    }
+  },
+  {
+    "name": "Empty community map explains missing data",
+    "passed": true
+  }
+]

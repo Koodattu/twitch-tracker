@@ -7,6 +7,7 @@ import { formatCount, formatDateTime, formatStatus } from "../../../format";
 import { StatusPill } from "../../../ui";
 import { DetailTable, DetailUnavailable } from "../../../detail-ui";
 import { getDetailPageNumber, getStreamSession } from "../stream-data";
+import { streamViewParams } from "../stream-view";
 
 export const metadata: Metadata = { title: "Stream data" };
 
@@ -18,33 +19,34 @@ const views = {
 };
 type View = keyof typeof views;
 
-export default async function StreamDataPage({ params, searchParams }: { params: Promise<{ streamId: string }>; searchParams: Promise<{ page?: string; view?: string }> }) {
+export default async function StreamDataPage({ params, searchParams }: { params: Promise<{ streamId: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { streamId } = await params;
   const search = await searchParams;
-  const view: View = search.view != null && Object.hasOwn(views, search.view) ? search.view as View : "observations";
-  const page = getDetailPageNumber(search.page);
+  const view: View = typeof search.view === "string" && Object.hasOwn(views, search.view) ? search.view as View : "observations";
+  const page = getDetailPageNumber(typeof search.page === "string" ? search.page : undefined);
+  const inspection = Object.fromEntries(streamViewParams(search));
   const stream = await getStreamSession(streamId);
   const privateData = view === "membership" || view === "presence";
   const pathname = `/streams/${encodeURIComponent(streamId)}/data`;
   return <>
     <nav className="stream-tabs stream-data-tabs" aria-label="Stream data views">{(Object.entries(views) as [View, string][])
       .filter(([key]) => stream?.canInspectRaw || key === "observations" || key === "buckets")
-      .map(([key, label]) => <Link href={`${pathname}?view=${key}`} key={key} prefetch={false} aria-current={view === key ? "page" : undefined}>{label}</Link>)}
+      .map(([key, label]) => <Link href={`${pathname}?${new URLSearchParams({ ...inspection, view: key })}`} key={key} prefetch={false} aria-current={view === key ? "page" : undefined}>{label}</Link>)}
     </nav>
     <section className="panel">
       <div className="panel-header"><div className="panel-heading"><h2>{views[view]}</h2><p>Newest observations first</p></div>{privateData ? <StatusPill tone="accent">Private detail</StatusPill> : null}</div>
-      {privateData && !stream?.canInspectRaw ? <DetailUnavailable privateData /> : <DataTable streamId={streamId} view={view} page={page} pathname={pathname} />}
+      {privateData && !stream?.canInspectRaw ? <DetailUnavailable privateData /> : <DataTable streamId={streamId} view={view} page={page} pathname={pathname} inspection={inspection} />}
     </section>
     {privateData ? <p className="data-note">Membership and presence observations describe chat-room activity. They do not establish who watched the stream or for how long.</p> : null}
   </>;
 }
 
-async function DataTable({ streamId, view, page, pathname }: { streamId: string; view: View; page: number; pathname: string }) {
+async function DataTable({ streamId, view, page, pathname, inspection }: { streamId: string; view: View; page: number; pathname: string; inspection: Record<string, string> }) {
   const privateData = view === "membership" || view === "presence";
   const init = await (privateData ? getAuthenticatedApiInit() : getPublicApiInit());
   const endpoint = `${privateData ? "/api/private/streams" : "/api/streams"}/${encodeURIComponent(streamId)}/${view}?page=${page}`;
   function table<T>(data: StreamDetailPage<T> | null, columns: string[], row: (item: T) => ReactNode) {
-    return <DetailTable data={data} columns={columns} row={row} label={views[view]} pathname={pathname} filters={{ view }} privateData={privateData} />;
+    return <DetailTable data={data} columns={columns} row={row} label={views[view]} pathname={pathname} filters={{ view, ...inspection }} privateData={privateData} />;
   }
   switch (view) {
     case "observations": return table(await getApiData<StreamDetailPage<StreamObservation>>(endpoint, init), ["Observed", "Viewers", "Category", "Title"], (item) =>

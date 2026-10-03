@@ -137,10 +137,28 @@ pnpm check:structure
 pnpm lint
 node node_modules/vitest/vitest.mjs run
 pnpm -r typecheck
+$env:INTERNAL_API_URL = 'http://127.0.0.1:4400'
+$env:NEXT_PUBLIC_API_URL = 'http://127.0.0.1:4400'
 pnpm -r build
 ```
 
 Stop the web dev server before building. The `-r` forms avoid the root scripts' nested Corepack selection on this Windows machine.
+The local API variables must also be set during the build: Next embeds the API proxy destination in its rewrite manifest. Keep them set when starting the built app.
+
+For the stream/community inspection release, run these after the base fixture is seeded and the local app is ready:
+
+```powershell
+$env:GOAL_EVIDENCE_DIR = './evidence/round5/'
+node work/goal-improvement/browser-stream-inspection.mjs built
+node work/goal-improvement/browser-stream-context.mjs
+node work/goal-improvement/browser-community-sharing.mjs built
+node work/goal-improvement/browser-chart-states.mjs built
+node work/goal-improvement/browser-round2.mjs built
+node work/goal-improvement/browser-account.mjs built
+node work/goal-improvement/measure-stream-inspection.mjs
+```
+
+Run browser scripts sequentially; they share temporary synthetic rows and the failure flag. The inspection and capacity scripts remove their dedicated stream in `finally`. The new evidence is under `evidence/round5/`; baseline screenshots show the old UI and cannot be recreated by running a `before` label against current code. Only representative screenshots are retained; JSON records cover all tested widths. The broader discovery scripts below also accept `GOAL_EVIDENCE_DIR`.
 
 Browser scripts use the already-installed bundled Playwright module and Chromium. On another machine, set `PLAYWRIGHT_MODULE` to its installed Playwright module path. No dependency was added. Run these sequentially while the synthetic API and web server are running:
 
