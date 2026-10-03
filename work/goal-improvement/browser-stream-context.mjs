@@ -11,11 +11,11 @@ try {
     const page = await browser.newPage({ viewport: { width, height: 900 }, reducedMotion: "reduce" });
     await page.goto("http://127.0.0.1:3300/streams/goal-aurora-0");
     await page.waitForLoadState("networkidle");
-    const slider = page.getByRole("slider", { name: "Inspect an interval" });
-    await slider.focus();
+    const chart = page.getByRole("group", { name: "Inspect stream activity", exact: true });
+    await chart.focus();
     await page.keyboard.press("End");
     const at = new URL(page.url()).searchParams.get("at");
-    const selected = await slider.inputValue();
+    const selected = await page.locator(".stream-chart-values").innerText();
     await page.getByRole("link", { name: "Chat", exact: true }).click();
     await page.getByLabel("Chatter login", { exact: true }).fill("testichat");
     await page.getByRole("button", { name: "Filter chat", exact: true }).click();
@@ -29,8 +29,8 @@ try {
     await page.waitForURL(url => !url.searchParams.has("chatter"));
     assert.equal(new URL(page.url()).searchParams.get("at"), at, "Clear removes chat filters only");
     await page.getByRole("link", { name: "Overview", exact: true }).click();
-    await slider.waitFor();
-    assert.equal(await slider.inputValue(), selected);
+    await chart.waitFor();
+    assert.equal(await page.locator(".stream-chart-values").innerText(), selected);
     results.push({ width, filtersPaginationClearAndReturn: true });
     await page.close();
   }

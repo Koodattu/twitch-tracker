@@ -58,8 +58,10 @@ export async function getStreamOverview(db: DbClient, streamId: string): Promise
           round(sum(viewer_count_avg::numeric * bucket_minutes)
             / nullif(sum(bucket_minutes) filter (where viewer_count_avg is not null), 0))::int as viewers,
           max(viewer_count_max) as viewer_peak,
-          round(sum(message_count)::numeric / nullif(sum(bucket_minutes) filter (where active_chatter_count is not null), 0), 2) as messages_per_minute,
-          max(active_chatter_count) as active_chatters,
+          round(sum(message_count)::numeric / nullif(sum(bucket_minutes), 0), 2) as messages_per_minute,
+          -- Message rollups only populate chatter counts when messages exist. A recorded
+          -- bucket with no messages has zero captured chat; an absent bucket stays null.
+          max(coalesce(active_chatter_count, case when message_count = 0 then 0 end)) as active_chatters,
           coalesce(bool_or(bucket_start > previous_end), false) or count(viewer_count_avg) < count(*) as interrupted
         from source cross join bounds group by time
       ), points as (
@@ -73,7 +75,7 @@ export async function getStreamOverview(db: DbClient, streamId: string): Promise
             / nullif(sum(bucket_minutes) filter (where viewer_count_avg is not null), 0))::int,
           'viewerCountMax', max(viewer_count_max),
           'messageCount', coalesce(sum(message_count), 0),
-          'activeChatterCountMax', max(active_chatter_count)
+          'activeChatterCountMax', max(coalesce(active_chatter_count, case when message_count = 0 then 0 end))
         ) from source),
         'intervalMinutes', (select minutes from bounds),
         'points', coalesce((select json_agg(json_build_object(

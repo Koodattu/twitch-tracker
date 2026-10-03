@@ -96,6 +96,7 @@ export default async function BotAccountsPage() {
 
           <section className="panel">
             <div className="panel-header"><div className="panel-heading"><h2>Blocked channels</h2><p>Grouped by channel, most recently detected first. Expand for restriction details and retry options.</p></div><StatusPill tone={channelGroups.length === 0 ? "success" : "danger"}>{formatCount(channelGroups.length)} channels</StatusPill></div>
+            {blockedChannels.some((block) => block.reason?.startsWith("IRC NOTICE msg_banned:")) ? <p className="data-note padded">Twitch’s chat ban notices do not name who issued the ban. Last detected is when a bot received the restriction, not necessarily when the ban was issued.</p> : null}
             {blockedChannels.length === 0 ? <EmptyState title="No blocked channels" description="Twitch has not reported a permanent channel restriction for any connected bot." /> : (
               <div className="blocked-channel-list">
                 {channelGroups.map((channel) => (
@@ -118,7 +119,7 @@ export default async function BotAccountsPage() {
                           <tr key={block.botAccountId}>
                             <td><strong>{block.botLogin}</strong></td>
                             <td><StatusPill tone={block.scope === "global" ? "danger" : "warning"}>{block.scope === "global" ? "All bots" : "This bot"}</StatusPill></td>
-                            <td>{block.reason ?? "Permanent IRC restriction"}</td>
+                            <td><div className="cell-stack"><span>{block.reason ?? "Permanent IRC restriction"}</span>{block.reason?.startsWith("IRC NOTICE msg_banned:") ? <span>Ban issuer: not included in the chat notice</span> : null}</div></td>
                             <td className="time-cell">{formatDateTime(block.detectedAt)}</td>
                             <td><form action={`/api/internal/bot-accounts/${encodeURIComponent(block.botAccountId)}/blocked-channels/${encodeURIComponent(block.broadcasterUserId)}/retry`} method="post"><button className="button button-secondary" type="submit" aria-label={`Retry ${block.botLogin} in ${channel.broadcasterLogin ?? channel.broadcasterUserId}`}>Retry</button></form></td>
                           </tr>

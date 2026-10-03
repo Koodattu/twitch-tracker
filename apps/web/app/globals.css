@@ -1524,16 +1524,31 @@ li,
 .stream-highlight:hover { border-color: var(--accent); }
 .stream-highlight:disabled { cursor: default; }
 .stream-highlight strong { font-size: 18px; }
-.stream-chart-controls button[aria-pressed="false"] { color: var(--muted); background: transparent; }
+.stream-chart-controls { gap: 4px 18px; padding-top: 8px; }
+.stream-chart-controls button { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0; border: 0; background: none; color: var(--foreground); font: inherit; cursor: pointer; }
+.stream-chart-controls button:hover { text-decoration: underline; text-underline-offset: 4px; }
+.stream-chart-controls button[aria-pressed="false"] { color: var(--muted); text-decoration: line-through; }
+.stream-chart-controls button[aria-pressed="false"] i { background: transparent; box-shadow: inset 0 0 0 1px currentColor; }
+.stream-activity-plot { position: relative; margin: 8px 18px 0; border-radius: 4px; }
+.stream-activity-plot:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.stream-activity-chart { min-height: 0; cursor: crosshair; }
 .stream-chart-point { fill: var(--panel); stroke-width: 1.5; }
 .stream-chart-peak { stroke-dasharray: 3 5; opacity: 0.55; }
 .stream-chart-cursor { stroke: var(--muted); stroke-dasharray: 4 4; }
-.stream-chart-inspector { padding: 14px 18px; display: grid; gap: 10px; font-size: 12px; }
-.stream-chart-inspector input { width: 100%; min-height: 44px; margin: 0; accent-color: var(--accent); }
-.stream-chart-values { display: flex; flex-wrap: wrap; gap: 8px 20px; min-height: 40px; font-variant-numeric: tabular-nums; }
-.stream-chart-lane-label { fill: var(--foreground); font-weight: 600; }
-.stream-inspection-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.stream-chart-tooltip { position: absolute; top: 42px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-raised); box-shadow: 0 5px 18px rgb(0 0 0 / 25%); pointer-events: none; font-size: 11px; font-variant-numeric: tabular-nums; }
+.stream-chart-tooltip strong { display: block; margin-bottom: 10px; }
+.stream-chart-tooltip dl { display: grid; gap: 8px; margin: 0; }
+.stream-chart-tooltip dl div { display: flex; justify-content: space-between; gap: 8px; }
+.stream-chart-tooltip dt { display: flex; align-items: center; gap: 6px; }
+.stream-chart-tooltip dd { margin: 0; font-weight: 600; white-space: nowrap; }
+.stream-chart-tooltip i { flex: 0 0 6px; height: 6px; border-radius: 50%; }
+.stream-chart-tooltip > span { display: block; margin-top: 8px; }
+.stream-chart-inspector { padding: 6px 18px 0; display: grid; gap: 2px; font-size: 12px; }
+.stream-chart-inspector > p { margin: 0; font-size: 11px; }
+.stream-inspection-actions { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+.stream-inspection-actions :is(button, a) { display: inline-flex; align-items: center; min-height: 32px; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .stream-share-result { overflow-wrap: anywhere; }
+@media (pointer: coarse) { .stream-chart-controls button, .stream-inspection-actions :is(button, a) { min-height: 44px; } }
 .stream-interval-figures { padding: 12px 18px 18px; border-top: 1px solid var(--line); }
 .stream-interval-figures summary { min-height: 44px; align-content: center; cursor: pointer; font-size: 13px; font-weight: 600; }
 .stream-interval-figures .data-note { margin: 0 0 14px; }

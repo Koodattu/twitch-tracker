@@ -25,16 +25,23 @@ try {
     const base = `http://127.0.0.1:3300/streams/${streamId}`;
     await page.goto(base);
     await page.waitForLoadState("networkidle");
-    const slider = page.getByRole("slider",{name:"Inspect an interval"});
+    const inspector = page.getByRole("group",{name:"Inspect stream activity",exact:true});
+    const selectedTime = () => new URL(page.url()).searchParams.get("at");
     await page.getByRole("button",{name:/Busiest chat interval/}).click();
-    const selected = await slider.inputValue();
-    assert.equal(selected,"12");
+    const selectedValues = await page.locator(".stream-chart-values").innerText();
+    assert.match(selectedValues, /20 Sept 2026, 11:00 UTC/);
+    const selected = selectedTime();
+    if (phase !== "before") assert.equal(selected,at);
     const selectedUrl = page.url();
     await page.reload();
     await page.waitForLoadState("networkidle");
-    const restored = await slider.inputValue();
-    if(phase==="before") assert.equal(restored,"0");
-    else { assert.equal(restored,"12"); assert.equal(new URL(selectedUrl).searchParams.get("at"),at); }
+    const restored = selectedTime();
+    if(phase==="before") assert.equal(restored,null);
+    else {
+      assert.equal(restored,at);
+      assert.equal(new URL(selectedUrl).searchParams.get("at"),at);
+      assert.equal(await page.locator(".stream-chart-values").innerText(),selectedValues);
+    }
     if (phase !== "before") {
       const viewers = page.getByRole("button",{name:"Viewers (average / peak)",exact:true});
       await viewers.click();
@@ -43,20 +50,22 @@ try {
       await page.reload();
       await page.waitForLoadState("networkidle");
       assert.equal(await viewers.getAttribute("aria-pressed"),"false");
-      assert.equal(await slider.inputValue(),"12");
+      assert.equal(selectedTime(),at);
+      assert.equal(await page.locator(".stream-chart-values").innerText(),selectedValues);
       await viewers.click();
       await page.goBack();
       assert.equal(page.url(),withMetrics);
       assert.equal(await viewers.getAttribute("aria-pressed"),"false");
       await viewers.click();
       const chart = page.getByRole("img",{name:/Stream activity/});
-      assert.equal(await chart.locator(".stream-chart-lane-label").count(),3);
+      assert.equal(await chart.locator(".chart-grid").count(),1);
+      assert.equal(await page.locator('input[type="range"]').count(),0);
       const chartBox = await chart.boundingBox();
       await page.mouse.move(chartBox.x+60,chartBox.y+60);
       const committedUrl = page.url();
       await page.mouse.move(2,2);
       assert.equal(page.url(),committedUrl,"Hover is not persisted");
-      assert.equal(await slider.inputValue(),"12");
+      assert.equal(selectedTime(),at);
       await page.context().grantPermissions(["clipboard-read","clipboard-write"]);
       await page.getByRole("button",{name:"Copy view link",exact:true}).click();
       assert.match(await page.getByRole("status").innerText(),/View link copied/);
@@ -64,7 +73,8 @@ try {
       const copy = await page.context().newPage();
       await copy.goto(shared);
       await copy.waitForLoadState("networkidle");
-      assert.equal(await copy.getByRole("slider").inputValue(),"12");
+      assert.equal(new URL(copy.url()).searchParams.get("at"),at);
+      assert.equal(await copy.locator(".stream-chart-values").innerText(),selectedValues);
       await copy.close();
       await page.getByRole("link",{name:"Events in this interval",exact:true}).click();
       await page.getByRole("heading",{name:"Channel events",exact:true}).waitFor();
@@ -77,16 +87,16 @@ try {
       assert.equal(await page.locator(".stream-event-list li").count(),6);
       assert.equal(new URL(page.url()).searchParams.get("at"),at);
       await page.getByRole("link",{name:"Overview",exact:true}).click();
-      await slider.waitFor();
+      await inspector.waitFor();
       await page.waitForLoadState("networkidle");
-      assert.equal(await slider.inputValue(),"12");
+      assert.equal(selectedTime(),at);
       await page.getByRole("link",{name:"Data",exact:true}).click();
       await page.getByRole("heading",{name:"Viewer observations",exact:true}).waitFor();
       await page.getByRole("link",{name:"Activity detail",exact:true}).click();
       await page.getByRole("heading",{name:"Activity detail",exact:true}).waitFor();
       await page.getByRole("link",{name:"Overview",exact:true}).click();
-      await slider.waitFor();
-      assert.equal(await slider.inputValue(),"12","Data subviews retain the selected stream moment");
+      await inspector.waitFor();
+      assert.equal(selectedTime(),at,"Data subviews retain the selected stream moment");
       await page.getByText("Interval figures · 24 intervals",{exact:true}).click();
       const table = page.getByRole("region",{name:"Stream interval figures"});
       assert.equal(await table.locator("tbody tr").count(),24);
@@ -123,13 +133,13 @@ try {
       await page.waitForLoadState("networkidle");
       assert.ok(await page.getByRole("heading",{name:"Choose a metric",exact:true}).isVisible());
       await page.getByRole("button",{name:"Reset view",exact:true}).click();
-      await slider.focus();
+      await inspector.focus();
       await page.keyboard.press("End");
-      assert.equal(await slider.inputValue(),"23");
+      assert.equal(selectedTime(),"2026-09-20T11:55:00.000Z");
       await page.keyboard.press("Home");
-      assert.equal(await slider.inputValue(),"0");
-      if(width<500) await slider.tap();
-      assert.ok((await slider.boundingBox()).height>=44);
+      assert.equal(selectedTime(),"2026-09-20T10:00:00.000Z");
+      if(width<500) await inspector.tap();
+      assert.ok((await inspector.boundingBox()).height>=44);
       await page.getByRole("button",{name:/Busiest chat interval/}).click();
       const failureFlag = new URL("../../.temp/goal-api-failure",import.meta.url);
       const selectedRange = `at=${encodeURIComponent(at)}&from=2026-09-20T11%3A00&to=2026-09-20T11%3A05`;
@@ -143,7 +153,7 @@ try {
         await rm(failureFlag);
         await page.getByRole("button",{name:"Try again",exact:true}).click();
         await page.getByRole("heading",{name:scenario.heading,exact:true}).waitFor({state:"hidden"});
-        if(scenario.api==="overview") assert.equal(await slider.inputValue(),"12");
+        if(scenario.api==="overview") assert.equal(selectedTime(),at);
         else assert.equal(await page.locator(".stream-event-list li").count(),50);
         assert.equal(new URL(page.url()).searchParams.get("at"),at);
       }

@@ -35,8 +35,9 @@ try {
     await pool.query(`insert into stream_activity_buckets(twitch_stream_id,bucket_start,bucket_minutes,viewer_count_avg,viewer_count_max,message_count,active_chatter_count)
       values($1,'2026-10-01T10:00:00Z',1,0,0,0,0)`, [streamId]);
     await go();
-    const slider = page.getByRole("slider", { name: "Inspect an interval" });
-    await slider.focus();
+    const inspector = page.getByRole("group", { name: "Inspect stream activity", exact: true });
+    assert.equal(await page.locator('input[type="range"]').count(), 0);
+    await inspector.focus();
     await page.keyboard.press("Home");
     await page.keyboard.press("End");
     const singleValues = await page.locator(".stream-chart-values").innerText();
@@ -66,8 +67,8 @@ try {
       await toggle.click();
       assert.equal(await toggle.getAttribute("aria-pressed"), "true");
     }
-    if (width < 500) await slider.tap();
-    await slider.focus();
+    if (width < 500) await inspector.tap();
+    await inspector.focus();
     await page.keyboard.press("End");
     assert.match(await page.locator(".stream-chart-values").innerText(), /1,600 average \/ 1,800 peak viewers/);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);

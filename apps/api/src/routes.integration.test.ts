@@ -276,7 +276,7 @@ describe.skipIf(database == null)("Analytics routes with PostgreSQL", () => {
     expect(data).not.toHaveProperty("snapshots");
   });
 
-  it("keeps missing intervals and unobserved chat distinct from zero", async () => {
+  it("shows zero captured chat for quiet activity buckets without filling missing intervals", async () => {
     await db.insert(streamActivityBuckets).values([
       { twitchStreamId: "stream", bucketStart: firstSeen, bucketMinutes: 1, viewerCountAvg: 10, viewerCountMax: 15 },
       { twitchStreamId: "stream", bucketStart: latestSeen, bucketMinutes: 1, viewerCountAvg: 20, viewerCountMax: 25, messageCount: 3, activeChatterCount: 2 }
@@ -285,9 +285,26 @@ describe.skipIf(database == null)("Analytics routes with PostgreSQL", () => {
     expect(response.status).toBe(200);
     const { points } = (await response.json()).data;
     expect(points).toHaveLength(4);
-    expect(points[0]).toMatchObject({ messagesPerMinute: null, interrupted: false });
+    expect(points[0]).toMatchObject({ messagesPerMinute: 0, activeChatters: 0, interrupted: false });
     expect(points[1]).toMatchObject({ viewers: null, viewerPeak: null, messagesPerMinute: null, activeChatters: null, interrupted: true });
     expect(points[3]).toMatchObject({ viewers: 20, messagesPerMinute: 3, activeChatters: 2, interrupted: true });
+  });
+
+  it("includes quiet minutes in a grouped captured-message rate", async () => {
+    await db.insert(streamActivityBuckets).values([0, 1, 2, 600].map((minute) => ({
+      twitchStreamId: "stream", bucketStart: new Date(firstSeen.getTime() + minute * 60_000), bucketMinutes: 1,
+      viewerCountAvg: 10, viewerCountMax: 15,
+      ...(minute === 0 ? { messageCount: 6, activeChatterCount: 2 } : {})
+    })));
+    const response = await app.request("/api/streams/stream/overview");
+    expect(response.status).toBe(200);
+    const data = (await response.json()).data;
+    expect(data.intervalMinutes).toBe(3);
+    // Six captured messages over three recorded minutes, including two quiet minutes.
+    expect(data.points[0]).toMatchObject({ messagesPerMinute: 2, activeChatters: 2 });
+    expect(data.points[1]).toMatchObject({ messagesPerMinute: null, activeChatters: null, interrupted: true });
+    expect(data.points.at(-1)).toMatchObject({ messagesPerMinute: 0, activeChatters: 0 });
+    expect(data.totals).toMatchObject({ messageCount: 6, activeChatterCountMax: 2 });
   });
 
   it("finds offline Finnish channels without exposing chatter-only, other-language or suppressed identities", async () => {
@@ -362,7 +379,7 @@ describe.skipIf(database == null)("Analytics routes with PostgreSQL", () => {
     // The chat-only interval supplies no audience evidence.
     expect(data.totals).toMatchObject({ viewerCountAvg: 25, viewerCountMax: 120, messageCount: 25 });
     if (endpoint === "overview") {
-      expect(data.points[0]).toMatchObject({ viewers: 25, viewerPeak: 120, messagesPerMinute: null });
+      expect(data.points[0]).toMatchObject({ viewers: 25, viewerPeak: 120, messagesPerMinute: 0, activeChatters: 0 });
       expect(data.points[1]).toMatchObject({ viewers: null, messagesPerMinute: 5, activeChatters: 3 });
     }
   });

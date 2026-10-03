@@ -8,8 +8,7 @@ import { formatCount, formatDateTime } from "../../format";
 import { EmptyState } from "../../ui";
 import { readStreamView, streamIntervalQuery, streamViewQuery, type StreamView } from "./stream-view";
 
-const plot = { left: 58, right: 20 };
-const laneHeight = 112;
+const plot = { left: 50, right: 50, top: 28, bottom: 222, height: 254 };
 const series = [
   { key: "viewers", label: "Viewers (average / peak)", color: "viewers" },
   { key: "messagesPerMinute", label: "Messages / min", color: "messages" },
@@ -21,6 +20,7 @@ export function StreamActivityChart({ activity, streamId }: { activity: StreamOv
   const view = readStreamView(useSearchParams());
   const [width, setWidth] = useState(800);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const [keyboardInspecting, setKeyboardInspecting] = useState(false);
   const [share, setShare] = useState<{ url: string; copied: boolean } | null>(null);
   const chartRef = useRef<HTMLDivElement>(null);
   const base = `/streams/${encodeURIComponent(streamId)}`;
@@ -32,12 +32,20 @@ export function StreamActivityChart({ activity, streamId }: { activity: StreamOv
   const intervalIndex = hoverIndex ?? committedIndex;
   const selected = points[intervalIndex];
   const committed = points[committedIndex];
-  const lanes = series.filter((item) => view.series.includes(item.key));
-  const height = lanes.length * laneHeight + 38;
+  const visibleSeries = series.filter((item) => view.series.includes(item.key));
+  // Keep both scales stable when a metric is hidden so toggling cannot change a trend's apparent size.
+  const viewerMaximum = Math.max(1, ...points.map((point) => Math.max(point.viewers ?? 0, point.viewerPeak ?? 0)));
+  const chatMaximum = Math.max(1, ...points.map((point) => Math.max(point.messagesPerMinute ?? 0, point.activeChatters ?? 0)));
+  const inspecting = hoverIndex != null || keyboardInspecting || (view.at != null && validTime);
+  const y = (value: number, key: typeof series[number]["key"] | "viewerPeak") =>
+    plot.top + (1 - value / (key === "viewers" || key === "viewerPeak" ? viewerMaximum : chatMaximum)) * (plot.bottom - plot.top);
   const x = (point: StreamChartPoint) => points.length === 1 ? (plot.left + width - plot.right) / 2
     : plot.left + (Date.parse(point.time) - firstTime) / Math.max(1, lastTime - firstTime) * (width - plot.left - plot.right);
   const hasData = points.some((point) => point.viewers != null || point.viewerPeak != null || point.messagesPerMinute != null || point.activeChatters != null);
   const invalid = view.invalid || (view.at != null && !validTime);
+  const tooltipWidth = Math.min(242, width - 16);
+  const tooltipLeft = selected == null ? 8 : Math.max(8, Math.min(width - tooltipWidth - 8,
+    x(selected) > width / 2 ? x(selected) - tooltipWidth - 14 : x(selected) + 14));
   useEffect(() => {
     const element = chartRef.current;
     if (element == null) return;
@@ -64,6 +72,7 @@ export function StreamActivityChart({ activity, streamId }: { activity: StreamOv
     const target = Date.parse(time);
     select(Math.max(0, points.findLastIndex((point) => Date.parse(point.time) <= target)));
     chartRef.current?.focus();
+    chartRef.current?.scrollIntoView({ block: "center" });
   }
   function pointerIndex(event: React.MouseEvent<SVGSVGElement> | React.PointerEvent<SVGSVGElement>) {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -74,6 +83,17 @@ export function StreamActivityChart({ activity, streamId }: { activity: StreamOv
   }
   function eventsHref(point: StreamChartPoint) {
     return `${base}/events?${streamIntervalQuery(view, point.time, activity.intervalMinutes)}`;
+  }
+  function path(key: typeof series[number]["key"] | "viewerPeak") {
+    let drawing = false;
+    return points.map((point) => {
+      const value = point[key];
+      if (value == null) { drawing = false; return ""; }
+      if (point.interrupted) drawing = false;
+      const segment = `${drawing ? "L" : "M"} ${x(point).toFixed(2)} ${y(value, key).toFixed(2)}`;
+      drawing = true;
+      return segment;
+    }).join(" ");
   }
   async function copyLink() {
     const query = streamViewQuery({ ...view, at: committed == null ? undefined : new Date(committed.time).toISOString() });
@@ -91,55 +111,55 @@ export function StreamActivityChart({ activity, streamId }: { activity: StreamOv
       <div className="panel-header"><div className="panel-heading"><h2>Activity over time</h2><p>Full observed session · {activity.intervalMinutes}-minute chart intervals · UTC</p></div></div>
       {invalid ? <p className="data-note padded" role="status">The linked time or chart options are unavailable. Showing the available session data; choose an interval to update the link.</p> : null}
       {!hasData ? <EmptyState title="No activity yet" description="The chart will appear when activity observations are available." /> : <figure className="chart-figure">
-        <div className="chart-legend stream-chart-controls" role="group" aria-label="Visible metrics">{series.map((item) => <button className="button button-secondary button-compact" type="button" aria-pressed={view.series.includes(item.key)} key={item.key} onClick={() => update({ at: committed == null ? undefined : new Date(committed.time).toISOString(), series: series.filter((candidate) => candidate.key === item.key ? !view.series.includes(item.key) : view.series.includes(candidate.key)).map((candidate) => candidate.key) })}><i className={`chart-key-${item.color}`} aria-hidden="true" />{item.label}</button>)}</div>
-        <div className="chart-wrap" ref={chartRef} tabIndex={-1}>
-          {lanes.length === 0 ? <EmptyState title="Choose a metric" description="Use the buttons above to show viewers or chat activity. Interval figures remain available below." /> : <svg className="line-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Stream activity on aligned time axes, with a separate scale for each metric. Use the interval slider or interval figures to inspect values."
-            onPointerMove={(event) => { if (event.pointerType === "mouse") setHoverIndex(pointerIndex(event)); }} onPointerLeave={() => setHoverIndex(null)} onClick={(event) => select(pointerIndex(event))}>
-            {lanes.map((item, lane) => {
-              const maximum = Math.max(1, ...points.map((point) => item.key === "viewers" ? Math.max(point.viewers ?? 0, point.viewerPeak ?? 0) : point[item.key] ?? 0));
-              const top = lane * laneHeight + 30;
-              const bottom = (lane + 1) * laneHeight - 12;
-              const y = (value: number) => top + (1 - value / maximum) * (bottom - top);
-              function path(key: typeof item.key | "viewerPeak") {
-                let drawing = false;
-                return points.map((point) => {
+        <div className="chart-legend stream-chart-controls" role="group" aria-label="Visible metrics">{series.map((item) => <button type="button" aria-pressed={view.series.includes(item.key)} key={item.key} onClick={() => update({ ...view, series: series.filter((candidate) => candidate.key === item.key ? !view.series.includes(item.key) : view.series.includes(candidate.key)).map((candidate) => candidate.key) })}><i className={`chart-key-${item.color}`} aria-hidden="true" />{item.label}</button>)}</div>
+        <div className="stream-activity-plot" ref={chartRef} tabIndex={visibleSeries.length === 0 ? -1 : 0} role="group" aria-label="Inspect stream activity" aria-describedby="stream-chart-help" onFocus={() => setKeyboardInspecting(true)} onBlur={() => setKeyboardInspecting(false)} onKeyDown={(event) => {
+          const next = event.key === "Home" ? 0 : event.key === "End" ? points.length - 1
+            : event.key === "ArrowLeft" ? Math.max(0, committedIndex - 1) : event.key === "ArrowRight" ? Math.min(points.length - 1, committedIndex + 1) : null;
+          if (next != null) { event.preventDefault(); select(next, true); }
+        }}>
+          {visibleSeries.length === 0 ? <EmptyState title="Choose a metric" description="Select a legend label to show viewers or chat activity. Interval figures remain available below." /> : <>
+            <svg className="line-chart stream-activity-chart" viewBox={`0 0 ${width} ${plot.height}`} role="img" aria-label="Stream activity: viewers on the left scale; messages per minute and active chatters on the right scale."
+              onPointerMove={(event) => { if (event.pointerType === "mouse") setHoverIndex(pointerIndex(event)); }} onPointerLeave={() => setHoverIndex(null)} onClick={(event) => { select(pointerIndex(event)); chartRef.current?.focus({ preventScroll: true }); }}>
+              <g className="chart-grid" aria-hidden="true">{[0, 0.5, 1].map((ratio) => <line key={ratio} x1={plot.left} x2={width - plot.right} y1={y(ratio * viewerMaximum, "viewers")} y2={y(ratio * viewerMaximum, "viewers")} />)}</g>
+              <g className="chart-axis-labels" aria-hidden="true">
+                <text x={0} y={14}>Viewers</text><text x={width} y={14} textAnchor="end">Chat activity</text>
+                {[0, 0.5, 1].map((ratio) => <g key={ratio}><text x={plot.left - 8} y={y(ratio * viewerMaximum, "viewers") + 4} textAnchor="end">{axisCount(ratio * viewerMaximum)}</text><text x={width - plot.right + 8} y={y(ratio * chatMaximum, "activeChatters") + 4}>{axisCount(ratio * chatMaximum)}</text></g>)}
+                <text x={0} y={plot.height - 8}>{axisTime(points[0]?.time)}</text><text x={width} y={plot.height - 8} textAnchor="end">{axisTime(points.at(-1)?.time)}</text>
+              </g>
+              {visibleSeries.flatMap((item) => (item.key === "viewers" ? ["viewers", "viewerPeak"] as const : [item.key]).map((key) => <g key={key}>
+                <path className={`chart-line chart-line-${item.color}${key === "viewerPeak" ? " stream-chart-peak" : ""}`} d={path(key)} vectorEffect="non-scaling-stroke" />
+                {points.map((point, index) => {
                   const value = point[key];
-                  if (value == null) { drawing = false; return ""; }
-                  if (point.interrupted) drawing = false;
-                  const segment = `${drawing ? "L" : "M"} ${x(point).toFixed(2)} ${y(value).toFixed(2)}`;
-                  drawing = true;
-                  return segment;
-                }).join(" ");
-              }
-              return <g key={item.key}>
-                <g className="chart-grid" aria-hidden="true">{[0, 0.5, 1].map((ratio) => <line key={ratio} x1={plot.left} x2={width - plot.right} y1={y(ratio * maximum)} y2={y(ratio * maximum)} />)}</g>
-                <g className="chart-axis-labels" aria-hidden="true"><text className="stream-chart-lane-label" x={8} y={lane * laneHeight + 16}>{item.label}</text><text x={plot.left - 10} y={top + 4} textAnchor="end">{formatCount(maximum)}</text><text x={plot.left - 10} y={bottom + 4} textAnchor="end">0</text></g>
-                <path className={`chart-line chart-line-${item.color}`} d={path(item.key)} vectorEffect="non-scaling-stroke" />
-                {item.key === "viewers" ? <path className="chart-line chart-line-viewers stream-chart-peak" d={path("viewerPeak")} vectorEffect="non-scaling-stroke" /> : null}
-                {points.map((point) => <g key={point.time}>
-                  {point[item.key] == null ? null : <circle className={`stream-chart-point chart-line-${item.color}`} cx={x(point)} cy={y(point[item.key]!)} r={2} />}
-                  {item.key !== "viewers" || point.viewerPeak == null ? null : <circle className="stream-chart-point chart-line-viewers stream-chart-peak" cx={x(point)} cy={y(point.viewerPeak)} r={2} />}
-                </g>)}
-                {selected == null ? null : <line className="stream-chart-cursor" x1={x(selected)} x2={x(selected)} y1={top} y2={bottom} />}
-              </g>;
-            })}
-            <g className="chart-axis-labels" aria-hidden="true"><text x={8} y={height - 12}>{axisTime(points[0]?.time)}</text><text x={width - 8} y={height - 12} textAnchor="end">{axisTime(points.at(-1)?.time)}</text></g>
-          </svg>}
+                  if (value == null) return null;
+                  const highlighted = index === intervalIndex && inspecting;
+                  const startsSegment = index === 0 || points[index - 1]![key] == null || point.interrupted;
+                  const endsSegment = index === points.length - 1 || points[index + 1]![key] == null || points[index + 1]!.interrupted;
+                  return highlighted || startsSegment && endsSegment
+                    ? <circle key={point.time} className={`stream-chart-point chart-line-${item.color}`} cx={x(point)} cy={y(value, key)} r={highlighted ? 3.5 : 2.5} /> : null;
+                })}
+              </g>))}
+              {!inspecting || selected == null ? null : <line className="stream-chart-cursor" x1={x(selected)} x2={x(selected)} y1={plot.top} y2={plot.bottom} />}
+            </svg>
+            {!inspecting || selected == null ? null : <div className="stream-chart-tooltip" style={{ left: tooltipLeft, width: tooltipWidth }} aria-hidden="true">
+              <strong>{formatDateTime(selected.time)}</strong>
+              <dl>{series.filter((item) => view.series.includes(item.key)).map((item) => <div key={item.key}><dt><i className={`chart-key-${item.color}`} />{item.label}</dt><dd>{item.key === "viewers" ? `${formatCount(selected.viewers)} / ${formatCount(selected.viewerPeak)}` : formatCount(selected[item.key])}</dd></div>)}</dl>
+              {selected.interrupted ? <span className="muted">Missing or partial activity records</span> : null}
+            </div>}
+          </>}
         </div>
         <div className="stream-chart-inspector">
-          <label htmlFor="stream-chart-interval">Inspect an interval</label>
-          <input id="stream-chart-interval" type="range" min={0} max={Math.max(0, points.length - 1)} value={intervalIndex} onFocus={() => setHoverIndex(null)} onChange={(event) => select(Number(event.target.value), true)} aria-valuetext={formatDateTime(selected?.time)} />
-          <div className="stream-chart-values" aria-live={hoverIndex == null ? "polite" : "off"}>
-            {selected == null ? null : <><strong>{formatDateTime(selected.time)}</strong><span>{formatCount(selected.viewers)} average / {formatCount(selected.viewerPeak)} peak viewers</span><span>{formatCount(selected.messagesPerMinute)} messages / min</span><span>{formatCount(selected.activeChatters)} peak active chatters</span>{selected.interrupted ? <span className="muted">Missing observations in or before this interval</span> : null}</>}
+          <p id="stream-chart-help" className="muted">Hover to inspect. Click or tap to pin. Arrow keys move the selection.</p>
+          <div className="stream-chart-values sr-only" aria-live={hoverIndex == null ? "polite" : "off"}>
+            {selected == null ? null : <><strong>{formatDateTime(selected.time)}. </strong><span>{formatCount(selected.viewers)} average / {formatCount(selected.viewerPeak)} peak viewers. </span><span>{formatCount(selected.messagesPerMinute)} messages / min. </span><span>{formatCount(selected.activeChatters)} peak active chatters. </span>{selected.interrupted ? <span className="muted">Missing observations in or before this interval</span> : null}</>}
           </div>
           <div className="stream-inspection-actions">
-            {committed == null ? null : <Link className="button button-secondary" href={eventsHref(committed)} prefetch={false}>Events in this interval</Link>}
-            <button className="button button-secondary" type="button" onClick={copyLink}>Copy view link</button>
-            <button className="button button-secondary" type="button" onClick={() => update({ series: series.map((item) => item.key) })}>Reset view</button>
+            {committed == null || !validTime ? null : <Link href={eventsHref(committed)} prefetch={false}>Events in this interval</Link>}
+            <button type="button" onClick={copyLink}>Copy view link</button>
+            {!invalid && view.at == null && visibleSeries.length === series.length ? null : <button type="button" onClick={() => update({ series: series.map((item) => item.key) })}>Reset view</button>}
           </div>
           {share == null ? null : <div className="stream-share-result" role="status">{share.copied ? "View link copied. It includes the selected interval and visible metrics." : <label>Copy this view link<input className="search-input" readOnly value={share.url} onFocus={(event) => event.currentTarget.select()} /></label>}</div>}
         </div>
-        <figcaption className="data-note padded">Each metric has its own scale; compare timing across tracks, not line heights. Dashed green shows peak viewers. Click or tap to keep an interval selected. Missing observations remain gaps.</figcaption>
+        <figcaption className="data-note padded">Viewers: left scale. Chat: right scale. Dashed: peak viewers. Zero means no captured chat; gaps mean missing activity records. Capture may be incomplete.</figcaption>
       </figure>}
       {points.length === 0 ? null : <details className="stream-interval-figures"><summary>Interval figures · {points.length} intervals</summary>
         <p className="data-note">Same values and UTC intervals as the chart. A dash means no observation. Active chatters are the maximum distinct speakers in an original activity interval, not unique people across the session. Open a time to inspect its events.</p>
@@ -158,4 +178,8 @@ export function StreamActivityChart({ activity, streamId }: { activity: StreamOv
 
 function axisTime(value: string | undefined) {
   return value == null ? "—" : new Date(value).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
+}
+
+function axisCount(value: number) {
+  return new Intl.NumberFormat("en-GB", { notation: "compact", maximumFractionDigits: 1 }).format(value);
 }
