@@ -51,6 +51,7 @@ body:has(.community-stage) .topbar { flex: 0 0 auto; }
 .community-heading h1 { font-size: clamp(22px, 2.2vw, 30px); letter-spacing: -0.04em; line-height: 1.2; margin: 7px 0; }
 .community-heading p { font-size: 12px; color: var(--muted-strong); margin: 0; }
 .community-heading p span { margin: 0 6px; color: var(--accent); }
+.community-heading, .community-date, .community-hint { background: #0b0b14; box-shadow: 0 0 12px 10px #0b0b14; border-radius: 4px; }
 .community-date { position: absolute; right: 28px; top: 30px; display: grid; gap: 6px; text-align: right; pointer-events: none; }
 .community-date strong { font-size: 12px; color: var(--muted-strong); }
 .community-date span { font-size: 11px; color: var(--muted); }
