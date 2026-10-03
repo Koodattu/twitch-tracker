@@ -2,7 +2,7 @@
 
 These fixtures use only PostgreSQL at `127.0.0.1:55432` and the two databases named below. They do not read `.env`. Seeding truncates the dedicated UI database; never repoint these scripts at another database. The API harness disables Twitch ingestion and EventSub and uses a synthetic session secret. The worker is not started.
 
-The implementation, verification, and release history are recorded in [STATE.md](STATE.md). The current release combines the round 2 reliability improvements and round 3 channel directory below. Earlier dependency security patches are already on main; this release needs no new dependency, database migration or production configuration change.
+The implementation, verification, and release history are recorded in [STATE.md](STATE.md). The current release combines the round 2 reliability improvements and round 3 channel directory below. It also replaces a vulnerable development-only ESLint dependency with an already-used package and a tested compatibility patch. No new runtime dependency, database migration or production configuration change is required.
 
 ## Channel discovery and release (round 3)
 
@@ -17,7 +17,7 @@ node work/goal-improvement/measure-directory.mjs
 
 The directory browser harness creates and removes 53 synthetic channel fixtures and covers offline discovery, both result links, history/back/reload, 52-result paging, clear/empty/error states, keyboard/touch, long text and 200% CSS zoom. Its `before` mode checks the original missing-discovery baseline and intentionally fails on the new UI. The capacity check creates and removes 1,000 channels with 20,000 sessions; do not run either script against a different database. Evidence and the source-linked product/research decisions are in `evidence/round3/` and [STATE.md](STATE.md).
 
-Release requires the unchanged CI checks, including both dependency audits. Current source/build/browser checks pass; the existing full-audit `braces` finding remains a release gate. Consult the current state log for the commit and release status.
+Release requires the unchanged CI checks, including both dependency audits. Source/build/browser checks and both audits now pass; see [the compatibility patch notes](../../patches/README.md) and the current state log for commit/release status.
 
 ## Prior local pass (round 2)
 
