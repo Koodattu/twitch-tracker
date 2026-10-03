@@ -61,6 +61,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           {query === "" ? null : <Link className="button button-secondary" href="/#live-ranking" prefetch={false}>Clear search</Link>}
         </div>
       </form>
+      <p className="channel-search-handoff">Looking for a channel’s past streams? <Link href={`/channels${query === "" ? "" : `?${new URLSearchParams({ q: query })}`}`} prefetch={false}>Search all channels</Link></p>
 
       {streamsAvailable ? (
         <section className="stat-row" aria-label="Live stream summary">

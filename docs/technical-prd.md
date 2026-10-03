@@ -722,6 +722,7 @@ Public endpoints:
 - `GET /api/streams/:streamId/observations`
 - `GET /api/streams/:streamId/buckets`
 - `GET /api/streams/:streamId/events`
+- `GET /api/channels?q=<channel name or login>&page=<page>`
 - `GET /api/channels/:login`
 - `GET /api/channels/:login/streams`
 - `GET /api/channels/:login/viewer-history`
@@ -734,6 +735,14 @@ Public endpoints:
 - `GET /api/chatters/:login`
 
 Stream and channel analytics endpoints are aggregate-first.
+The channel directory searches names and logins literally, case-insensitively,
+across channels with an observed Finnish stream. It returns the latest Finnish
+session per channel, ordered by start time then login and identity, in pages of
+50 with `hasMore`. Chatter-only identities and channels without a known login
+are excluded. Public results respect the existing hidden/opted-out visibility
+rules; administrator results use the same exception as the live directory.
+The web Channels page preserves query/page in its URL and links to existing
+channel analytics and individual streams. No new identity data is collected.
 `/api/streams/live` returns current live Finnish stream summaries enriched with
 the latest stored viewer-count snapshot and chat-assignment state when
 available. Viewer counts come from Twitch REST snapshots; chat assignment or
@@ -747,8 +756,10 @@ PostgreSQL rollup tables.
 The stream page uses `overview` for totals, at most 300 chart intervals across
 the full observed session, peak audience and chat intervals, the largest
 incoming raid, and five recent events. Grouped chart intervals retain viewer
-peaks and missing-data indicators; active chatters use the maximum original
-bucket count, not a sum of distinct speakers. Chat rates use minutes with
+peaks and missing-data indicators. Audience averages weight each known bucket
+average by its interval length, in both chart groups and session totals;
+unknown audience intervals do not contribute to the denominator. Active chatters
+use the maximum original bucket count, not a sum of distinct speakers. Chat rates use minutes with
 captured-chat evidence. These are observed metrics, not collection-coverage
 or unique-viewer estimates.
 

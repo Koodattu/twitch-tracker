@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,6 +9,8 @@ const require=createRequire(import.meta.url);
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE ?? join(homedir(), ".cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright"));
 const {Pool}=createRequire(new URL("../../packages/db/package.json",import.meta.url))("pg");
 const pool=new Pool({connectionString:fixtureUrl});
+const evidence = new URL(process.env.GOAL_EVIDENCE_DIR ?? "./evidence/", import.meta.url);
+await mkdir(evidence, { recursive: true });
 const browser=await chromium.launch({headless:true});
 const checks=[];
 const label=process.argv[2] ?? "after";
@@ -22,7 +24,7 @@ try {
     await page.waitForFunction(()=>!document.querySelector("main")?.textContent?.includes("Loading analytics"));
     await page.waitForLoadState("networkidle");
   };
-  const capture=async name=>page.screenshot({path:fileURLToPath(new URL(`./evidence/${label}-${name}-390.png`,import.meta.url)),fullPage:true,caret:"initial"});
+  const capture=async name=>page.screenshot({path:fileURLToPath(new URL(`${label}-${name}-390.png`,evidence)),fullPage:true,caret:"initial"});
   await go("/streams/goal-aurora-0/chat?chatter=testichat&chatter=other");
   checks.push({name:"Repeated chatter query does not crash the page",passed:await page.getByRole("heading",{name:"Captured messages",exact:true}).isVisible()});
   await capture("chat-repeated");
@@ -47,6 +49,6 @@ try {
   if(originalMap)await pool.query("update community_map_snapshots set graph=$2 where id=$1",[originalMap.id,originalMap.graph]);
   await pool.end();await browser.close();
 }
-await writeFile(new URL(`./evidence/${label}-edge-states.json`,import.meta.url),JSON.stringify(checks,null,2));
+await writeFile(new URL(`${label}-edge-states.json`,evidence),JSON.stringify(checks,null,2));
 console.log(checks);
 assert.ok(checks.every(check=>check.passed),"One or more edge-state acceptance checks failed.");

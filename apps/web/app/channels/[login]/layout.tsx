@@ -19,7 +19,7 @@ export default async function ChannelLayout({ params, children }: { params: Prom
   const base = `/channels/${encodeURIComponent(login)}`;
   return <>
     <section className="page-title page-title-wide channel-heading">
-      <div className="breadcrumbs"><Link href="/">Live streams</Link><span>/</span><span>Channel</span></div>
+      <div className="breadcrumbs"><Link href="/channels">Channels</Link><span>/</span><span>Channel</span></div>
       <div className="page-heading-row">
         <div className="identity-heading"><Avatar name={name} src={channel.profileImageUrl} size="large" /><div><span className="eyebrow">Channel analytics</span><h1>{name}</h1></div></div>
         <a className="button button-secondary" href={`https://www.twitch.tv/${encodeURIComponent(channel.login ?? login)}`} target="_blank" rel="noreferrer">Open on Twitch ↗</a>

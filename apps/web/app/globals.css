@@ -277,6 +277,8 @@ li,
 
 .nav-link {
   display: inline-flex;
+  flex-shrink: 0;
+  white-space: nowrap;
   align-items: center;
   min-height: 44px;
   padding: 0 12px;
@@ -1300,11 +1302,33 @@ li,
 }
 
 .live-search { display: grid; gap: 8px; margin-bottom: 24px; }
+.channel-search-handoff { margin: -10px 0 24px; color: var(--muted-strong); font-size: 14px; line-height: 1.6; }
+.channel-search-handoff a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.channel-directory-list { margin: 0; padding: 0; list-style: none; }
+.channel-directory .panel-heading { min-width: 0; }
+.channel-directory .panel-heading h2 { overflow-wrap: anywhere; }
+.channel-directory-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(180px, auto); align-items: center; gap: 24px; padding: 20px; border-bottom: 1px solid var(--line); }
+.channel-directory-row:last-child { border-bottom: 0; }
+.channel-directory-identity { display: flex; align-items: center; gap: 12px; min-width: 0; min-height: 44px; border-radius: 6px; }
+.channel-directory-identity > span:last-child { display: grid; gap: 4px; min-width: 0; }
+.channel-directory-identity strong { overflow-wrap: anywhere; font-size: 15px; }
+.channel-directory-identity > span > span { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.channel-directory-broadcast { display: grid; gap: 5px; min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
+.channel-directory-broadcast > .muted:first-child { font-size: 12px; }
+.channel-directory-broadcast > a { display: flex; align-items: center; min-height: 44px; font-size: 14px; line-height: 1.5; }
+.channel-directory-time { display: grid; justify-items: end; gap: 8px; font-size: 13px; }
+.channel-directory-time time { color: var(--muted); font-size: 12px; text-align: right; }
+@media (max-width: 760px) {
+  .channel-directory-row { grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 18px; }
+  .channel-directory-time { justify-items: start; gap: 5px; }
+  .channel-directory-time time { text-align: left; }
+}
 .live-search > label { color: var(--muted-strong); font-size: 14px; font-weight: 600; }
 .live-search-controls { display: flex; flex-wrap: wrap; gap: 10px; }
 .live-search-controls .search-input { flex: 1 1 280px; min-width: 0; }
 .live-search-controls .button { min-height: 44px; }
 @media (max-width: 430px) {
+  .nav-link { padding-inline: 8px; min-width: 44px; justify-content: center; }
   .live-search-controls .search-input { flex-basis: 100%; font-size: 16px; }
   .live-search-controls .button { flex: 1; }
 }
@@ -1497,7 +1521,7 @@ li,
 .stream-chart-peak { stroke-dasharray: 3 5; opacity: 0.55; }
 .stream-chart-cursor { stroke: var(--muted); stroke-dasharray: 4 4; }
 .stream-chart-inspector { padding: 14px 18px; display: grid; gap: 10px; font-size: 12px; }
-.stream-chart-inspector input { width: 100%; accent-color: var(--accent); }
+.stream-chart-inspector input { width: 100%; min-height: 44px; margin: 0; accent-color: var(--accent); }
 .stream-chart-values { display: flex; flex-wrap: wrap; gap: 8px 20px; min-height: 40px; font-variant-numeric: tabular-nums; }
 
 .channel-session-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 12px; padding: 0 18px 18px; }

@@ -9,6 +9,8 @@ const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE ?? join(homedir(), ".cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright"));
 const { Pool } = createRequire(new URL("../../packages/db/package.json",import.meta.url))("pg");
 const pool = new Pool({connectionString: fixtureUrl});
+const evidence = new URL(process.env.GOAL_EVIDENCE_DIR ?? "./evidence/", import.meta.url);
+await mkdir(evidence, { recursive: true });
 const failureFlag = new URL("../../.temp/goal-api-failure",import.meta.url);
 await mkdir(new URL("../../.temp/",import.meta.url), { recursive: true });
 const browser = await chromium.launch({headless:true});
@@ -33,7 +35,7 @@ try {
     const go=async path=>{await page.goto(`http://127.0.0.1:3300${path}`);await ready();};
     const capture=async name=>{
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
-      await page.screenshot({path:fileURLToPath(new URL(`./evidence/after-${name}-${width}.png`,import.meta.url)),fullPage:true,caret:"initial"});
+      await page.screenshot({path:fileURLToPath(new URL(`after-${name}-${width}.png`,evidence)),fullPage:true,caret:"initial"});
     };
     await go("/?q=fixture");
     assert.equal(await page.locator(".live-ranking-table tbody tr").count(),100);
@@ -116,5 +118,5 @@ try {
   await pool.end();
   await browser.close();
 }
-await writeFile(new URL("./evidence/browser-extended.json",import.meta.url),JSON.stringify(results,null,2));
+await writeFile(new URL("browser-extended.json",evidence),JSON.stringify(results,null,2));
 console.log(JSON.stringify(results,null,2));

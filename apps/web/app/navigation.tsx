@@ -16,6 +16,7 @@ export function AppHeader({ viewer, authConfigured, loading = false }: { viewer:
   const viewerName = viewer?.displayName ?? viewer?.login ?? "Twitch user";
   const links = [
     { href: "/", label: "Live" },
+    { href: "/channels", label: "Channels" },
     { href: "/communities", label: "Communities" },
     { href: "/me", label: viewer == null ? "My data" : "My activity" },
     ...(viewer?.isAdmin === true

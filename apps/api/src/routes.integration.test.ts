@@ -67,6 +67,10 @@ describe.skipIf(database == null)("Analytics routes with PostgreSQL", () => {
 
   it.each([
     "/api/streams/recent?limit=bad",
+    "/api/channels?page=0",
+    "/api/channels?page=1.5",
+    "/api/channels?page=100001",
+    `/api/channels?q=${"a".repeat(101)}`,
     "/api/channels/channel/streams?limit=51",
     "/api/channels/channel/viewer-history?limit=501",
     "/api/channels/channel/activity?days=0"
@@ -281,9 +285,86 @@ describe.skipIf(database == null)("Analytics routes with PostgreSQL", () => {
     expect(response.status).toBe(200);
     const { points } = (await response.json()).data;
     expect(points).toHaveLength(4);
-    expect(points[0].messagesPerMinute).toBeNull();
+    expect(points[0]).toMatchObject({ messagesPerMinute: null, interrupted: false });
     expect(points[1]).toMatchObject({ viewers: null, viewerPeak: null, messagesPerMinute: null, activeChatters: null, interrupted: true });
     expect(points[3]).toMatchObject({ viewers: 20, messagesPerMinute: 3, activeChatters: 2, interrupted: true });
+  });
+
+  it("finds offline Finnish channels without exposing chatter-only, other-language or suppressed identities", async () => {
+    const identities = ["offline", "other", "hidden", "opted", "unnamed"];
+    await db.insert(twitchUsers).values(identities.map((id) => ({ twitchUserId: id, login: id === "unnamed" ? null : id, displayName: `${id} channel` })));
+    await db.insert(streamSessions).values(identities.map((id) => ({
+      twitchStreamId: `${id}-session`, broadcasterUserId: id, startedAt: firstSeen, firstSeenAt: firstSeen,
+      lastSeenLiveAt: latestSeen, endedAt: latestSeen, isFinnishEligible: id !== "other", latestTitle: "An earlier broadcast"
+    })));
+    await db.insert(subjectPrivacyStates).values([
+      { twitchUserId: "hidden", publicProfileHidden: true }, { twitchUserId: "opted", trackingOptedOut: true }
+    ]);
+    const response = await app.request("/api/channels");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+    const { data } = await response.json();
+    expect(data.items.map((item: { login: string }) => item.login)).toEqual(["channel", "offline"]);
+    expect(data.items[1]).toMatchObject({ login: "offline", latestStreamId: "offline-session", latestTitle: "An earlier broadcast", endedAt: latestSeen.toISOString() });
+    expect(data).toMatchObject({ page: 1, pageSize: 50, hasMore: false });
+    const search = await app.request("/api/channels?q=%20OFFLINE%20");
+    expect((await search.json()).data.items.map((item: { login: string }) => item.login)).toEqual(["offline"]);
+    await db.update(appUsers).set({ isAdmin: true }).where(eq(appUsers.twitchUserId, "chatter"));
+    const admin = await app.request("/api/channels", { headers });
+    expect((await admin.json()).data.items.map((item: { login: string }) => item.login)).toEqual(["channel", "hidden", "offline", "opted"]);
+  });
+
+  it("searches channel names literally and returns the latest Finnish session once per channel", async () => {
+    await db.update(twitchUsers).set({ displayName: "100%_Suomi" }).where(eq(twitchUsers.twitchUserId, "broadcaster"));
+    await db.insert(streamSessions).values({ twitchStreamId: "older", broadcasterUserId: "broadcaster",
+      startedAt: new Date(firstSeen.getTime() - 86_400_000), firstSeenAt: firstSeen, lastSeenLiveAt: firstSeen,
+      endedAt: firstSeen, isFinnishEligible: true });
+    const response = await app.request("/api/channels?q=100%25_");
+    expect(response.status).toBe(200);
+    const items = (await response.json()).data.items;
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ login: "channel", latestStreamId: "stream", endedAt: null, latestCategoryName: null });
+    // Existing ingestion preserves a Finnish match reason if the language later changes.
+    await db.update(streamSessions).set({ isFinnishEligible: false, finnishMatchReason: "language" }).where(eq(streamSessions.twitchStreamId, "stream"));
+    expect((await (await app.request("/api/channels")).json()).data.items[0].latestStreamId).toBe("stream");
+    for (const q of ["missing", "100_", "' OR 1=1 --"]) {
+      const result = await app.request(`/api/channels?${new URLSearchParams({ q })}`);
+      expect((await result.json()).data.items).toEqual([]);
+    }
+  });
+
+  it("paginates matching channels with a stable order and no repeated channels", async () => {
+    const ids = Array.from({ length: 52 }, (_, index) => `directory-${String(index).padStart(2, "0")}`);
+    await db.insert(twitchUsers).values(ids.map((id) => ({ twitchUserId: id, login: id })));
+    await db.insert(streamSessions).values(ids.map((id) => ({ twitchStreamId: `${id}-stream`, broadcasterUserId: id,
+      startedAt: latestSeen, firstSeenAt: latestSeen, lastSeenLiveAt: latestSeen, endedAt: latestSeen, isFinnishEligible: true })));
+    const first = await app.request("/api/channels?q=directory");
+    expect(first.status).toBe(200);
+    const firstPage = (await first.json()).data;
+    const secondPage = (await (await app.request("/api/channels?q=directory&page=2")).json()).data;
+    expect(firstPage).toMatchObject({ page: 1, hasMore: true });
+    expect(firstPage.items).toHaveLength(50);
+    expect(secondPage).toMatchObject({ page: 2, hasMore: false });
+    expect([...firstPage.items, ...secondPage.items].map((item: { login: string }) => item.login)).toEqual(ids);
+    expect((await (await app.request("/api/channels?q=directory&page=3")).json()).data.items).toEqual([]);
+  });
+
+  it.each(["overview", "activity"])("weights stream audience averages by observed interval length, excluding unknown audience: %s", async (endpoint) => {
+    await db.insert(streamActivityBuckets).values([
+      { twitchStreamId: "stream", bucketStart: firstSeen, bucketMinutes: 1, viewerCountAvg: 100, viewerCountMax: 120 },
+      { twitchStreamId: "stream", bucketStart: new Date(firstSeen.getTime() + 60_000), bucketMinutes: 5, viewerCountAvg: 10, viewerCountMax: 12 },
+      { twitchStreamId: "stream", bucketStart: new Date(firstSeen.getTime() + 6 * 60_000), bucketMinutes: 5, messageCount: 25, activeChatterCount: 3 }
+    ]);
+    const response = await app.request(`/api/streams/stream/${endpoint}`);
+    expect(response.status).toBe(200);
+    const data = (await response.json()).data;
+    // One minute at 100 plus five at 10 is 150 viewer-minutes / 6 = 25.
+    // The chat-only interval supplies no audience evidence.
+    expect(data.totals).toMatchObject({ viewerCountAvg: 25, viewerCountMax: 120, messageCount: 25 });
+    if (endpoint === "overview") {
+      expect(data.points[0]).toMatchObject({ viewers: 25, viewerPeak: 120, messagesPerMinute: null });
+      expect(data.points[1]).toMatchObject({ viewers: null, messagesPerMinute: 5, activeChatters: 3 });
+    }
   });
 
   it("merges raids and events in time order without duplicate EventSub raids", async () => {

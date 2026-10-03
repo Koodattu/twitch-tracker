@@ -5,6 +5,7 @@ import { getApiBaseUrl, getApiData, getAuthenticatedApiInit } from "../api-clien
 import { ConfirmSubmitButton } from "../confirm-submit-button";
 import { formatCount, formatDateTime, formatStatus } from "../format";
 import { Avatar, EmptyState, MetricCard, StatusPill } from "../ui";
+import { RetryButton } from "../retry-button";
 
 export const metadata: Metadata = { title: "My activity" };
 
@@ -98,14 +99,14 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
       <section className="page-title">
         <span className="eyebrow">Your Twitch identity</span>
         <h1>{me?.user == null ? "See what we’ve captured" : "Your activity"}</h1>
-        <p>Sign in with Twitch to access messages associated with your immutable Twitch user ID. Your Twitch token never reaches browser JavaScript.</p>
+        <p>Review captured messages linked to your Twitch account and manage your privacy requests.</p>
       </section>
 
       <AuthNotice status={query.auth} />
       <PrivacyNotice status={query.privacy} />
 
       {me == null ? (
-        <section className="panel"><EmptyState title="Account service unavailable" description="Your account and privacy settings could not be loaded. Please try again shortly." /></section>
+        <section className="panel"><EmptyState title="Account service unavailable" description="Your account and privacy settings could not be loaded. Try again to reconnect." action={<RetryButton />} /></section>
       ) : me.user == null ? (
         <section className="login-panel">
           <div className="login-copy">
@@ -153,7 +154,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           <section className="panel">
             <div className="panel-header"><div className="panel-heading"><h2>Your recent messages</h2><p>Newest retained messages first</p></div><StatusPill tone={ownData == null ? "danger" : "accent"}>{ownData == null ? "Unavailable" : `${ownData.recentMessages.length} loaded`}</StatusPill></div>
             {ownData == null ? (
-              <EmptyState title="Activity unavailable" description="Your session is valid, but activity data could not be loaded." />
+              <EmptyState title="Activity unavailable" description="Your session is valid, but activity data could not be loaded." action={<RetryButton />} />
             ) : ownData.recentMessages.length === 0 ? (
               <EmptyState title="No messages connected yet" description="The tracker has no retained chat messages associated with this Twitch identity." />
             ) : (
@@ -178,7 +179,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
               <StatusPill tone={privacyData == null ? "danger" : privacyData.state.trackingOptedOut ? "warning" : "success"}>{privacyData == null ? "Unavailable" : privacyData.state.trackingOptedOut ? "Tracking opted out" : "Tracking allowed"}</StatusPill>
             </div>
             {privacyData == null ? (
-              <EmptyState title="Privacy controls unavailable" description="Privacy state could not be loaded for this session." />
+              <EmptyState title="Privacy controls unavailable" description="Privacy state could not be loaded for this session." action={<RetryButton />} />
             ) : (
               <>
                 <div className="table-scroll" role="region" aria-label="Current privacy settings" tabIndex={0}>
@@ -231,6 +232,6 @@ function AuthNotice({ status }: { status: string | undefined }) {
 
 function PrivacyNotice({ status }: { status: string | undefined }) {
   if (status === "received") return <div className="callout" role="status" aria-live="polite"><div><strong>Privacy request received</strong><p>Your request was recorded. Its status is shown below.</p></div></div>;
-  if (status === "failed") return <div className="callout callout-danger" role="alert"><div><strong>Privacy request failed</strong><p>The request was not recorded. Please try again.</p></div></div>;
+  if (status === "failed") return <div className="callout callout-danger" role="alert"><div><strong>Privacy request could not be confirmed</strong><p>Check its status below before trying again.</p></div></div>;
   return null;
 }

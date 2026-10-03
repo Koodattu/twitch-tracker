@@ -1,0 +1,35 @@
+[
+  {
+    "width": 1440,
+    "singleValues": "1 Oct 2026, 10:00 UTC\n0 average / 0 peak viewers\n0 messages / min\n0 peak active chatters",
+    "zoomedLabelPx": 22,
+    "emptyState": true,
+    "denseChartWithGap": true,
+    "legendAndResize": true,
+    "touch": false
+  },
+  {
+    "width": 768,
+    "singleValues": "1 Oct 2026, 10:00 UTC\n0 average / 0 peak viewers\n0 messages / min\n0 peak active chatters",
+    "emptyState": true,
+    "denseChartWithGap": true,
+    "legendAndResize": true,
+    "touch": false
+  },
+  {
+    "width": 390,
+    "singleValues": "1 Oct 2026, 10:00 UTC\n0 average / 0 peak viewers\n0 messages / min\n0 peak active chatters",
+    "emptyState": true,
+    "denseChartWithGap": true,
+    "legendAndResize": true,
+    "touch": true
+  },
+  {
+    "width": 320,
+    "singleValues": "1 Oct 2026, 10:00 UTC\n0 average / 0 peak viewers\n0 messages / min\n0 peak active chatters",
+    "emptyState": true,
+    "denseChartWithGap": true,
+    "legendAndResize": true,
+    "touch": true
+  }
+]

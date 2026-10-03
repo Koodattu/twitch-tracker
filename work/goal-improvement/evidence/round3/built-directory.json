@@ -1,0 +1,42 @@
+[
+  {
+    "width": 1440,
+    "offlineDiscovery": true,
+    "history": true,
+    "urlPersistence": true,
+    "pagination": 52,
+    "recovery": true,
+    "keyboardOrTouch": true,
+    "errors": []
+  },
+  {
+    "width": 768,
+    "offlineDiscovery": true,
+    "history": true,
+    "urlPersistence": true,
+    "pagination": 52,
+    "recovery": true,
+    "keyboardOrTouch": true,
+    "errors": []
+  },
+  {
+    "width": 390,
+    "offlineDiscovery": true,
+    "history": true,
+    "urlPersistence": true,
+    "pagination": 52,
+    "recovery": true,
+    "keyboardOrTouch": true,
+    "errors": []
+  },
+  {
+    "width": 320,
+    "offlineDiscovery": true,
+    "history": true,
+    "urlPersistence": true,
+    "pagination": 52,
+    "recovery": true,
+    "keyboardOrTouch": true,
+    "errors": []
+  }
+]

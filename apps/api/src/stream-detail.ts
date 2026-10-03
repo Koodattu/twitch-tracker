@@ -53,10 +53,12 @@ export async function getStreamOverview(db: DbClient, streamId: string): Promise
         from source
       ), grouped as (
         select date_bin(make_interval(mins => bounds.minutes), bucket_start, bounds.first_at) as time,
-          round(avg(viewer_count_avg))::int as viewers, max(viewer_count_max) as viewer_peak,
+          round(sum(viewer_count_avg::numeric * bucket_minutes)
+            / nullif(sum(bucket_minutes) filter (where viewer_count_avg is not null), 0))::int as viewers,
+          max(viewer_count_max) as viewer_peak,
           round(sum(message_count)::numeric / nullif(sum(bucket_minutes) filter (where active_chatter_count is not null), 0), 2) as messages_per_minute,
           max(active_chatter_count) as active_chatters,
-          bool_or(bucket_start > previous_end) or count(viewer_count_avg) < count(*) as interrupted
+          coalesce(bool_or(bucket_start > previous_end), false) or count(viewer_count_avg) < count(*) as interrupted
         from source cross join bounds group by time
       ), points as (
         select time, viewers, viewer_peak, messages_per_minute, active_chatters, coalesce(interrupted, true) as interrupted
@@ -65,7 +67,8 @@ export async function getStreamOverview(db: DbClient, streamId: string): Promise
       )
       select json_build_object(
         'totals', (select json_build_object(
-          'viewerCountAvg', round(avg(viewer_count_avg))::int,
+          'viewerCountAvg', round(sum(viewer_count_avg::numeric * bucket_minutes)
+            / nullif(sum(bucket_minutes) filter (where viewer_count_avg is not null), 0))::int,
           'viewerCountMax', max(viewer_count_max),
           'messageCount', coalesce(sum(message_count), 0),
           'activeChatterCountMax', max(active_chatter_count)

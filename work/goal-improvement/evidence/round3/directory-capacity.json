@@ -1,0 +1,42 @@
+{
+  "workload": "1,000 synthetic Finnish channels, 20,000 ended sessions; one cold plus 15 warm HTTP calls per query",
+  "node": "v24.19.0",
+  "results": [
+    {
+      "query": "",
+      "rows": 50,
+      "bytes": 14241,
+      "coldMs": 47.942999999999984,
+      "warmMedianMs": 30.824400000000082,
+      "warmMinMs": 21.02800000000002,
+      "warmMaxMs": 34.19079999999997
+    },
+    {
+      "query": "?q=performance",
+      "rows": 50,
+      "bytes": 14281,
+      "coldMs": 30.925899999999956,
+      "warmMedianMs": 29.83069999999998,
+      "warmMinMs": 20.728399999999965,
+      "warmMaxMs": 35.080799999999954
+    },
+    {
+      "query": "?q=performance0999",
+      "rows": 1,
+      "bytes": 347,
+      "coldMs": 29.124399999999923,
+      "warmMedianMs": 30.72289999999998,
+      "warmMinMs": 28.909599999999955,
+      "warmMaxMs": 32.948700000000144
+    },
+    {
+      "query": "?q=performance&page=20",
+      "rows": 50,
+      "bytes": 14463,
+      "coldMs": 31.584400000000187,
+      "warmMedianMs": 31.49499999999989,
+      "warmMinMs": 27.18209999999999,
+      "warmMaxMs": 32.92879999999968
+    }
+  ]
+}

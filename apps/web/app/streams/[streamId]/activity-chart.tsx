@@ -1,11 +1,10 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { StreamChartPoint, StreamOverview } from "@twitch-tracker/shared";
 import { formatCount, formatDateTime } from "../../format";
 import { EmptyState } from "../../ui";
 
-const width = 800;
 const height = 280;
 const plot = { left: 58, right: 58, top: 18, bottom: 42 };
 const series = [
@@ -16,16 +15,27 @@ const series = [
 
 export function StreamActivityChart({ activity }: { activity: StreamOverview }) {
   const { points } = activity;
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [width, setWidth] = useState(800);
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const [visible, setVisible] = useState({ viewers: true, messagesPerMinute: true, activeChatters: true });
   const chartRef = useRef<HTMLDivElement>(null);
-  const selected = selectedIndex == null ? null : points[selectedIndex];
+  const intervalIndex = Math.min(selectedIndex, Math.max(0, points.length - 1));
+  const selected = points[intervalIndex];
   const firstTime = new Date(points[0]?.time ?? 0).getTime();
   const lastTime = new Date(points.at(-1)?.time ?? 0).getTime();
   const x = (point: StreamChartPoint) => plot.left + (new Date(point.time).getTime() - firstTime) / Math.max(1, lastTime - firstTime) * (width - plot.left - plot.right);
   const viewerMax = Math.max(1, ...points.map((point) => point.viewerPeak ?? point.viewers ?? 0));
   const activityMax = Math.max(1, ...points.map((point) => Math.max(visible.messagesPerMinute ? point.messagesPerMinute ?? 0 : 0, visible.activeChatters ? point.activeChatters ?? 0 : 0)));
   const hasData = points.some((point) => point.viewers != null || point.messagesPerMinute != null || point.activeChatters != null);
+  useEffect(() => {
+    const element = chartRef.current;
+    if (element == null) return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry != null) setWidth(Math.max(240, entry.contentRect.width));
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [hasData]);
   function path(key: "viewers" | "viewerPeak" | "messagesPerMinute" | "activeChatters", max: number) {
     let drawing = false;
     return points.map((point) => {
@@ -68,7 +78,7 @@ export function StreamActivityChart({ activity }: { activity: StreamOverview }) 
               <text x={plot.left - 10} y={plot.top + 4} textAnchor="end">{visible.viewers ? formatCount(viewerMax) : "—"}</text>
               <text x={width - plot.right + 10} y={plot.top + 4}>{visible.messagesPerMinute || visible.activeChatters ? formatCount(activityMax) : "—"}</text>
               <text x={plot.left - 10} y={height - plot.bottom + 4} textAnchor="end">0</text><text x={width - plot.right + 10} y={height - plot.bottom + 4}>0</text>
-              <text x={plot.left} y={height - 14}>{axisTime(points[0]?.time)}</text><text x={width - plot.right} y={height - 14} textAnchor="end">{axisTime(points.at(-1)?.time)}</text>
+              <text x={width < 480 ? 8 : plot.left} y={height - 14}>{axisTime(points[0]?.time)}</text><text x={width - (width < 480 ? 8 : plot.right)} y={height - 14} textAnchor="end">{axisTime(points.at(-1)?.time)}</text>
             </g>
             {series.filter((item) => visible[item.key]).map((item) => <g key={item.key}>
               <path className={`chart-line chart-line-${item.color}`} d={path(item.key, item.key === "viewers" ? viewerMax : activityMax)} vectorEffect="non-scaling-stroke" />
@@ -80,9 +90,9 @@ export function StreamActivityChart({ activity }: { activity: StreamOverview }) 
         </div>
         <div className="stream-chart-inspector">
           <label htmlFor="stream-chart-interval">Inspect an interval</label>
-          <input id="stream-chart-interval" type="range" min={0} max={Math.max(0, points.length - 1)} value={selectedIndex ?? 0} onChange={(event) => setSelectedIndex(Number(event.target.value))} aria-valuetext={formatDateTime(points[selectedIndex ?? 0]?.time)} />
+          <input id="stream-chart-interval" type="range" min={0} max={Math.max(0, points.length - 1)} value={intervalIndex} onChange={(event) => setSelectedIndex(Number(event.target.value))} aria-valuetext={formatDateTime(selected?.time)} />
           <div className="stream-chart-values" aria-live="polite">
-            {selected == null ? <span className="muted">Hover over the chart or use the slider to see values.</span> : <><strong>{formatDateTime(selected.time)}</strong><span>{formatCount(selected.viewers)} average / {formatCount(selected.viewerPeak)} peak viewers</span><span>{formatCount(selected.messagesPerMinute)} messages / min</span><span>{formatCount(selected.activeChatters)} peak active chatters</span>{selected.interrupted ? <span className="muted">Missing observations in or before this interval</span> : null}</>}
+            {selected == null ? null : <><strong>{formatDateTime(selected.time)}</strong><span>{formatCount(selected.viewers)} average / {formatCount(selected.viewerPeak)} peak viewers</span><span>{formatCount(selected.messagesPerMinute)} messages / min</span><span>{formatCount(selected.activeChatters)} peak active chatters</span>{selected.interrupted ? <span className="muted">Missing observations in or before this interval</span> : null}</>}
           </div>
         </div>
         <figcaption className="data-note padded">Viewers use the left scale; chat activity uses the right. Dashed green shows peak viewers. Active chatters are the maximum distinct speakers in an original activity interval, not unique people across the session. Missing observations appear as gaps.</figcaption>

@@ -50,6 +50,7 @@ import { createVodThumbnailLookup } from "./vod-thumbnails.js";
 import { getStreamDetail, getStreamOverview, streamDetailQuerySchema } from "./stream-detail.js";
 import { channelDetailQuerySchema, getChannelDetail, getChannelOverview } from "./channel-detail.js";
 import { getCommunityMap, getCommunityBuildStatus } from "./community-map.js";
+import { detailPage, detailPageNumberSchema, detailPageSize } from "./detail-records.js";
 
 type ApiBindings = {
   Variables: {
@@ -86,6 +87,10 @@ const recentStreamsQuerySchema = z.object({
 });
 const channelStreamsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(50)
+});
+const channelDirectoryQuerySchema = z.object({
+  q: z.string().trim().max(100).default(""),
+  page: detailPageNumberSchema
 });
 const channelViewerHistoryQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(500).default(500)
@@ -384,7 +389,8 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
       db
         .select({
           viewerCountMax: sql<number | null>`max(${streamActivityBuckets.viewerCountMax})`,
-          viewerCountAvg: sql<number | null>`round(avg(${streamActivityBuckets.viewerCountAvg}) filter (where ${streamActivityBuckets.viewerCountAvg} is not null))::int`,
+          viewerCountAvg: sql<number | null>`round(sum(${streamActivityBuckets.viewerCountAvg}::numeric * ${streamActivityBuckets.bucketMinutes})
+            / nullif(sum(${streamActivityBuckets.bucketMinutes}) filter (where ${streamActivityBuckets.viewerCountAvg} is not null), 0))::int`,
           messageCount: sql<number>`coalesce(sum(${streamActivityBuckets.messageCount}), 0)::int`,
           joinCount: sql<number>`coalesce(sum(${streamActivityBuckets.joinCount}), 0)::int`,
           partCount: sql<number>`coalesce(sum(${streamActivityBuckets.partCount}), 0)::int`,
@@ -535,6 +541,42 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
         canInspectRaw: await hasPrivilegedAccess(c)
       }
     });
+  });
+
+  app.get("/api/channels", async (c) => {
+    const query = channelDirectoryQuerySchema.parse(c.req.query());
+    const canSeeSuppressed = await hasAdminAccess(c);
+    const db = c.get("db");
+    // A channel's history remains discoverable after its Finnish stream ends.
+    const latest = db.selectDistinctOn([streamSessions.broadcasterUserId], {
+      broadcasterUserId: streamSessions.broadcasterUserId,
+      latestStreamId: streamSessions.twitchStreamId,
+      latestTitle: streamSessions.latestTitle,
+      latestCategoryName: streamSessions.latestCategoryName,
+      startedAt: streamSessions.startedAt,
+      endedAt: streamSessions.endedAt
+    }).from(streamSessions)
+      .where(or(eq(streamSessions.isFinnishEligible, true), isNotNull(streamSessions.finnishMatchReason)))
+      .orderBy(streamSessions.broadcasterUserId, desc(streamSessions.startedAt), desc(streamSessions.twitchStreamId))
+      .as("latest_finnish_stream");
+    const searchPattern = `%${escapeLikePattern(query.q)}%`;
+    const rows = await db.select({
+      twitchUserId: twitchUsers.twitchUserId, login: twitchUsers.login,
+      displayName: twitchUsers.displayName, profileImageUrl: twitchUsers.profileImageUrl,
+      latestStreamId: latest.latestStreamId, latestTitle: latest.latestTitle,
+      latestCategoryName: latest.latestCategoryName, startedAt: latest.startedAt, endedAt: latest.endedAt
+    }).from(latest)
+      .innerJoin(twitchUsers, eq(latest.broadcasterUserId, twitchUsers.twitchUserId))
+      .leftJoin(subjectPrivacyStates, eq(twitchUsers.twitchUserId, subjectPrivacyStates.twitchUserId))
+      .where(and(
+        isNotNull(twitchUsers.login), sql`${twitchUsers.login} <> ''`,
+        canSeeSuppressed ? undefined : publicSubjectVisibilityCondition,
+        query.q === "" ? undefined : or(ilike(twitchUsers.login, searchPattern), ilike(twitchUsers.displayName, searchPattern))
+      ))
+      .orderBy(desc(latest.startedAt), twitchUsers.login, twitchUsers.twitchUserId)
+      .limit(detailPageSize + 1).offset((query.page - 1) * detailPageSize);
+    c.header("Cache-Control", "private, no-store");
+    return c.json({ data: { ...detailPage(rows, query.page), pageSize: detailPageSize } });
   });
 
   app.get("/api/channels/:login", async (c) => {

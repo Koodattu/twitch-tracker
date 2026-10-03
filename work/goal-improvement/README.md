@@ -2,7 +2,44 @@
 
 These fixtures use only PostgreSQL at `127.0.0.1:55432` and the two databases named below. They do not read `.env`. Seeding truncates the dedicated UI database; never repoint these scripts at another database. The API harness disables Twitch ingestion and EventSub and uses a synthetic session secret. The worker is not started.
 
-The implementation, verification, and subsequently authorized release are recorded in [STATE.md](STATE.md). Review the release diff including `apps/web/app/retry-button.tsx` and this directory. The release includes security patch dependency updates; no new database migrations or production configuration changes are needed.
+The implementation, verification, and release history are recorded in [STATE.md](STATE.md). The current release combines the round 2 reliability improvements and round 3 channel directory below. Earlier dependency security patches are already on main; this release needs no new dependency, database migration or production configuration change.
+
+## Channel discovery and release (round 3)
+
+The current goal includes the round 2 changes below plus a searchable Channels page. Open `/channels` or use “Search all channels” below the Live search. Name/login queries and result pages can be bookmarked or shared; each result opens channel analytics or its latest observed Finnish stream. Public suppression rules remain in force. No migration or new dependency is required.
+
+With the isolated API and built web app running as below:
+
+```powershell
+node work/goal-improvement/browser-directory.mjs built
+node work/goal-improvement/measure-directory.mjs
+```
+
+The directory browser harness creates and removes 53 synthetic channel fixtures and covers offline discovery, both result links, history/back/reload, 52-result paging, clear/empty/error states, keyboard/touch, long text and 200% CSS zoom. Its `before` mode checks the original missing-discovery baseline and intentionally fails on the new UI. The capacity check creates and removes 1,000 channels with 20,000 sessions; do not run either script against a different database. Evidence and the source-linked product/research decisions are in `evidence/round3/` and [STATE.md](STATE.md).
+
+Release requires the unchanged CI checks, including both dependency audits. Current source/build/browser checks pass; the existing full-audit `braces` finding remains a release gate. Consult the current state log for the commit and release status.
+
+## Prior local pass (round 2)
+
+This pass started at `85dd30b14d4bb7accdb6c86bd7bfb28a3b80138e` as local-only work and is now included in the authorized release. It corrects mixed-duration stream audience averages and false first-interval gap warnings; makes stream charts readable on phones and single observations inspectable without a pointer; and adds load-failure recovery to stream activity, communities and My data. Request-failure copy no longer claims a timed-out request was never recorded. Authentication and privacy behavior are unchanged.
+
+Use the same isolated setup below. Before `pnpm -r build`, set `INTERNAL_API_URL` and `NEXT_PUBLIC_API_URL` to `http://127.0.0.1:4400` in the build terminal as well as the server terminal: Next captures the `/api` rewrite destination at build time. The account harness imports the built configuration package and creates only temporary synthetic account/session rows. It never logs in to Twitch. Run browser scripts sequentially because they share synthetic failure flags and fixtures:
+
+```powershell
+node work/goal-improvement/browser-round2.mjs built
+node work/goal-improvement/browser-account.mjs built
+node work/goal-improvement/browser-chart-states.mjs built
+$env:GOAL_EVIDENCE_DIR = './evidence/round2/regression/'
+node work/goal-improvement/browser-journeys.mjs
+node work/goal-improvement/browser-extended.mjs
+node work/goal-improvement/browser-edge-states.mjs built
+```
+
+`built` labels evidence; it does not start a server. Start the API as below and use `next start --hostname 127.0.0.1 --port 3300` from `apps/web` for the local built-UI checks, with the same API environment. This Windows verification uses `next start`, not the generated standalone deployment server. The new evidence is in `evidence/round2/`. `GOAL_EVIDENCE_DIR` is optional, relative to the harness directory, and must end with `/`; it keeps repeat QA from overwriting earlier evidence.
+
+The stream benchmark uses 360 non-overlapping activity intervals over 18 synthetic hours. With the **baseline API** running, `node work/goal-improvement/measure-stream.mjs before` seeds and measures it; restart the API with the new code and run `node work/goal-improvement/measure-stream.mjs after`. The script checks the expected source version through the resulting average. Running `before` against current code intentionally fails; it cannot recreate historical measurements. Saved measurements show the correct average **25 instead of 55**, unchanged peaks/message totals/payload, and warm medians of 15.14/14.66 ms (within variance, not a speedup).
+
+Review application changes with `git diff 85dd30b14d4bb7accdb6c86bd7bfb28a3b80138e -- apps docs packages` and the QA scripts/evidence under this directory. Full checks and limitations are recorded at the top of [STATE.md](STATE.md). No new migrations, dependencies, or deployment steps are required by this pass.
 
 ## Runtime
 
@@ -88,7 +125,7 @@ The extended and edge scripts temporarily modify synthetic rows and restore them
 
 Checks cover search/back/clear at 1440, 390, and 320 pixels; 101 filtered streams across pages with preserved original ranks; title/category search; retry with retained input; channel chart/history/data; chat filtering/pagination; invalid and repeated query values; community selection, keyboard interaction, no connections, and no data. Synthetic external imagery is replaced with placeholders in the main journey scripts. This is Chromium viewport testing, not physical-device or cross-browser verification.
 
-The production build passed. The generated standalone server failed locally with `EPERM` resolving a React dependency link on Windows, both inside and outside the sandbox. Built-app browser checks therefore used `next start` with the same API environment and port; Next warns that this is not the intended standalone deployment entry point. Linux container execution and production deployment remain unverified by this goal.
+The production build passed. The generated standalone server failed locally with `EPERM` resolving a React dependency link on Windows, both inside and outside the sandbox. Built-app browser checks therefore used `next start` with the same API environment and port; Next warns that this is not the intended standalone deployment entry point. Round 3 separately built all five Linux Compose images and verified standalone web health and channel-directory rendering in a read-only local container. Production release status is recorded separately in [STATE.md](STATE.md).
 
 ## Evidence and measurements
 

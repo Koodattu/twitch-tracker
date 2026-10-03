@@ -56,3 +56,14 @@ export type ChannelCategory = {
 
 export type ChannelObservation = StreamObservation & { twitchStreamId: string };
 export type ChannelBucket = StreamBucket & { twitchStreamId: string };
+export type ChannelDirectoryEntry = {
+  twitchUserId: string;
+  login: string;
+  displayName: string | null;
+  profileImageUrl: string | null;
+  latestStreamId: string;
+  latestTitle: string | null;
+  latestCategoryName: string | null;
+  startedAt: string;
+  endedAt: string | null;
+};

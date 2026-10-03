@@ -1,0 +1,53 @@
+[
+  {
+    "width": 1440,
+    "chartHeight": 425.59375,
+    "chartWidth": 1216,
+    "labelRenderedFontPx": 16.719754464285714,
+    "recovery": [
+      {
+        "page": "/streams/goal-aurora-0",
+        "canRetry": false
+      },
+      {
+        "page": "/communities",
+        "canRetry": false
+      }
+    ],
+    "errors": []
+  },
+  {
+    "width": 390,
+    "chartHeight": 180,
+    "chartWidth": 338,
+    "labelRenderedFontPx": 4.6475,
+    "recovery": [
+      {
+        "page": "/streams/goal-aurora-0",
+        "canRetry": false
+      },
+      {
+        "page": "/communities",
+        "canRetry": false
+      }
+    ],
+    "errors": []
+  },
+  {
+    "width": 320,
+    "chartHeight": 180,
+    "chartWidth": 268,
+    "labelRenderedFontPx": 3.685,
+    "recovery": [
+      {
+        "page": "/streams/goal-aurora-0",
+        "canRetry": false
+      },
+      {
+        "page": "/communities",
+        "canRetry": false
+      }
+    ],
+    "errors": []
+  }
+]

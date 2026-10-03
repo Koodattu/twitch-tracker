@@ -4,6 +4,7 @@ import type { StreamOverview } from "@twitch-tracker/shared";
 import { getApiData, getPublicApiInit } from "../../api-client";
 import { formatCount } from "../../format";
 import { EmptyState, MetricCard } from "../../ui";
+import { RetryButton } from "../../retry-button";
 import { StreamActivityChart } from "./activity-chart";
 import { EventTimeline } from "./detail-ui";
 
@@ -12,10 +13,10 @@ export const metadata: Metadata = { title: "Stream overview" };
 export default async function StreamPage({ params }: { params: Promise<{ streamId: string }> }) {
   const { streamId } = await params;
   const activity = await getApiData<StreamOverview>(`/api/streams/${encodeURIComponent(streamId)}/overview`, await getPublicApiInit());
-  if (activity == null) return <section className="panel"><EmptyState title="Activity unavailable" description="Stream activity could not be loaded right now. Please try again later." /></section>;
+  if (activity == null) return <section className="panel"><EmptyState title="Activity unavailable" description="Stream activity could not be loaded. Try again to refresh this session." action={<RetryButton />} /></section>;
   return <>
     <section className="stat-row stream-summary" aria-label="Stream summary">
-      <MetricCard label="Average viewers" value={formatCount(activity.totals.viewerCountAvg)} detail="Across observed activity intervals" />
+      <MetricCard label="Average viewers" value={formatCount(activity.totals.viewerCountAvg)} detail="Weighted by observed interval length" />
       <MetricCard label="Peak viewers" value={formatCount(activity.totals.viewerCountMax)} />
       <MetricCard label="Messages captured" value={formatCount(activity.totals.messageCount)} />
       <MetricCard label="Peak active chatters" value={formatCount(activity.totals.activeChatterCountMax)} detail="Distinct speakers in one activity interval" />

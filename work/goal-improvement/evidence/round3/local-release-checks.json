@@ -1,0 +1,46 @@
+{
+  "date": "2026-10-03",
+  "scope": "Local verification of the working tree based on 85dd30b14d4bb7accdb6c86bd7bfb28a3b80138e; not a production release",
+  "runtime": { "node": "24.19.0", "pnpm": "11.21.0" },
+  "checks": {
+    "structure": "passed, 17 paths",
+    "lint": "passed after final application edit",
+    "tests": "37 files, 260 tests passed against disposable PostgreSQL 16.14",
+    "typecheck": "all seven workspace packages passed",
+    "build": "full workspace passed; web rebuilt after final application edit",
+    "browser": "directory plus six existing journey/recovery/chart harnesses passed against the built UI",
+    "containers": "all five existing Compose images built; final web image rebuilt after final application edit",
+    "compose": "configuration validation passed",
+    "caddy": "configuration validation passed in pinned image",
+    "backupScripts": "all syntax checks and retention/retry tests passed",
+    "productionAudit": "exit 0, zero findings",
+    "fullAudit": "exit 1, one high development-only braces advisory GHSA-vfj7-8cjw-p6xm",
+    "diffCheck": "passed"
+  },
+  "linuxStandaloneSmoke": {
+    "image": "sha256:cf6158b59f0198c70c1aa5b6945bd6aecadbb938ab85fbb7f99756ecd588f555",
+    "tag": "goal-01a100dd-round3",
+    "revisionLabel": "85dd30b-local-product-review",
+    "container": "3d3767bd902e7e444efbdbf4a289bf3586fcebea1ae1f7181ed95f0685ccd0ac",
+    "settings": "localhost:13300, 2 CPUs, 512 MiB, read-only, tmpfs; synthetic local API",
+    "healthStatus": 200,
+    "channelDirectoryStatus": 200,
+    "channelDirectoryContainsSyntheticAuroraPelaa": true,
+    "removedAfterVerification": true
+  },
+  "cleanup": {
+    "temporaryChannels": 0,
+    "temporaryChartSessions": 0,
+    "temporaryAccounts": 0,
+    "failureFlagAbsent": true,
+    "ownedLocalServersStopped": true,
+    "ownedPostgresContainerRemoved": true,
+    "unrelatedResourcesChanged": false
+  },
+  "limitations": [
+    "The full dependency audit remains an unresolved required release gate.",
+    "Browser evidence is Chromium viewport/touch emulation and CSS zoom, not physical-device or screen-reader verification.",
+    "Real Twitch OAuth and external ingestion were not invoked.",
+    "Synthetic timing measurements do not establish production performance."
+  ]
+}

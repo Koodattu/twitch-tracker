@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE ?? join(homedir(), ".cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright"));
-const evidence = new URL("./evidence/", import.meta.url);
+const evidence = new URL(process.env.GOAL_EVIDENCE_DIR ?? "./evidence/", import.meta.url);
 await mkdir(evidence, { recursive: true });
 const browser = await chromium.launch({ headless: true });
 const results = [];

@@ -1,0 +1,83 @@
+{
+  "Head": "85dd30b14d4bb7accdb6c86bd7bfb28a3b80138e",
+  "Status": [
+    " M apps/api/src/routes.integration.test.ts",
+    " M apps/api/src/routes.ts",
+    " M apps/api/src/stream-detail.ts",
+    " M apps/web/app/communities/page.tsx",
+    " M apps/web/app/globals.css",
+    " M apps/web/app/me/page.tsx",
+    " M apps/web/app/streams/[streamId]/activity-chart.tsx",
+    " M apps/web/app/streams/[streamId]/page.tsx",
+    " M docs/technical-prd.md",
+    " M work/goal-improvement/README.md",
+    " M work/goal-improvement/STATE.md",
+    " M work/goal-improvement/browser-edge-states.mjs",
+    " M work/goal-improvement/browser-extended.mjs",
+    " M work/goal-improvement/browser-journeys.mjs",
+    "?? work/goal-improvement/browser-account.mjs",
+    "?? work/goal-improvement/browser-chart-states.mjs",
+    "?? work/goal-improvement/browser-round2.mjs",
+    "?? work/goal-improvement/evidence/round2/",
+    "?? work/goal-improvement/measure-stream.mjs"
+  ],
+  "Hashes": [
+    {
+      "Path": "apps/api/src/routes.integration.test.ts",
+      "Sha256": "5E80934D72D6B56920082FD6E06A34D421D3B00A4D4AC7D43FFD0710004D5025"
+    },
+    {
+      "Path": "apps/api/src/routes.ts",
+      "Sha256": "9363D335408219DD3484DF86B96BF3063C17E8CA611A8180CE740EDFD76630F6"
+    },
+    {
+      "Path": "apps/api/src/stream-detail.ts",
+      "Sha256": "021CC00ABC3DB1E0095D8E875B29593DBAF80C3AC7B3E22928DB38A94539646E"
+    },
+    {
+      "Path": "apps/web/app/communities/page.tsx",
+      "Sha256": "E107236518F959FC5699B861856D116A2E0DC193B3864964B4D061E0BAE37348"
+    },
+    {
+      "Path": "apps/web/app/globals.css",
+      "Sha256": "C0B67F4A1A4D81D2B24C5ECD6ECFD0D7BCA09B6C6E09042BC5C957053D40489C"
+    },
+    {
+      "Path": "apps/web/app/me/page.tsx",
+      "Sha256": "F98A147F695B78AA757FE23D76EB56D074FDC24431C7416D0D05B21B0C5C37B6"
+    },
+    {
+      "Path": "apps/web/app/streams/[streamId]/activity-chart.tsx",
+      "Sha256": "1C7C52BEC2EC17D3350C93C07282F7A1DCC78B000884AB17B48C1E260B5AD8C4"
+    },
+    {
+      "Path": "apps/web/app/streams/[streamId]/page.tsx",
+      "Sha256": "9DA202FC984A38F5BD6B2C52D3E09577FB8FEA7CDDA041FA61D034D66AEE7DB6"
+    },
+    {
+      "Path": "docs/technical-prd.md",
+      "Sha256": "5C262F47DD3DDCCC1F875B6DD477CDFFAFEC418CCAD5D1EA9BE1DB7BB0D86203"
+    },
+    {
+      "Path": "work/goal-improvement/README.md",
+      "Sha256": "E81C39C93912CD6766A60D0650732F7A4E6B37C5A6A91B3A7C2E8CF850C189A0"
+    },
+    {
+      "Path": "work/goal-improvement/STATE.md",
+      "Sha256": "A823D30FDD50B5117B2A60E1E79887FB8DD963CDA03396AC4146A22361AA05DE"
+    },
+    {
+      "Path": "work/goal-improvement/browser-edge-states.mjs",
+      "Sha256": "C6F0DF8C80CC31FF4B91434CB779A03589924E64C69AE71DCCB95998D674AC8A"
+    },
+    {
+      "Path": "work/goal-improvement/browser-extended.mjs",
+      "Sha256": "E73DB2680C1F1F62981871603E5DDC4910D856E376DCC1F6398967E5EFF417D5"
+    },
+    {
+      "Path": "work/goal-improvement/browser-journeys.mjs",
+      "Sha256": "7B1C33E3C1940E9C24036EBC114C832348F24052C927B4CAC6087ABD17307156"
+    }
+  ],
+  "Note": "Captured after adding the round 3 work-log section; application files remain at the verified round 2 baseline."
+}

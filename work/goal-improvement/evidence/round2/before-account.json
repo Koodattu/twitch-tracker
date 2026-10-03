@@ -1,0 +1,42 @@
+[
+  {
+    "width": 1440,
+    "messages": 55,
+    "recovery": [
+      {
+        "failure": "/api/me",
+        "canRetry": false
+      },
+      {
+        "failure": "/api/me/data",
+        "canRetry": false
+      },
+      {
+        "failure": "/api/me/privacy",
+        "canRetry": false
+      }
+    ],
+    "failureCopy": "Privacy request failed\n\nThe request was not recorded. Please try again.",
+    "errors": []
+  },
+  {
+    "width": 390,
+    "messages": 55,
+    "recovery": [
+      {
+        "failure": "/api/me",
+        "canRetry": false
+      },
+      {
+        "failure": "/api/me/data",
+        "canRetry": false
+      },
+      {
+        "failure": "/api/me/privacy",
+        "canRetry": false
+      }
+    ],
+    "failureCopy": "Privacy request failed\n\nThe request was not recorded. Please try again.",
+    "errors": []
+  }
+]
