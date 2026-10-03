@@ -30,6 +30,7 @@ export type ChannelDay = {
 export type ChannelOverview = {
   fromDay: string;
   toDay: string;
+  asOf: string;
   daily: ChannelDay[];
   totals: {
     streamCount: number;

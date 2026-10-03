@@ -1,0 +1,28 @@
+[
+  {
+    "width": 1440,
+    "verified": [
+      "101 filtered results with preserved query/ranks",
+      "title/category search",
+      "duplicate query handling",
+      "outage/retry with input preserved",
+      "channel chart and history/data",
+      "chat paging/filter validation/retry",
+      "community selection/escape/zoom/help/keyboard"
+    ],
+    "errors": []
+  },
+  {
+    "width": 390,
+    "verified": [
+      "101 filtered results with preserved query/ranks",
+      "title/category search",
+      "duplicate query handling",
+      "outage/retry with input preserved",
+      "channel chart and history/data",
+      "chat paging/filter validation/retry",
+      "community selection/escape/zoom/help/keyboard"
+    ],
+    "errors": []
+  }
+]

@@ -6,33 +6,42 @@ import { DetailUnavailable } from "../../detail-ui";
 import { EmptyState, MetricCard, StatusPill } from "../../ui";
 import { ViewerTrendChart } from "./viewer-trend-chart";
 import { CategoryArt } from "./category-art";
+import { channelViewQuery, readChannelView, type ChannelSearch } from "./channel-view";
+import { PeriodControls } from "./period-controls";
 
-export default async function ChannelPage({ params }: { params: Promise<{ login: string }> }) {
+export default async function ChannelPage({ params, searchParams }: { params: Promise<{ login: string }>; searchParams: Promise<ChannelSearch> }) {
   const { login } = await params;
-  const overview = await getApiData<ChannelOverview>(`/api/channels/${encodeURIComponent(login)}/overview`, await getPublicApiInit());
-  if (overview == null) return <section className="panel"><DetailUnavailable /></section>;
+  const today = new Date().toISOString().slice(0, 10);
+  const view = readChannelView(await searchParams, today);
+  const pathname = `/channels/${encodeURIComponent(login)}`;
+  const toDay = view.end ?? today;
+  const fromDay = new Date(Date.parse(toDay) - (view.days - 1) * 86_400_000).toISOString().slice(0, 10);
+  const controls = <PeriodControls pathname={pathname} fromDay={fromDay} toDay={toDay} today={today} />;
+  const overview = await getApiData<ChannelOverview>(`/api/channels/${encodeURIComponent(login)}/overview?${new URLSearchParams({ days: String(view.days), end: toDay })}`, await getPublicApiInit());
+  if (overview == null) return <div className="channel-overview">{controls}<section className="panel"><DetailUnavailable /></section></div>;
   const { totals, liveSession, topCategories } = overview;
-  const streamPath = `/channels/${encodeURIComponent(login)}/streams`;
+  const streamPath = `${pathname}/streams?${channelViewQuery({ ...view, day: undefined })}`;
   const chatDays = overview.daily.filter((day) => day.messageCount > 0);
   const busiestChat = [...chatDays].sort((a, b) => b.messageCount - a.messageCount)[0];
   const maxMessages = busiestChat?.messageCount ?? 1;
   const categoryShare = overview.categorySeconds === 0 || topCategories[0] == null ? 0 : Math.round(topCategories[0].liveSeconds / overview.categorySeconds * 100);
   return <div className="channel-overview">
+    {view.invalid ? <p className="data-note" role="status">Some view options were invalid. Showing the valid period and selections below.</p> : null}
     {liveSession == null ? null : <div className="channel-live">
       <div className="channel-live-copy"><StatusPill tone="success">Live now</StatusPill><strong>{liveSession.latestTitle ?? "This channel is live"}</strong><span className="muted">{liveSession.latestCategoryName}</span></div>
       <Link className="button button-secondary button-compact" href={`/streams/${encodeURIComponent(liveSession.twitchStreamId)}`} prefetch={false}>View live stream ↗</Link>
     </div>}
-    <div className="channel-period"><h2>Last 30 days</h2><span>{overview.fromDay} – {overview.toDay} · UTC</span></div>
-    <section className="stat-row stream-summary channel-metrics" aria-label="Channel summary for the last 30 days">
+    {controls}
+    <section className="stat-row stream-summary channel-metrics" aria-label={`Channel summary for ${overview.fromDay} to ${overview.toDay}`}>
       <MetricCard label="Average viewers" value={formatCount(totals?.viewerCountAvg)} detail="During observed stream time" />
       <MetricCard label="Peak viewers" value={formatCount(totals?.viewerCountMax)} detail="Highest observed audience" />
       <MetricCard label="Hours streamed" value={totals == null ? "—" : `${formatCount(Math.round(totals.liveSeconds / 3600 * 10) / 10)}h`} detail="Stream time within this period" />
       <MetricCard label="Streams" value={formatCount(totals?.streamCount)} detail="Started in this period" />
     </section>
-    <ViewerTrendChart overview={overview} />
+    <ViewerTrendChart key={`${overview.fromDay}:${overview.toDay}`} overview={overview} login={login} />
     <div className="channel-discovery-grid">
       <section className="panel channel-categories">
-        <div className="panel-header"><div className="panel-heading"><h2>Top games & categories</h2><p>By observed airtime · Last 30 days</p></div>{overview.categoryCount > 0 ? <span className="badge">{formatCount(overview.categoryCount)} {overview.categoryCount === 1 ? "category" : "categories"}</span> : null}</div>
+        <div className="panel-header"><div className="panel-heading"><h2>Top games & categories</h2><p>By observed airtime · Selected {view.days} days</p></div>{overview.categoryCount > 0 ? <span className="badge">{formatCount(overview.categoryCount)} {overview.categoryCount === 1 ? "category" : "categories"}</span> : null}</div>
         {topCategories.length === 0 ? <EmptyState title="No category history yet" description="Games and categories will appear as more stream activity is observed." /> : <>
           <div className="channel-category-grid">{topCategories.map((category, index) => {
             const share = Math.round(category.liveSeconds / overview.categorySeconds * 100);
@@ -48,10 +57,10 @@ export default async function ChannelPage({ params }: { params: Promise<{ login:
         </>}
       </section>
       <section className="panel channel-chat-summary">
-        <div className="panel-header"><div className="panel-heading"><h2>Chat activity</h2><p>From captured chat · Last 30 days</p></div></div>
+        <div className="panel-header"><div className="panel-heading"><h2>Chat activity</h2><p>From captured chat · Selected {view.days} days</p></div></div>
         {chatDays.length === 0 ? <EmptyState title="No chat activity recorded" description="Chat isn’t captured for every stream. This doesn’t mean nobody was chatting." /> : <div className="channel-chat-body">
           <div className="channel-chat-total"><strong>{formatCount(totals?.messageCount)}</strong><span>messages captured</span></div>
-          <div className="channel-chat-bars" role="img" aria-label={`Messages were captured on ${chatDays.length} days in this period.`}>{Array.from({ length: 30 }, (_, index) => {
+          <div className="channel-chat-bars" role="img" aria-label={`Messages were captured on ${chatDays.length} days in this period.`}>{Array.from({ length: view.days }, (_, index) => {
             const day = new Date(Date.parse(overview.fromDay) + index * 86_400_000).toISOString().slice(0, 10);
             const messages = overview.daily.find((record) => record.day === day)?.messageCount ?? 0;
             return <span key={day} style={{ height: `${Math.max(4, messages / maxMessages * 100)}%` }} data-empty={messages === 0} />;

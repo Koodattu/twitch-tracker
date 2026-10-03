@@ -735,6 +735,19 @@ Public endpoints:
 - `GET /api/chatters/:login`
 
 Stream and channel analytics endpoints are aggregate-first.
+Channel overview accepts optional `days=7|30|90` (default 30) and
+`end=YYYY-MM-DD` (default today, UTC; 2011-01-01 through today). Both boundaries
+are calendar dates: the end day is included, while observations stop at the
+following midnight or the current instant, whichever is earlier. Summaries,
+daily figures and categories share that interval. `asOf` records when the
+overview was calculated; it is not a last-ingested-observation timestamp.
+Channel sessions accepts optional `day=YYYY-MM-DD` to return streams active
+during that UTC day, including overnight sessions. Existing pagination and
+public visibility rules apply. Repeated or invalid period/date inputs return
+400. The web overview preserves period, measure and selected day in URLs;
+copied links pin the end date. Daily chart figures use the overview payload,
+while the existing Data tab still exposes retained source rollups with its
+documented start-day grouping.
 The channel directory searches names and logins literally, case-insensitively,
 across channels with an observed Finnish stream. It returns the latest Finnish
 session per channel, ordered by start time then login and identity, in pages of

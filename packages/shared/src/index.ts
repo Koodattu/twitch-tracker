@@ -3,6 +3,16 @@ export type * from "./channel-detail.js";
 export type * from "./community-map.js";
 
 export const communityMapRecipe = "finnish-presence-v4";
+export const channelPeriodDays = [7, 30, 90] as const;
+export type ChannelPeriodDays = typeof channelPeriodDays[number];
+export const earliestChannelPeriodEnd = "2011-01-01";
+
+/** Whole UTC dates; the preceding year supports periods ending in early 2011. */
+export function isChannelDay(value: unknown, today = new Date().toISOString().slice(0, 10)): value is string {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)
+    && value >= "2010-10-04" && value <= today
+    && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
+}
 export const communityMapThresholds = { channelPeople: 5, sharedPeople: 3 } as const;
 export const communityNodeRadius = (people: number) => Math.min(17, 3 + Math.sqrt(people) * 0.6);
 

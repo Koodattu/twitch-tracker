@@ -1,0 +1,44 @@
+{
+  "fixture": {
+    "endDay": "2026-10-02",
+    "zeroDay": "2026-09-30",
+    "missingDay": "2026-09-14",
+    "emptyDay": "2026-09-21",
+    "sessions": 87,
+    "samples": 837
+  },
+  "report": [
+    {
+      "version": "before-populated",
+      "width": 1440,
+      "period": "Last 30 days\n2026-09-04 – 2026-10-03 · UTC",
+      "summary": "Average viewers\n722\nDuring observed stream time\nPeak viewers\n1,397\nHighest observed audience\nHours streamed\n13.5h\nStream time within this period\nStreams\n27\nStarted in this period",
+      "sliderHeight": 20,
+      "chatOverflow": false
+    },
+    {
+      "version": "after-populated",
+      "width": 1440,
+      "period": "Last 30 days\n2026-09-04 – 2026-10-03 · UTC · Today so far\n7 days\n30 days\n90 days\nPrevious\nNext\nChoose end date",
+      "summary": "Average viewers\n722\nDuring observed stream time\nPeak viewers\n1,397\nHighest observed audience\nHours streamed\n13.5h\nStream time within this period\nStreams\n27\nStarted in this period",
+      "sliderHeight": 44,
+      "chatOverflow": false
+    },
+    {
+      "version": "before-populated",
+      "width": 390,
+      "period": "Last 30 days\n2026-09-04 – 2026-10-03 · UTC",
+      "summary": "Average viewers\n722\nDuring observed stream time\nPeak viewers\n1,397\nHighest observed audience\nHours streamed\n13.5h\nStream time within this period\nStreams\n27\nStarted in this period",
+      "sliderHeight": 20,
+      "chatOverflow": false
+    },
+    {
+      "version": "after-populated",
+      "width": 390,
+      "period": "Last 30 days\n2026-09-04 – 2026-10-03 · UTC · Today so far\n7 days\n30 days\n90 days\nPrevious\nNext\nChoose end date",
+      "summary": "Average viewers\n722\nDuring observed stream time\nPeak viewers\n1,397\nHighest observed audience\nHours streamed\n13.5h\nStream time within this period\nStreams\n27\nStarted in this period",
+      "sliderHeight": 44,
+      "chatOverflow": false
+    }
+  ]
+}

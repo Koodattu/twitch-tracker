@@ -1,0 +1,35 @@
+[
+  {
+    "width": 1440,
+    "urlBefore": "http://127.0.0.1:3300/channels/aurorapelaa",
+    "selectedBefore": "2026-09-04\nNo observations",
+    "selectedAfter": "2026-10-03\n1,017 avg viewers\n1,090 peak viewers\n1h 0m streamed",
+    "modeAfter": "Audience over time",
+    "period": "Last 30 days\n2026-09-04 – 2026-10-03 · UTC",
+    "sliderHeight": 20,
+    "overflow": false,
+    "errors": []
+  },
+  {
+    "width": 390,
+    "urlBefore": "http://127.0.0.1:3300/channels/aurorapelaa",
+    "selectedBefore": "2026-09-04\nNo observations",
+    "selectedAfter": "2026-10-03\n1,017 avg viewers\n1,090 peak viewers\n1h 0m streamed",
+    "modeAfter": "Audience over time",
+    "period": "Last 30 days\n2026-09-04 – 2026-10-03 · UTC",
+    "sliderHeight": 20,
+    "overflow": false,
+    "errors": []
+  },
+  {
+    "width": 320,
+    "urlBefore": "http://127.0.0.1:3300/channels/aurorapelaa",
+    "selectedBefore": "2026-09-04\nNo observations",
+    "selectedAfter": "2026-10-03\n1,017 avg viewers\n1,090 peak viewers\n1h 0m streamed",
+    "modeAfter": "Audience over time",
+    "period": "Last 30 days\n2026-09-04 – 2026-10-03 · UTC",
+    "sliderHeight": 20,
+    "overflow": false,
+    "errors": []
+  }
+]

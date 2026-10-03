@@ -441,6 +441,82 @@ describe.skipIf(database == null)("Analytics routes with PostgreSQL", () => {
     expect((await publicApp.request("/api/private/streams/stream/messages", { headers })).status).toBe(200);
   });
 
+  it("reviews a historical channel period with matching UTC boundaries for audience, airtime and chat", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-10T12:00:00Z"));
+    try {
+      await db.insert(streamSessions).values({ twitchStreamId: "midnight", broadcasterUserId: "broadcaster",
+        startedAt: new Date("2026-08-31T23:57:00Z"), endedAt: new Date("2026-09-01T00:06:00Z") });
+      await db.insert(streamSnapshots).values([
+        { twitchStreamId: "midnight", broadcasterUserId: "broadcaster", observedAt: new Date("2026-08-31T23:58:00Z"), viewerCount: 10, title: "Night stream", categoryId: "game", categoryName: "Game" },
+        { twitchStreamId: "midnight", broadcasterUserId: "broadcaster", observedAt: new Date("2026-09-01T00:04:00Z"), viewerCount: 40 }
+      ]);
+      await db.insert(channelDailyStats).values([
+        { broadcasterUserId: "broadcaster", day: "2026-09-07", messageCount: 25 },
+        { broadcasterUserId: "broadcaster", day: "2026-09-08", messageCount: 999 }
+      ]);
+      const response = await app.request("/api/channels/channel/overview?days=7&end=2026-09-07");
+      expect(response.status).toBe(200);
+      const data = (await response.json()).data;
+      expect([data.fromDay, data.toDay]).toEqual(["2026-09-01", "2026-09-07"]);
+      expect(data.totals).toEqual({ streamCount: 1, liveSeconds: 540, messageCount: 25, viewerCountAvg: 20, viewerCountMax: 40 });
+      expect(data.viewerSeconds).toBe(360);
+      expect(data.categorySeconds).toBe(360);
+      expect(data.daily.map((day: { day: string }) => day.day)).toEqual(["2026-09-01", "2026-09-05", "2026-09-07"]);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("drills into streams active on a UTC day, including overnight streams but excluding boundary-only overlap", async () => {
+    await db.insert(streamSessions).values([
+      { twitchStreamId: "overnight", broadcasterUserId: "broadcaster", startedAt: new Date("2026-09-04T23:58:00Z"), endedAt: new Date("2026-09-05T00:04:00Z") },
+      { twitchStreamId: "ends-at-midnight", broadcasterUserId: "broadcaster", startedAt: new Date("2026-09-04T23:00:00Z"), endedAt: new Date("2026-09-05T00:00:00Z") },
+      { twitchStreamId: "starts-tomorrow", broadcasterUserId: "broadcaster", startedAt: new Date("2026-09-06T00:00:00Z") },
+      { twitchStreamId: "another-channel", broadcasterUserId: "chatter", startedAt: firstSeen }
+    ]);
+    const response = await app.request("/api/channels/channel/sessions?day=2026-09-05");
+    expect(response.status).toBe(200);
+    expect((await response.json()).data.items.map((item: { twitchStreamId: string }) => item.twitchStreamId)).toEqual(["stream", "overnight"]);
+  });
+
+  it.each([
+    "overview?days=0", "overview?days=91", "overview?days=7&days=90",
+    "overview?end=2026-02-30", "overview?end=9999-01-01", "overview?end=0000-01-01",
+    "sessions?day=2026-02-30", "sessions?day=9999-01-01", "sessions?day=2026-09-05&day=2026-09-06"
+  ])("rejects invalid or ambiguous channel periods: %s", async (suffix) => {
+    expect((await app.request(`/api/channels/channel/${suffix}`)).status).toBe(400);
+  });
+
+  it("supports 90 calendar days across a leap day and keeps the default period unchanged", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-10T12:00:00Z"));
+    try {
+      await db.insert(channelDailyStats).values([
+        { broadcasterUserId: "broadcaster", day: "2024-02-29", messageCount: 20 },
+        { broadcasterUserId: "broadcaster", day: "2024-03-02", messageCount: 999 }
+      ]);
+      const historical = (await (await app.request("/api/channels/channel/overview?days=90&end=2024-03-01")).json()).data;
+      expect([historical.fromDay, historical.toDay]).toEqual(["2023-12-03", "2024-03-01"]);
+      expect(historical.totals.messageCount).toBe(20);
+      expect(historical.totals.viewerCountAvg).toBeNull();
+      const current = (await (await app.request("/api/channels/channel/overview")).json()).data;
+      expect([current.fromDay, current.toDay]).toEqual(["2026-08-12", "2026-09-10"]);
+      expect(current.asOf).toBe("2026-09-10T12:00:00.000Z");
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("paginates only streams active on the selected day", async () => {
+    await db.insert(streamSessions).values(Array.from({ length: 51 }, (_, index) => ({
+      twitchStreamId: `day-${index.toString().padStart(2, "0")}`, broadcasterUserId: "broadcaster", startedAt: firstSeen
+    })));
+    await db.insert(streamSessions).values({ twitchStreamId: "outside-day", broadcasterUserId: "broadcaster", startedAt: new Date("2026-09-06T00:00:00Z") });
+    const first = (await (await app.request("/api/channels/channel/sessions?day=2026-09-05")).json()).data;
+    const second = (await (await app.request("/api/channels/channel/sessions?day=2026-09-05&page=2")).json()).data;
+    expect(first.items).toHaveLength(50);
+    expect(first.hasMore).toBe(true);
+    expect(second.items.map((item: { twitchStreamId: string }) => item.twitchStreamId)).toEqual(["day-01", "day-00"]);
+    expect(second.hasMore).toBe(false);
+  });
+
   it("bounds channel snapshot reads and does not query raw chat or activity buckets", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-09-06T12:00:00Z"));

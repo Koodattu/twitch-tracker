@@ -1,0 +1,45 @@
+{
+  "fixture": {
+    "endDay": "2026-10-02",
+    "zeroDay": "2026-09-30",
+    "missingDay": "2026-09-14",
+    "emptyDay": "2026-09-21",
+    "sessions": 87,
+    "samples": 837
+  },
+  "runs": [
+    {
+      "width": 1440,
+      "selected": "2026-09-26\n446 messages captured\n30m streamed",
+      "shared": "http://127.0.0.1:3300/channels/periodreview?days=7&end=2026-10-02&measure=messages&day=2026-09-26",
+      "errors": [],
+      "overflow": false,
+      "sliderHeight": 44
+    },
+    {
+      "width": 768,
+      "selected": "2026-09-26\n446 messages captured\n30m streamed",
+      "shared": "http://127.0.0.1:3300/channels/periodreview?days=7&end=2026-10-02&measure=messages&day=2026-09-26",
+      "errors": [],
+      "overflow": false,
+      "sliderHeight": 44
+    },
+    {
+      "width": 390,
+      "selected": "2026-09-26\n446 messages captured\n30m streamed",
+      "shared": "http://127.0.0.1:3300/channels/periodreview?days=7&end=2026-10-02&measure=messages&day=2026-09-26",
+      "errors": [],
+      "overflow": false,
+      "sliderHeight": 44
+    },
+    {
+      "width": 320,
+      "selected": "2026-09-26\n446 messages captured\n30m streamed",
+      "shared": "http://127.0.0.1:3300/channels/periodreview?days=7&end=2026-10-02&measure=messages&day=2026-09-26",
+      "errors": [],
+      "overflow": false,
+      "sliderHeight": 44
+    }
+  ],
+  "recovery": "Actual API 503 -> retry -> same historical period"
+}

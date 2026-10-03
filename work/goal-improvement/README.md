@@ -2,7 +2,36 @@
 
 These fixtures use only PostgreSQL at `127.0.0.1:55432` and the two databases named below. They do not read `.env`. Seeding truncates the dedicated UI database; never repoint these scripts at another database. The API harness disables Twitch ingestion and EventSub and uses a synthetic session secret. The worker is not started.
 
-The implementation, verification, and release history are recorded in [STATE.md](STATE.md). The current release combines the round 2 reliability improvements and round 3 channel directory below. It also replaces a vulnerable development-only ESLint dependency with an already-used package and a tested compatibility patch. No new runtime dependency, database migration or production configuration change is required.
+The implementation, verification, and release history are recorded in [STATE.md](STATE.md). Round 4 adds historical channel analysis and reusable day inspection to the preceding reliability and discovery releases. The earlier release also replaced a vulnerable development-only ESLint dependency with an already-used package and a tested compatibility patch. No new runtime dependency, database migration or production configuration change is required.
+
+## Channel analytical workflow (round 4)
+
+Open any channel from `/channels`. Choose 7, 30 or 90 days, step to earlier
+periods, or choose an end date. Viewer/chat selections survive reload and can
+be shared with **Copy view link**. **Daily figures** exposes the chart's exact
+values, with missing observations shown as dashes. Open a day to find streams
+active during it, including overnight streams, then return through Overview.
+History's date filter adjusts the overview period when necessary.
+
+Start the isolated database/API/web as below, then run:
+
+```powershell
+node work/goal-improvement/browser-channel-period.mjs built
+node work/goal-improvement/measure-channel-period.mjs
+```
+
+The browser harness creates/removes 87 synthetic sessions and 837 observations
+across 95 dates. It covers shared links, history/back/reload, period/date controls,
+daily values, zero/missing data, four viewport widths, keyboard/touch, 200% CSS
+zoom, clipboard denial and an actual API outage/retry. The capacity harness
+expands the same fixture to 10,407 observations and cleans it up. Run them
+sequentially because they share that task-owned fixture identity. Neither uses
+production data. The `.temp/goal-api-failure` marker must be absent afterward.
+
+Evidence is in `evidence/round4/`; decisions and release status are at the top
+of [STATE.md](STATE.md). No dependency, migration or deployment configuration
+change is needed. To review this pass, use `git diff 97e7778 -- apps packages
+docs work/goal-improvement` (plus untracked files before committing).
 
 ## Channel discovery and release (round 3)
 

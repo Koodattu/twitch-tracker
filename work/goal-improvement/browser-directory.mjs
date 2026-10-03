@@ -12,7 +12,7 @@ const { Pool } = require("pg");
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE ?? join(homedir(), ".cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright"));
 const phase = process.argv[2] ?? "built";
 assert.match(phase, /^(before|built)$/);
-const evidence = new URL("./evidence/round3/", import.meta.url);
+const evidence = new URL(process.env.GOAL_EVIDENCE_DIR ?? "./evidence/round3/", import.meta.url);
 const failureFlag = new URL("../../.temp/goal-api-failure", import.meta.url);
 await mkdir(evidence, { recursive: true });
 const pool = new Pool({ connectionString: fixtureUrl });

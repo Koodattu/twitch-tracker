@@ -1328,7 +1328,7 @@ li,
 .live-search-controls .search-input { flex: 1 1 280px; min-width: 0; }
 .live-search-controls .button { min-height: 44px; }
 @media (max-width: 430px) {
-  .nav-link { padding-inline: 8px; min-width: 44px; justify-content: center; }
+  .nav-link { padding-inline: 7px; min-width: 44px; justify-content: center; }
   .live-search-controls .search-input { flex-basis: 100%; font-size: 16px; }
   .live-search-controls .button { flex: 1; }
 }

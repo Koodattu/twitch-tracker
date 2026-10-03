@@ -48,7 +48,7 @@ import type { MiddlewareHandler } from "hono";
 import { z } from "zod";
 import { createVodThumbnailLookup } from "./vod-thumbnails.js";
 import { getStreamDetail, getStreamOverview, streamDetailQuerySchema } from "./stream-detail.js";
-import { channelDetailQuerySchema, getChannelDetail, getChannelOverview } from "./channel-detail.js";
+import { channelDetailQuerySchema, channelOverviewQuerySchema, getChannelDetail, getChannelOverview } from "./channel-detail.js";
 import { getCommunityMap, getCommunityBuildStatus } from "./community-map.js";
 import { detailPage, detailPageNumberSchema, detailPageSize } from "./detail-records.js";
 
@@ -608,7 +608,12 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
     app.get(`/api/channels/:login/${kind}`, async (c) => {
       const params = loginParamSchema.parse(c.req.param());
       const query = channelDetailQuerySchema.safeParse(c.req.query());
-      if (!query.success) return c.json({ error: { code: "invalid_query", message: "Check the page number." } }, 400);
+      if ([...(kind === "overview" ? ["days", "end"] : []), "day"].some((key) => (c.req.queries(key)?.length ?? 0) > 1)) {
+        return c.json({ error: { code: "invalid_query", message: "Use one value for each period or date option." } }, 400);
+      }
+      if (!query.success) return c.json({ error: { code: "invalid_query", message: "Check the page number and UTC date." } }, 400);
+      const period = channelOverviewQuerySchema.safeParse(kind === "overview" ? c.req.query() : {});
+      if (!period.success) return c.json({ error: { code: "invalid_query", message: "Choose 7, 30 or 90 days and a valid past or current UTC end date." } }, 400);
       const [channel] = await c.get("db").select({
         twitchUserId: twitchUsers.twitchUserId,
         publicProfileHidden: subjectPrivacyStates.publicProfileHidden,
@@ -621,8 +626,8 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
       }
       c.header("Cache-Control", "private, no-store");
       const data = kind === "overview"
-        ? await getChannelOverview(c.get("db"), channel.twitchUserId, Math.max(config.DISCOVERY_INTERVAL_MS, config.KNOWN_CHANNEL_DISCOVERY_INTERVAL_MS) * 2 / 1000)
-        : await getChannelDetail(c.get("db"), channel.twitchUserId, kind, query.data.page);
+        ? await getChannelOverview(c.get("db"), channel.twitchUserId, Math.max(config.DISCOVERY_INTERVAL_MS, config.KNOWN_CHANNEL_DISCOVERY_INTERVAL_MS) * 2 / 1000, period.data)
+        : await getChannelDetail(c.get("db"), channel.twitchUserId, kind, query.data.page, query.data.day);
       return c.json({ data });
     });
   }

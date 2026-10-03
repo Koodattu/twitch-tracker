@@ -1,0 +1,32 @@
+{
+  "fixture": {
+    "endDay": "2026-10-02",
+    "zeroDay": "2026-09-30",
+    "missingDay": "2026-09-14",
+    "emptyDay": "2026-09-21",
+    "sessions": 87,
+    "samples": 837
+  },
+  "workload": "87 synthetic six-hour sessions across 95 UTC dates; no production data",
+  "measurements": [
+    {
+      "days": 30,
+      "coldMs": 63.50279999999998,
+      "warmMedianMs": 27.4070999999999,
+      "warmMinMs": 15.995400000000018,
+      "warmMaxMs": 32.34500000000003,
+      "bytes": 5814,
+      "dailyRecords": 28
+    },
+    {
+      "days": 90,
+      "coldMs": 52.41579999999999,
+      "warmMedianMs": 49.76499999999987,
+      "warmMinMs": 36.15039999999999,
+      "warmMaxMs": 62.898899999999685,
+      "bytes": 12368,
+      "dailyRecords": 83
+    }
+  ],
+  "samples": 10407
+}

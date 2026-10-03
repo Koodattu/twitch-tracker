@@ -26,7 +26,7 @@ export default async function ChannelLayout({ params, children }: { params: Prom
       </div>
       {channel.description == null || channel.description === "" ? null : <details className="channel-about"><summary>About {name}</summary><p>{channel.description}</p></details>}
     </section>
-    <DetailNavigation label="Channel pages" links={[{ path: base, label: "Overview" }, { path: `${base}/streams`, label: "Streams" }, { path: `${base}/data`, label: "Data" }]} />
+    <DetailNavigation label="Channel pages" preserveSearch={["days", "end", "measure", "day"]} links={[{ path: base, label: "Overview" }, { path: `${base}/streams`, label: "Streams" }, { path: `${base}/data`, label: "Data" }]} />
     {children}
   </>;
 }
