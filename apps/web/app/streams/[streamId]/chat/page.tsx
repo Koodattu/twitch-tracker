@@ -9,20 +9,21 @@ import { getDetailPageNumber, getStreamSession } from "../stream-data";
 
 export const metadata: Metadata = { title: "Stream chat" };
 
-export default async function StreamChatPage({ params, searchParams }: { params: Promise<{ streamId: string }>; searchParams: Promise<{ page?: string; chatter?: string; from?: string; to?: string }> }) {
+export default async function StreamChatPage({ params, searchParams }: { params: Promise<{ streamId: string }>; searchParams: Promise<{ page?: string; chatter?: string | string[]; from?: string | string[]; to?: string | string[] }> }) {
   const { streamId } = await params;
   const stream = await getStreamSession(streamId);
   if (!stream?.canInspectRaw) return <section className="panel"><DetailUnavailable privateData /></section>;
   const search = await searchParams;
   const page = getDetailPageNumber(search.page);
-  const filters = { chatter: (search.chatter ?? "").trim().slice(0, 100), from: search.from ?? "", to: search.to ?? "" };
+  const filterValue = (value: string | string[] | undefined) => typeof value === "string" ? value : "";
+  const filters = { chatter: filterValue(search.chatter).trim().slice(0, 100), from: filterValue(search.from), to: filterValue(search.to) };
   const query = new URLSearchParams({ page: String(page), chatter: filters.chatter });
   let invalidTime = false;
   for (const name of ["from", "to"] as const) {
     const value = filters[name];
     if (value === "") continue;
     const date = new Date(`${value}Z`);
-    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value) || Number.isNaN(date.getTime())) invalidTime = true;
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value) || Number.isNaN(date.getTime()) || date.toISOString().slice(0, 16) !== value) invalidTime = true;
     else query.set(name, date.toISOString());
   }
   if (filters.from !== "" && filters.to !== "" && filters.from >= filters.to) invalidTime = true;

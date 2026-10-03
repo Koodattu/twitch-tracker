@@ -3,6 +3,7 @@ import { encryptSecret, hashSessionToken, loadConfig } from "@twitch-tracker/con
 import { appUsers, channelDailyStats, channelEvents, chatMembershipEvents, chatMessages, chatPresenceSnapshots, createDb, oauthAccounts, raids, rawEventsubEvents, sessions, streamActivityBuckets, streamSessions, streamSnapshots, subjectPrivacyStates, twitchUsers } from "@twitch-tracker/db";
 import { eq } from "drizzle-orm";
 import { createApiApp } from "./routes.js";
+import { HTTPException } from "hono/http-exception";
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 if (testDatabaseUrl != null && !new URL(testDatabaseUrl).pathname.toLowerCase().includes("test")) {
@@ -62,6 +63,34 @@ describe.skipIf(database == null)("Analytics routes with PostgreSQL", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it.each([
+    "/api/streams/recent?limit=bad",
+    "/api/channels/channel/streams?limit=51",
+    "/api/channels/channel/viewer-history?limit=501",
+    "/api/channels/channel/activity?days=0"
+  ])("reports invalid query input as a client error: %s", async (path) => {
+    const response = await app.request(path);
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: { code: "invalid_request", message: "Check the request parameters." } });
+  });
+
+  it("keeps HTTP error responses and logs unexpected failures without input or error details", async () => {
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    const errorApp = createApiApp({ config, db });
+    errorApp.get("/test/failure/:identity", () => { throw new Error("synthetic-sensitive-database-value"); });
+    errorApp.get("/test/http-error", () => { throw new HTTPException(429, { res: new Response("Please retry later", { status: 429, headers: { "Retry-After": "60" } }) }); });
+    try {
+      const response = await errorApp.request("/test/failure/synthetic-identity?token=synthetic-sensitive-token");
+      expect(response.status).toBe(500);
+      expect(await response.text()).toBe("Internal Server Error");
+      expect(errors).toHaveBeenCalledExactlyOnceWith(JSON.stringify({ level: "error", message: "API request failed", method: "GET", route: "/test/failure/:identity", errorType: "Error" }));
+      const limited = await errorApp.request("/test/http-error");
+      expect(limited.status).toBe(429);
+      expect(limited.headers.get("Retry-After")).toBe("60");
+      expect(await limited.text()).toBe("Please retry later");
+    } finally { errors.mockRestore(); }
   });
 
   it("returns packed raw lines and erases their archived copies through the privacy API", async () => {
@@ -357,6 +386,52 @@ describe.skipIf(database == null)("Analytics routes with PostgreSQL", () => {
       querySpy.mockRestore();
       vi.useRealTimers();
     }
+  });
+
+  it("counts category airtime across compacted snapshots and stops at an explicit category removal", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-06T12:00:00Z"));
+    try {
+      await db.update(streamSessions).set({ endedAt: new Date("2026-09-05T10:15:00Z") }).where(eq(streamSessions.twitchStreamId, "stream"));
+      await db.insert(streamSnapshots).values([
+        { twitchStreamId: "stream", broadcasterUserId: "broadcaster", observedAt: firstSeen, viewerCount: 10, title: "Playing", categoryId: "game", categoryName: "Game" },
+        { twitchStreamId: "stream", broadcasterUserId: "broadcaster", observedAt: latestSeen, viewerCount: 30 },
+        { twitchStreamId: "stream", broadcasterUserId: "broadcaster", observedAt: new Date("2026-09-05T10:06:00Z"), viewerCount: 50, title: "Talking", categoryId: "chat", categoryName: "Just Chatting" },
+        { twitchStreamId: "stream", broadcasterUserId: "broadcaster", observedAt: new Date("2026-09-05T10:09:00Z"), viewerCount: 70 },
+        { twitchStreamId: "stream", broadcasterUserId: "broadcaster", observedAt: new Date("2026-09-05T10:12:00Z"), viewerCount: 90, title: "No category" }
+      ]);
+      const response = await app.request("/api/channels/channel/overview");
+      expect(response.status).toBe(200);
+      const data = (await response.json()).data;
+      expect(data.categorySeconds).toBe(720);
+      expect(data.topCategories).toEqual([
+        { id: "chat", name: "Just Chatting", liveSeconds: 360, viewerCountAvg: 60 },
+        { id: "game", name: "Game", liveSeconds: 360, viewerCountAvg: 20 }
+      ]);
+      expect(data.totals.viewerCountAvg).toBe(50);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("recovers categories set before the period without carrying audience gaps or another session's category", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-30T12:00:00Z"));
+    try {
+      await db.update(streamSessions).set({ startedAt: new Date("2026-08-31T22:00:00Z"), endedAt: new Date("2026-09-01T00:09:00Z") }).where(eq(streamSessions.twitchStreamId, "stream"));
+      await db.insert(streamSessions).values({ twitchStreamId: "uncategorized", broadcasterUserId: "broadcaster", startedAt: new Date("2026-09-01T01:00:00Z"), endedAt: new Date("2026-09-01T01:03:00Z") });
+      await db.insert(streamSnapshots).values([
+        { twitchStreamId: "stream", broadcasterUserId: "broadcaster", observedAt: new Date("2026-08-31T22:00:00Z"), viewerCount: 999, title: "Game night", categoryId: "game", categoryName: "Game" },
+        ...[20, 40, 60].map((viewerCount, index) => ({ twitchStreamId: "stream", broadcasterUserId: "broadcaster", observedAt: new Date(`2026-09-01T00:0${index * 3}:00Z`), viewerCount })),
+        { twitchStreamId: "uncategorized", broadcasterUserId: "broadcaster", observedAt: new Date("2026-09-01T01:00:00Z"), viewerCount: 20 }
+      ]);
+      const response = await app.request("/api/channels/channel/overview");
+      expect(response.status).toBe(200);
+      const data = (await response.json()).data;
+      expect(data.fromDay).toBe("2026-09-01");
+      expect(data.categorySeconds).toBe(540);
+      expect(data.topCategories).toEqual([{ id: "game", name: "Game", liveSeconds: 540, viewerCountAvg: 40 }]);
+      expect(data.viewerSeconds).toBe(720);
+      expect(data.totals.viewerCountMax).toBe(60);
+    } finally { vi.useRealTimers(); }
   });
 
   it("uses the same 30 UTC calendar days for channel chart and totals", async () => {

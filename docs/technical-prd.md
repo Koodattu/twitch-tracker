@@ -759,12 +759,15 @@ parameter. Ordering is newest first with a stable tie-breaker; pagination uses
 offsets, so newly arriving records can shift pages on live sessions. The
 existing combined `activity` and private `raw` endpoints remain available.
 
-The channel overview reads daily rollups for the last 30 UTC calendar days,
-including today, plus six recent sessions and the latest live session. It does
-not fetch viewer snapshots or activity buckets. Period totals use those daily
-rollups; average viewers is the mean of available daily averages. Missing
-observations remain unknown, and stream counts and duration follow the rollup's
-session-start day attribution.
+The channel overview covers the last 30 UTC calendar days, including today,
+plus six recent sessions and the latest live session. Captured-message totals
+come from daily rollups. Stream time is clipped to the period and split across
+UTC days; audience and category averages are weighted by observed time from
+viewer snapshots, with long observation gaps left uncounted. Sparse category
+metadata is carried forward within its session, seeded from the last metadata
+observation before the period when needed. An explicit category removal stops
+that carry-forward. Missing audience observations remain unknown. The overview
+does not query raw chat or activity buckets.
 
 Channel Streams and Data subpages fetch sessions, daily rollups, viewer
 observations, or activity buckets only when opened, with prefetching disabled.

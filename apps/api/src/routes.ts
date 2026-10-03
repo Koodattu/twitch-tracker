@@ -42,6 +42,8 @@ import { createEventSubEnvelope, eventSubHeaders, exchangeTwitchAuthorizationCod
 import { and, desc, eq, gt, ilike, inArray, isNotNull, isNull, lt, max, min, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
+import { HTTPException } from "hono/http-exception";
+import { routePath } from "hono/route";
 import type { MiddlewareHandler } from "hono";
 import { z } from "zod";
 import { createVodThumbnailLookup } from "./vod-thumbnails.js";
@@ -106,6 +108,19 @@ const publicSubjectVisibilityCondition = or(
 export const createApiApp = ({ config, db }: CreateApiAppInput) => {
   const app = new Hono<ApiBindings>();
   const getVodThumbnail = createVodThumbnailLookup(config);
+
+  app.onError((error, c) => {
+    if (error instanceof z.ZodError) {
+      return c.json({ error: { code: "invalid_request", message: "Check the request parameters." } }, 400);
+    }
+    if (error instanceof HTTPException) {
+      const response = error.getResponse();
+      return c.newResponse(response.body, response);
+    }
+    // Error messages and database errors can contain input values or credentials.
+    console.error(JSON.stringify({ level: "error", message: "API request failed", method: c.req.method, route: routePath(c), errorType: error.name }));
+    return c.text("Internal Server Error", 500);
+  });
 
   app.use("*", async (c, next) => {
     c.set("config", config);

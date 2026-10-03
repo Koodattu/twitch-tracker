@@ -1,0 +1,52 @@
+import assert from "node:assert/strict";
+import { createRequire } from "node:module";
+import { writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { fixtureUrl } from "./fixture.mjs";
+const require=createRequire(import.meta.url);
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE ?? join(homedir(), ".cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright"));
+const {Pool}=createRequire(new URL("../../packages/db/package.json",import.meta.url))("pg");
+const pool=new Pool({connectionString:fixtureUrl});
+const browser=await chromium.launch({headless:true});
+const checks=[];
+const label=process.argv[2] ?? "after";
+let originalMap;
+try {
+  originalMap=(await pool.query("select id,graph from community_map_snapshots where recipe='synthetic-goal-qa'")).rows[0];
+  const page=await browser.newPage({viewport:{width:390,height:844},reducedMotion:"reduce"});
+  await page.context().addCookies([{name:"goal-qa",value:"synthetic",url:"http://127.0.0.1:3300"}]);
+  const go=async path=>{
+    await page.goto(`http://127.0.0.1:3300${path}`);
+    await page.waitForFunction(()=>!document.querySelector("main")?.textContent?.includes("Loading analytics"));
+    await page.waitForLoadState("networkidle");
+  };
+  const capture=async name=>page.screenshot({path:fileURLToPath(new URL(`./evidence/${label}-${name}-390.png`,import.meta.url)),fullPage:true,caret:"initial"});
+  await go("/streams/goal-aurora-0/chat?chatter=testichat&chatter=other");
+  checks.push({name:"Repeated chatter query does not crash the page",passed:await page.getByRole("heading",{name:"Captured messages",exact:true}).isVisible()});
+  await capture("chat-repeated");
+  await go("/streams/goal-aurora-0/chat?chatter=testichat&from=2026-02-31T10:00");
+  checks.push({name:"Impossible calendar date is reported as invalid",passed:await page.getByRole("heading",{name:"Check the time range",exact:true}).isVisible()});
+  await capture("chat-invalid-date");
+  await pool.query("update community_map_snapshots set graph=$2 where id=$1",[originalMap.id,{nodes:originalMap.graph.nodes.map(node=>({...node,community:null})),edges:[]}]);
+  await go("/communities");
+  checks.push({name:"Map shows qualifying channels when none have connections",passed:await page.locator(".community-node").count()===4});
+  await page.getByRole("button",{name:"Fit map",exact:true}).click();
+  checks.push({name:"Fit map keeps unconnected channels visible",passed:await page.locator(".community-node").count()===4});
+  await page.locator(".community-canvas").focus();
+  await page.keyboard.press("ArrowRight");
+  const focus=await page.locator(".community-canvas").evaluate(element=>({style:getComputedStyle(element).outlineStyle,width:parseFloat(getComputedStyle(element).outlineWidth)}));
+  checks.push({name:"Keyboard map focus has a visible outline",passed:focus.style!=="none"&&focus.width>=2,actual:focus});
+  await capture("community-unconnected");
+  await pool.query("update community_map_snapshots set graph=$2 where id=$1",[originalMap.id,{nodes:[],edges:[]}]);
+  await go("/communities");
+  checks.push({name:"Empty community map explains missing data",passed:await page.getByRole("heading",{name:"Not enough recorded chat activity"}).isVisible()});
+  await capture("community-empty");
+} finally {
+  if(originalMap)await pool.query("update community_map_snapshots set graph=$2 where id=$1",[originalMap.id,originalMap.graph]);
+  await pool.end();await browser.close();
+}
+await writeFile(new URL(`./evidence/${label}-edge-states.json`,import.meta.url),JSON.stringify(checks,null,2));
+console.log(checks);
+assert.ok(checks.every(check=>check.passed),"One or more edge-state acceptance checks failed.");

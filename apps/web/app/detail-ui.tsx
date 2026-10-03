@@ -3,9 +3,10 @@ import type { ReactNode } from "react";
 import type { DetailPage } from "@twitch-tracker/shared";
 import { formatCount } from "./format";
 import { EmptyState } from "./ui";
+import { RetryButton } from "./retry-button";
 
 export function DetailUnavailable({ privateData = false }: { privateData?: boolean }) {
-  return <EmptyState title="Details unavailable" description={privateData ? "These records require private access. Check your account or try again later." : "These records could not be loaded. Please try again later."} />;
+  return <EmptyState title="Details unavailable" description={privateData ? "These records require private access. Check your account or try again later." : "These records could not be loaded. Please try again later."} action={<RetryButton />} />;
 }
 
 export function DetailPagination({ page, hasMore, pathname, filters = {} }: { page: number; hasMore: boolean; pathname: string; filters?: Record<string, string> }) {

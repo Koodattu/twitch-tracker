@@ -1,15 +1,18 @@
 import type { LiveStreamSummary, RecentStreamSummary } from "@twitch-tracker/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getApiData, getPublicApiInit } from "./api-client";
+import { getApiData, getDetailPageNumber, getPublicApiInit } from "./api-client";
 import { formatCount, formatDateTime, formatDuration, formatRelativeTime, getSizedThumbnailUrl } from "./format";
 import { Avatar, EmptyState, MetricCard, StatusPill } from "./ui";
 import { StreamThumbnail } from "./stream-thumbnail";
+import { RetryButton } from "./retry-button";
 
 export const metadata: Metadata = { title: "Live streams" };
 
-export default async function HomePage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
+export default async function HomePage({ searchParams }: { searchParams: Promise<{ page?: string | string[]; q?: string | string[] }> }) {
   const search = await searchParams;
+  const query = typeof search.q === "string" ? search.q.trim().slice(0, 100) : "";
+  const normalizedQuery = query.toLowerCase();
   const apiInit = await getPublicApiInit();
   const [streamResponse, recentResponse] = await Promise.all([
     getApiData<LiveStreamSummary[]>("/api/streams/live", apiInit),
@@ -18,12 +21,16 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const streams = streamResponse ?? [];
   const recentStreams = recentResponse ?? [];
   const streamsAvailable = streamResponse != null;
-  const featuredStreams = streams.slice(0, 4);
+  const featuredStreams = query === "" ? streams.slice(0, 4) : [];
+  const matchingStreams = streams.map((stream, index) => ({ stream, rank: index + 1 })).filter(({ stream }) =>
+    query === "" || [stream.broadcasterDisplayName, stream.broadcasterLogin, stream.title, stream.categoryName]
+      .some((value) => value?.toLowerCase().includes(normalizedQuery)));
   const pageSize = 100;
-  const totalPages = Math.max(1, Math.ceil(streams.length / pageSize));
-  const page = Math.min(totalPages, Math.max(1, Number.parseInt(search.page ?? "1", 10) || 1));
+  const totalPages = Math.max(1, Math.ceil(matchingStreams.length / pageSize));
+  const page = Math.min(totalPages, getDetailPageNumber(typeof search.page === "string" ? search.page : undefined));
   const pageOffset = (page - 1) * pageSize;
-  const rankedStreams = streams.slice(pageOffset, pageOffset + pageSize);
+  const rankedStreams = matchingStreams.slice(pageOffset, pageOffset + pageSize);
+  const pageHref = (target: number) => `/?${new URLSearchParams({ ...(query === "" ? {} : { q: query }), page: String(target) })}#live-ranking`;
   const totalViewers = streams.reduce((sum, stream) => sum + (stream.viewerCount ?? 0), 0);
   const trackedStreams = streams.filter((stream) => stream.isChatTracked).length;
   const latestObservation = streams
@@ -45,6 +52,15 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           <StatusPill tone={!streamsAvailable ? "danger" : streams.length > 0 ? "success" : "neutral"}>{!streamsAvailable ? "Unavailable" : streams.length > 0 ? "Live data" : "Waiting for data"}</StatusPill>
         </div>
       </section>
+
+      <form className="live-search" role="search" action="/#live-ranking" method="get">
+        <label htmlFor="live-search">Search live streams</label>
+        <div className="live-search-controls">
+          <input className="search-input" id="live-search" type="search" name="q" defaultValue={query} key={query} maxLength={100} placeholder="Channel, stream title or category" />
+          <button className="button" type="submit">Search</button>
+          {query === "" ? null : <Link className="button button-secondary" href="/#live-ranking" prefetch={false}>Clear search</Link>}
+        </div>
+      </form>
 
       {streamsAvailable ? (
         <section className="stat-row" aria-label="Live stream summary">
@@ -74,16 +90,18 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       <section className="panel" id="live-ranking">
         <div className="panel-header">
           <div className="panel-heading">
-            <h2>Full live ranking</h2>
-            <p>Viewer counts are periodic snapshots, not real-time telemetry.</p>
+            <h2>{query === "" ? "Full live ranking" : "Search results"}</h2>
+            <p>{query === "" ? "Viewer counts are periodic snapshots, not real-time telemetry." : `Matches for “${query}” · Ranks stay relative to all live streams.`}</p>
           </div>
-          <StatusPill tone={streamsAvailable ? "accent" : "danger"}>{streamsAvailable ? `${streams.length} live` : "Unavailable"}</StatusPill>
+          <StatusPill tone={streamsAvailable ? "accent" : "danger"}>{streamsAvailable ? query === "" ? `${streams.length} live` : `${matchingStreams.length} of ${streams.length} live` : "Unavailable"}</StatusPill>
         </div>
 
         {streamResponse == null ? (
-          <EmptyState title="Live data is unavailable" description="The analytics service could not be reached. Try again shortly." />
+          <EmptyState title="Live data is unavailable" description="The analytics service could not be reached. Try loading it again." action={<RetryButton />} />
         ) : streams.length === 0 ? (
           <EmptyState title="No live streams captured" description="No live Finnish stream has been discovered yet." />
+        ) : rankedStreams.length === 0 ? (
+          <EmptyState title="No matching live streams" description="Try another channel, stream title or category, or clear your search to see all live streams." action={<Link className="button button-secondary" href="/#live-ranking" prefetch={false}>Clear search</Link>} />
         ) : (
           <div className="table-scroll" role="region" aria-label="Live Finnish stream ranking" tabIndex={0}>
             <table className="table live-ranking-table">
@@ -99,11 +117,11 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                 </tr>
               </thead>
               <tbody>
-                {rankedStreams.map((stream, index) => {
+                {rankedStreams.map(({ stream, rank }) => {
                   const identity = stream.broadcasterDisplayName ?? stream.broadcasterLogin ?? stream.broadcasterId;
                   return (
                     <tr key={stream.streamId}>
-                      <td className="rank-cell">{pageOffset + index + 1}</td>
+                      <td className="rank-cell">{rank}</td>
                       <td>
                         <div className="channel-cell">
                           <Avatar name={identity} src={stream.broadcasterProfileImageUrl} size="small" />
@@ -136,10 +154,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         )}
         {totalPages > 1 ? (
           <nav className="pagination" aria-label="Live ranking pages">
-            <span>Page {page} of {totalPages} · {formatCount(streams.length)} live streams</span>
+            <span>Page {page} of {totalPages} · {formatCount(matchingStreams.length)} {query === "" ? "live streams" : "matches"}</span>
             <div className="pagination-actions">
-              {page > 1 ? <Link className="button button-secondary button-compact" href={`/?page=${page - 1}#live-ranking`}>Previous</Link> : null}
-              {page < totalPages ? <Link className="button button-secondary button-compact" href={`/?page=${page + 1}#live-ranking`}>Next</Link> : null}
+              {page > 1 ? <Link className="button button-secondary button-compact" href={pageHref(page - 1)} prefetch={false}>Previous</Link> : null}
+              {page < totalPages ? <Link className="button button-secondary button-compact" href={pageHref(page + 1)} prefetch={false}>Next</Link> : null}
             </div>
           </nav>
         ) : null}
@@ -154,7 +172,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           <StatusPill tone={recentResponse == null ? "danger" : "neutral"}>{recentResponse == null ? "Unavailable" : `${recentStreams.length} sessions`}</StatusPill>
         </div>
         {recentResponse == null ? (
-          <EmptyState title="Recent sessions are unavailable" description="Historical stream sessions could not be loaded right now." />
+          <EmptyState title="Recent sessions are unavailable" description="Historical stream sessions could not be loaded right now." action={<RetryButton />} />
         ) : recentStreams.length === 0 ? (
           <EmptyState title="No ended sessions yet" description="Completed stream sessions will appear here once they have been observed." />
         ) : (

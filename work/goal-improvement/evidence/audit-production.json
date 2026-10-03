@@ -1,0 +1,62 @@
+{
+  "advisories": {
+    "1240609": {
+      "findings": [
+        {
+          "version": "16.3.3",
+          "paths": [
+            "apps__web>next"
+          ],
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "id": 1240609,
+      "title": "Next.js: Remote Code Execution in next/og ImageResponse",
+      "module_name": "next",
+      "vulnerable_versions": ">=16.2.0 <16.3.6",
+      "patched_versions": ">=16.3.6",
+      "severity": "critical",
+      "cwe": "CWE-1395",
+      "github_advisory_id": "GHSA-vcvr-r3jv-pc5j",
+      "url": "https://github.com/advisories/GHSA-vcvr-r3jv-pc5j"
+    },
+    "1240640": {
+      "findings": [
+        {
+          "version": "4.13.5",
+          "paths": [
+            "apps__api>@hono/node-server>hono",
+            "apps__api>hono"
+          ],
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "id": 1240640,
+      "title": "hono/jsx renders plain strings unescaped in boundary components, leading to XSS",
+      "module_name": "hono",
+      "vulnerable_versions": "<4.13.7",
+      "patched_versions": ">=4.13.7",
+      "severity": "moderate",
+      "cwe": "CWE-79",
+      "github_advisory_id": "GHSA-hxh3-vqpv-xpqv",
+      "url": "https://github.com/advisories/GHSA-hxh3-vqpv-xpqv"
+    }
+  },
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 1,
+      "high": 0,
+      "critical": 1
+    },
+    "dependencies": 42,
+    "devDependencies": 0,
+    "optionalDependencies": 123,
+    "totalDependencies": 165
+  }
+}

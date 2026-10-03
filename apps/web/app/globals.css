@@ -35,7 +35,7 @@ body:has(.community-stage) .topbar { flex: 0 0 auto; }
 .community-explorer::before { content: ""; position: absolute; inset: 0; pointer-events: none; background-image: radial-gradient(#8982a11a 0.7px, transparent 0.7px); background-size: 28px 28px; }
 .community-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; outline: none; user-select: none; -webkit-user-select: none; }
 .community-canvas:active { cursor: grabbing; }
-.community-canvas:focus-visible { outline: none; }
+.community-canvas:focus-visible { outline: 3px solid var(--accent-bright); outline-offset: -3px; }
 .community-node { cursor: pointer; outline: none; }
 .community-node-dot { r: min(var(--community-node-radius), calc(var(--community-unit) * 18)); stroke-width: calc(var(--community-unit) * 1.5); }
 .community-node-hit, .community-node-halo { r: calc(min(var(--community-node-radius), var(--community-unit) * 18) + min(4px, var(--community-unit) * 4)); }
@@ -1299,6 +1299,16 @@ li,
   box-shadow: var(--shadow-panel);
 }
 
+.live-search { display: grid; gap: 8px; margin-bottom: 24px; }
+.live-search > label { color: var(--muted-strong); font-size: 14px; font-weight: 600; }
+.live-search-controls { display: flex; flex-wrap: wrap; gap: 10px; }
+.live-search-controls .search-input { flex: 1 1 280px; min-width: 0; }
+.live-search-controls .button { min-height: 44px; }
+@media (max-width: 430px) {
+  .live-search-controls .search-input { flex-basis: 100%; font-size: 16px; }
+  .live-search-controls .button { flex: 1; }
+}
+
 .search-input {
   width: 100%;
   min-height: 44px;
@@ -1564,7 +1574,8 @@ li,
 
   .page-heading-row,
   .profile-card,
-  .callout {
+  .callout,
+  .empty-state {
     align-items: flex-start;
     flex-direction: column;
   }
@@ -1632,6 +1643,11 @@ li,
 }
 
 @media (max-width: 430px) {
+  .topbar-inner { grid-template-columns: minmax(0, 1fr) auto; }
+  .topbar-inner .brand { grid-column: 1; grid-row: 1; }
+  .topbar-inner .account-area { grid-column: 2; grid-row: 1; }
+  .topbar-inner .nav { grid-column: 1 / -1; grid-row: 2; }
+
   .stat-row {
     grid-template-columns: 1fr;
   }

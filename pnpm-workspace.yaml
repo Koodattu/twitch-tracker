@@ -17,3 +17,4 @@ minimumReleaseAgeExclude:
 
 overrides:
   "@esbuild-kit/core-utils>esbuild": 0.25.0
+  "brace-expansion@5.0.9": 5.0.12

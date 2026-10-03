@@ -10,8 +10,16 @@ Use Node 24.19 and the pinned pnpm version:
 corepack enable
 corepack prepare pnpm@11.21.0 --activate
 pnpm install --frozen-lockfile
+```
+
+Use `.env.example` as a configuration reference and export the values needed by each process before starting it. The API, worker, and migration scripts read process environment variables; copying this file alone does not load them. Point `DATABASE_URL` at a designated local development database. Twitch ingestion and EventSub are disabled by default. Then migrate and start:
+
+```powershell
+pnpm --filter @twitch-tracker/db db:migrate
 pnpm dev
 ```
+
+For a self-contained walkthrough using a disposable database and synthetic data, see [the local QA setup](work/goal-improvement/README.md). It includes browser regression commands and review evidence.
 
 Run the repository checks with:
 
@@ -22,8 +30,6 @@ pnpm test
 pnpm typecheck
 pnpm build
 ```
-
-Copy `.env.example` to `.env` for local development. Twitch ingestion and EventSub are disabled by default so local startup does not make live Twitch calls unexpectedly.
 
 ## Production
 
