@@ -1,5 +1,5 @@
 import { channelDailyStats, streamActivityBuckets, streamSessions, streamSnapshots, type DbClient } from "@twitch-tracker/db";
-import { and, asc, desc, eq, gte, isNull, lt, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 import { detailPage, detailPageNumberSchema, detailPageSize, viewerObservationFields } from "./detail-records.js";
 import { summarizeChannelPeriod } from "./channel-period.js";
@@ -22,6 +22,7 @@ export async function getChannelOverview(db: DbClient, broadcasterId: string, ma
   const toDay = now.toISOString().slice(0, 10);
   const fromDay = new Date(Date.parse(toDay) - 29 * 86_400_000).toISOString().slice(0, 10);
   const from = new Date(fromDay);
+  const sampleStart = new Date(from.getTime() - maxGapSeconds * 1000);
   const [daily, recentSessions, liveSessions, periodSessions, samples] = await Promise.all([
     db.select(dailyFields).from(channelDailyStats)
       .where(and(eq(channelDailyStats.broadcasterUserId, broadcasterId), gte(channelDailyStats.day, fromDay), lte(channelDailyStats.day, toDay)))
@@ -33,14 +34,32 @@ export async function getChannelOverview(db: DbClient, broadcasterId: string, ma
     db.select(sessionFields).from(streamSessions).where(and(eq(streamSessions.broadcasterUserId, broadcasterId),
       lt(streamSessions.startedAt, now), gte(sql`coalesce(${streamSessions.endedAt}, ${streamSessions.lastSeenLiveAt})`, from))),
     db.select({ twitchStreamId: streamSnapshots.twitchStreamId, observedAt: streamSnapshots.observedAt,
-      viewerCount: streamSnapshots.viewerCount, categoryId: streamSnapshots.categoryId, categoryName: streamSnapshots.categoryName })
+      viewerCount: streamSnapshots.viewerCount, title: streamSnapshots.title,
+      categoryId: streamSnapshots.categoryId, categoryName: streamSnapshots.categoryName })
       .from(streamSnapshots).where(and(eq(streamSnapshots.broadcasterUserId, broadcasterId),
-        gte(streamSnapshots.observedAt, new Date(from.getTime() - maxGapSeconds * 1000)), lt(streamSnapshots.observedAt, now)))
+        gte(streamSnapshots.observedAt, sampleStart), lt(streamSnapshots.observedAt, now)))
       .orderBy(asc(streamSnapshots.twitchStreamId), asc(streamSnapshots.observedAt), asc(streamSnapshots.id))
   ]);
+  // Metadata is stored only on change. Seed each overlapping session once so a
+  // category set before the chart window still applies to its sparse samples.
+  const categorySeeds = periodSessions.length === 0 ? [] : await db.selectDistinctOn([streamSnapshots.twitchStreamId], {
+    twitchStreamId: streamSnapshots.twitchStreamId,
+    categoryId: streamSnapshots.categoryId, categoryName: streamSnapshots.categoryName
+  }).from(streamSnapshots).where(and(
+    inArray(streamSnapshots.twitchStreamId, periodSessions.map((session) => session.twitchStreamId)),
+    lt(streamSnapshots.observedAt, sampleStart), isNotNull(streamSnapshots.title)
+  )).orderBy(streamSnapshots.twitchStreamId, desc(streamSnapshots.observedAt), desc(streamSnapshots.id));
+  const categories = new Map(categorySeeds.map((seed) => [seed.twitchStreamId, seed]));
+  const resolvedSamples = samples.map((sample) => {
+    // A title marks a full observation, including an explicit category removal.
+    // Category-only legacy rows also remain usable without changing their meaning.
+    if (sample.title != null || sample.categoryId != null || sample.categoryName != null) categories.set(sample.twitchStreamId, sample);
+    const category = categories.get(sample.twitchStreamId);
+    return { ...sample, categoryId: category?.categoryId ?? null, categoryName: category?.categoryName ?? null };
+  });
   return {
     fromDay, toDay, recentSessions, liveSession: liveSessions[0] ?? null,
-    ...summarizeChannelPeriod({ from, to: now, maxGapSeconds, sessions: periodSessions, samples, messages: daily })
+    ...summarizeChannelPeriod({ from, to: now, maxGapSeconds, sessions: periodSessions, samples: resolvedSamples, messages: daily })
   };
 }
 

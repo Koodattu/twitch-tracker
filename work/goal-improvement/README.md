@@ -1,0 +1,119 @@
+# Isolated local QA
+
+These fixtures use only PostgreSQL at `127.0.0.1:55432` and the two databases named below. They do not read `.env`. Seeding truncates the dedicated UI database; never repoint these scripts at another database. The API harness disables Twitch ingestion and EventSub and uses a synthetic session secret. The worker is not started.
+
+The implementation, verification, and subsequently authorized release are recorded in [STATE.md](STATE.md). Review the release diff including `apps/web/app/retry-button.tsx` and this directory. The release includes security patch dependency updates; no new database migrations or production configuration changes are needed.
+
+## Runtime
+
+Use the repository's Node 24.19 and pnpm 11.21.0 with installed locked dependencies. Commands below run in PowerShell from the repository root unless specified otherwise. On the machine used for this run, select the bundled compatible runtime in each terminal:
+
+```powershell
+$env:PATH = "$env:USERPROFILE\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin;" + $env:PATH
+node --version
+```
+
+The machine's default Node 24.4.1 is unsupported. Its Corepack executable can still select that older runtime despite PATH ordering. In the commands below, substitute this invocation for `pnpm` on that machine:
+
+```powershell
+node 'C:\Program Files\nodejs\node_modules\corepack\dist\pnpm.js' --version
+```
+
+## Disposable PostgreSQL
+
+Create a new task-owned container. An existing container with the same name must be inspected before reuse or removal. This command uses a tmpfs database with no persistent volume:
+
+```powershell
+docker run --detach --name twitch-tracker-goal-test --label purpose=twitch-tracker-goal-improvement --cpus 2 --memory 1g --publish 127.0.0.1:55432:5432 --tmpfs /var/lib/postgresql/data:rw,size=768m --env POSTGRES_USER=goal_test --env POSTGRES_PASSWORD=goal_test_local_only --env POSTGRES_DB=twitch_tracker_goal_test postgres:16.14-alpine3.24@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+docker exec twitch-tracker-goal-test pg_isready -U goal_test -d twitch_tracker_goal_test
+```
+
+Wait for `accepting connections`, then migrate both databases and seed UI data:
+
+```powershell
+$env:DATABASE_URL = 'postgres://goal_test:goal_test_local_only@127.0.0.1:55432/twitch_tracker_goal_test'
+pnpm --filter @twitch-tracker/db db:migrate
+node work/goal-improvement/fixture.mjs create
+$env:DATABASE_URL = 'postgres://goal_test:goal_test_local_only@127.0.0.1:55432/twitch_tracker_goal_ui_test'
+pnpm --filter @twitch-tracker/db db:migrate
+node work/goal-improvement/fixture.mjs seed
+```
+
+The fixture contains four synthetic channels, twelve sessions, 252 sparse viewer snapshots, 55 messages, and a small community map. Re-seeding resets only this UI database. Automated integration tests use the separate `twitch_tracker_goal_test` database because their cleanup truncates shared tables.
+
+## Run the UI
+
+Start the synthetic API from the repository root:
+
+```powershell
+node --conditions=development --import ./apps/api/node_modules/tsx/dist/loader.mjs work/goal-improvement/local-api.ts
+```
+
+In another terminal, set the compatible Node runtime and start the web app:
+
+```powershell
+$env:INTERNAL_API_URL = 'http://127.0.0.1:4400'
+$env:NEXT_PUBLIC_API_URL = 'http://127.0.0.1:4400'
+$env:NEXT_TELEMETRY_DISABLED = '1'
+Set-Location apps/web
+node node_modules/next/dist/bin/next dev --hostname 127.0.0.1 --port 3300
+```
+
+Open <http://127.0.0.1:3300>. Search for `LumiStudio`, open `AuroraPelaa`, inspect the Messages chart and stream chat, then search/select a channel in Communities. All identities and chat records are synthetic. Signed-out account guidance is available at `/me`; real OAuth is intentionally outside this fixture.
+
+## Verification
+
+In a root terminal with Node 24.19 selected:
+
+```powershell
+$env:TEST_DATABASE_URL = 'postgres://goal_test:goal_test_local_only@127.0.0.1:55432/twitch_tracker_goal_test'
+pnpm check:structure
+pnpm lint
+node node_modules/vitest/vitest.mjs run
+pnpm -r typecheck
+pnpm -r build
+```
+
+Stop the web dev server before building. The `-r` forms avoid the root scripts' nested Corepack selection on this Windows machine.
+
+Browser scripts use the already-installed bundled Playwright module and Chromium. On another machine, set `PLAYWRIGHT_MODULE` to its installed Playwright module path. No dependency was added. Run these sequentially while the synthetic API and web server are running:
+
+```powershell
+node work/goal-improvement/browser-journeys.mjs
+node work/goal-improvement/browser-extended.mjs
+node work/goal-improvement/browser-edge-states.mjs after
+```
+
+The extended and edge scripts temporarily modify synthetic rows and restore them in `finally`. Extended QA uses `.temp/goal-api-failure` to inject a 503 at the local HTTP boundary and removes the flag afterward. If interrupted forcibly, remove that task-owned flag and re-seed the UI database. These scripts are local evidence tools, not an installed CI browser suite.
+
+Checks cover search/back/clear at 1440, 390, and 320 pixels; 101 filtered streams across pages with preserved original ranks; title/category search; retry with retained input; channel chart/history/data; chat filtering/pagination; invalid and repeated query values; community selection, keyboard interaction, no connections, and no data. Synthetic external imagery is replaced with placeholders in the main journey scripts. This is Chromium viewport testing, not physical-device or cross-browser verification.
+
+The production build passed. The generated standalone server failed locally with `EPERM` resolving a React dependency link on Windows, both inside and outside the sandbox. Built-app browser checks therefore used `next start` with the same API environment and port; Next warns that this is not the intended standalone deployment entry point. Linux container execution and production deployment remain unverified by this goal.
+
+## Evidence and measurements
+
+- `evidence/baseline-browser.json` and `before-*.png`: six baseline journeys at desktop/mobile widths.
+- `evidence/browser-journeys.json`, `browser-extended.json`, and `after-*.png`: interactions and recovery after changes.
+- `evidence/before-edge-states.json`, `after-edge-states.json`, and `built-edge-states.json`: reproduced and fixed chat/map boundary cases.
+- `evidence/channel-before.json` and `channel-after.json`: one cold request followed by 15 warm requests against 29 six-hour sessions and 3,509 snapshots.
+- `evidence/audit-production.json` and `audit-all.json`: original audits with 2 production / 9 total findings. Release patch updates reduce this to zero production findings and one development-only advisory without a published fix; see `audit-release-production.json`, `audit-release-all.json`, and `STATE.md`.
+
+The category fixture's classified airtime increased from 10,440 to the correct 626,400 seconds. Warm median HTTP time increased from 16.52 to 26.73 ms because correctness requires a metadata seed query. Response size changed from 5,169 to 5,174 bytes. This is a local correctness tradeoff, not a production speedup or storage saving. No index, cache, or storage policy was changed.
+
+`measure-channel.mjs before` seeds that bounded workload and records the currently running API; `after` reuses it. The saved evidence was captured before and after the implementation. To reproduce a comparison, run the respective code revisions with fresh fixtures and preserve each result separately; running both labels against current code does not recreate the historical baseline. Baseline capture scripts overwrite their own evidence names.
+
+## Cleanup
+
+Stop only the two terminal servers with Ctrl+C. Verify the disposable container's label before removing it:
+
+```powershell
+docker inspect --format '{{ index .Config.Labels "purpose" }}' twitch-tracker-goal-test
+```
+
+After confirming `twitch-tracker-goal-improvement`, remove only that container:
+
+```powershell
+docker rm --force twitch-tracker-goal-test
+```
+
+Its tmpfs databases disappear with it. Do not prune containers or volumes. Next dev may generate `apps/web/AGENTS.md` and `CLAUDE.md`; they were absent at this goal's start and are not application changes.

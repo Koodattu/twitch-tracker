@@ -1,0 +1,43 @@
+{
+  "label": "before",
+  "node": "v24.19.0",
+  "workload": "29 six-hour sessions, 3509 snapshots, category switch halfway; PostgreSQL 16.14, localhost; first request then 15 warm runs",
+  "firstMs": 59.53,
+  "warmMedianMs": 16.52,
+  "warmMinMs": 13.05,
+  "warmMaxMs": 36.6,
+  "bytes": 5169,
+  "categorySeconds": 10440,
+  "topCategories": [
+    {
+      "id": "chat",
+      "name": "Just Chatting",
+      "liveSeconds": 5220,
+      "viewerCountAvg": 160
+    },
+    {
+      "id": "game",
+      "name": "Game",
+      "liveSeconds": 5220,
+      "viewerCountAvg": 100
+    }
+  ],
+  "elapsedMs": [
+    59.53,
+    18.47,
+    23.77,
+    25.32,
+    36.6,
+    24.76,
+    28.16,
+    15.06,
+    15.24,
+    16.52,
+    14.03,
+    15.63,
+    13.05,
+    17.95,
+    16.49,
+    14.88
+  ]
+}

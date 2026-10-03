@@ -1,0 +1,35 @@
+[
+  {
+    "width": 1440,
+    "journeys": [
+      "search with keyboard",
+      "case-insensitive channel match",
+      "global ranking preserved",
+      "channel navigation and browser back preserve query",
+      "no matches and clear"
+    ],
+    "errors": []
+  },
+  {
+    "width": 390,
+    "journeys": [
+      "search with keyboard",
+      "case-insensitive channel match",
+      "global ranking preserved",
+      "channel navigation and browser back preserve query",
+      "no matches and clear"
+    ],
+    "errors": []
+  },
+  {
+    "width": 320,
+    "journeys": [
+      "search with keyboard",
+      "case-insensitive channel match",
+      "global ranking preserved",
+      "channel navigation and browser back preserve query",
+      "no matches and clear"
+    ],
+    "errors": []
+  }
+]

@@ -91,7 +91,8 @@ export function CommunityExplorer({ map }: { map: CommunityMap }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [page, setPage] = useState(0);
-  const [hideUnconnected, setHideUnconnected] = useState(true);
+  const hasConnectedChannels = map.graph.nodes.some((node) => node.community != null);
+  const [hideUnconnected, setHideUnconnected] = useState(hasConnectedChannels);
   const connectedView = useMemo(() => fitCommunityView(map.graph.nodes.filter((node) => node.community != null)), [map]);
   const allView = useMemo(() => fitCommunityView(map.graph.nodes), [map]);
   const homeView = hideUnconnected ? connectedView : allView;
@@ -142,7 +143,7 @@ export function CommunityExplorer({ map }: { map: CommunityMap }) {
     const center = { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 };
     return transformCamera(current, bounds, center, center, factor, homeView.size * 2);
   });
-  const reset = () => { setView(connectedView); setSelected(null); setHovered(null); setQuery(""); setGroup("all"); setHideUnconnected(true); setSearchOpen(false); setPage(0); };
+  const reset = () => { setView(hasConnectedChannels ? connectedView : allView); setSelected(null); setHovered(null); setQuery(""); setGroup("all"); setHideUnconnected(hasConnectedChannels); setSearchOpen(false); setPage(0); };
   useEffect(() => {
     const element = svg.current;
     if (element == null) return;
