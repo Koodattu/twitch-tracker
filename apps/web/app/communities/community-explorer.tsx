@@ -125,12 +125,20 @@ export function CommunityExplorer({ map, canLookupChatter = false }: { map: Comm
   const hasConnectedChannels = map.graph.nodes.some((node) => node.community != null);
   const [hideUnconnected, setHideUnconnected] = useState(hasConnectedChannels);
   const sparseCount = [...degrees.values()].filter(degree => degree > 0 && degree < 3).length;
+  const connections = useMemo(() => selected == null ? [] : map.graph.edges.filter((edge) => edge.source === selected || edge.target === selected)
+    .map((edge) => ({ ...edge, node: byId.get(edge.source === selected ? edge.target : edge.source)! })), [map, selected, byId]);
+  const matches = useMemo(() => map.graph.nodes.filter((node) =>
+    (group === "all" || (node.community ?? "ungrouped") === group) &&
+    `${name(node)} ${node.login ?? ""}`.toLowerCase().includes(query.trim().toLowerCase()))
+    .sort((a, b) => participants(b) - participants(a) || name(a).localeCompare(name(b))), [map, group, query]);
   const visibleMap = useMemo(() => {
-    const nodes = map.graph.nodes.filter(node => node.id === selected || highlighted?.has(node.id)
+    const revealed = new Set([selected, ...highlighted ?? [], ...connections.map(connection => connection.node.id)]);
+    if (group !== "all" || query.trim() !== "") for (const node of matches) revealed.add(node.id);
+    const nodes = map.graph.nodes.filter(node => revealed.has(node.id)
       || ((!hideUnconnected || (degrees.get(node.id) ?? 0) > 0) && (!hideSparse || (degrees.get(node.id) ?? 0) === 0 || (degrees.get(node.id) ?? 0) >= 3)));
     const visible = new Set(nodes.map(node => node.id));
     return { ...map, graph: { nodes, edges: map.graph.edges.filter(edge => visible.has(edge.source) && visible.has(edge.target)) } };
-  }, [map, selected, highlighted, hideUnconnected, hideSparse, degrees]);
+  }, [map, selected, highlighted, connections, group, query, matches, hideUnconnected, hideSparse, degrees]);
   const connectedView = useMemo(() => fitCommunityView(map.graph.nodes.filter((node) => node.community != null)), [map]);
   const allView = useMemo(() => fitCommunityView(map.graph.nodes), [map]);
   const homeView = hideUnconnected ? connectedView : allView;
@@ -163,12 +171,6 @@ export function CommunityExplorer({ map, canLookupChatter = false }: { map: Comm
     const area = communityArea(community.nodes);
     return area == null ? [] : [{ ...area, id: community.id, title: categorySummaries.get(community.id)?.title ?? "Category unknown" }];
   }) : [], [showAreas, communities, categorySummaries, group]);
-  const connections = useMemo(() => selected == null ? [] : map.graph.edges.filter((edge) => edge.source === selected || edge.target === selected)
-    .map((edge) => ({ ...edge, node: byId.get(edge.source === selected ? edge.target : edge.source)! })), [map, selected, byId]);
-  const matches = useMemo(() => map.graph.nodes.filter((node) =>
-    (group === "all" || (node.community ?? "ungrouped") === group) &&
-    `${name(node)} ${node.login ?? ""}`.toLowerCase().includes(query.trim().toLowerCase()))
-    .sort((a, b) => participants(b) - participants(a) || name(a).localeCompare(name(b))), [map, group, query]);
   const select = useCallback((node: MapNode, locate = false) => {
     setCamera((current) => {
       const currentView = current?.selected === selected ? current.view : initialView;
@@ -295,7 +297,7 @@ export function CommunityExplorer({ map, canLookupChatter = false }: { map: Comm
           <label><input type="checkbox" checked={showAreas} onChange={event => setShowAreas(event.target.checked)} />Show community category areas</label>
           <p>Circles mark the central area of each community. Labels describe recorded streaming categories, not why people watch.</p>
           {sparseCount > 0 && <label><input type="checkbox" checked={hideSparse} onChange={event => setHideSparse(event.target.checked)} />Hide sparse channels ({formatCount(sparseCount)})</label>}
-          {sparseCount > 0 && <p>Sparse means one or two connections on this map. These channels still belong to communities; search can reveal them.</p>}
+          {sparseCount > 0 && <p>Sparse means one or two connections on this map. These channels still belong to communities. Searches, chosen communities and connections to the selected channel stay visible.</p>}
         {unconnectedCount > 0 && <label><input type="checkbox" checked={hideUnconnected}
           onChange={(event) => { setHideUnconnected(event.target.checked); setView(event.target.checked ? connectedView : allView); if (event.target.checked && selectedNode?.community == null) setSelected(null); }} />
           Hide unconnected channels ({formatCount(unconnectedCount)})</label>}
@@ -310,14 +312,13 @@ export function CommunityExplorer({ map, canLookupChatter = false }: { map: Comm
           <label htmlFor="community-filter">Community</label>
           <select id="community-filter" className="community-input" value={group} onChange={(event) => {
             const next = event.target.value; setGroup(next); setPage(0); setSelected(null);
-            if (next === "ungrouped") setHideUnconnected(false);
             const nodes = map.graph.nodes.filter((node) => (node.community ?? "ungrouped") === next);
-            if (next === "all") setView(homeView);
+            if (next === "all") setCamera({ selected: null, view: homeView });
             else if (nodes.length > 0) {
               const xs = nodes.map((node) => node.x), ys = nodes.map((node) => node.y);
               const left = Math.min(...xs), right = Math.max(...xs), top = Math.min(...ys), bottom = Math.max(...ys);
               const size = Math.max(300, Math.max(right - left, bottom - top) * 1.4);
-              setView({ x: (left + right - size) / 2, y: (top + bottom - size) / 2, size });
+              setCamera({ selected: null, view: { x: (left + right - size) / 2, y: (top + bottom - size) / 2, size } });
             }
           }}><option value="all">All communities</option>
             {communities.map((item) => <option key={item.id} value={item.id}>{labels.get(item.id)} ({item.nodes.length}){categorySummaries.get(item.id) == null ? "" : ` · ${categorySummaries.get(item.id)!.title}`}</option>)}

@@ -1,0 +1,33 @@
+{
+  "initial": {
+    "labels": [
+      "SmallPair0",
+      "SmallPair1"
+    ],
+    "members": [
+      "pair-0",
+      "pair-1"
+    ],
+    "selectedGroup": "small-pair",
+    "view": "800 650 300 300"
+  },
+  "selected": {
+    "connections": 1,
+    "heading": "SmallPair0",
+    "members": 2
+  },
+  "fromSelection": {
+    "labels": [
+      "SmallPair0",
+      "SmallPair1"
+    ],
+    "members": [
+      "pair-0",
+      "pair-1"
+    ],
+    "selectedGroup": "small-pair",
+    "view": "800 650 300 300"
+  },
+  "searchAndReset": true,
+  "unconnectedAndReset": true
+}

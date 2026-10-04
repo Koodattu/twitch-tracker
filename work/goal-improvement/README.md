@@ -4,6 +4,12 @@ These fixtures use only PostgreSQL at `127.0.0.1:55432` and the two databases na
 
 The implementation, verification, and release history are recorded in [STATE.md](STATE.md). Round 4 adds historical channel analysis and reusable day inspection to the preceding reliability and discovery releases. The earlier release also replaced a vulnerable development-only ESLint dependency with an already-used package and a tested compatibility patch. No new runtime dependency, database migration or production configuration change is required.
 
+## Community controls and visibility
+
+After migrating the dedicated UI database below, run `node work/goal-improvement/community-controls-fixture.mjs`. This replaces only that disposable database with 98 synthetic map channels, including dense clusters, sparse members, six isolates and a two-channel community. Start the API and web app as below and open `/communities`.
+
+The browser regression helper `community-visibility-check.mjs` exports `checkVisibilityJourney(page)`. In the initialized CUA runtime, import it using the absolute local file URL and pass the tab's documented `playwright` interface. It runs against the rendered application: both small-community channels and their connection remain visible with overview filters enabled; selecting a channel then choosing the group focuses correctly; search/clear and unconnected/all restore defaults. Run at desktop and 320px widths. The helper was executed through CUA, not a separate browser driver. Evidence and broader journey coverage are in `evidence/final-discovery-20261004/` and the top of [STATE.md](STATE.md).
+
 ## Channel analytical workflow (round 4)
 
 Open any channel from `/channels`. Choose 7, 30 or 90 days, step to earlier

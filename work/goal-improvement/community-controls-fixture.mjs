@@ -36,6 +36,12 @@ try {
     users.push([id, `quietchannel${i}`, `QuietChannel${i}`]);
     if (!isolated) edges.push({ source: id, target: `qa-${i % 3}-0`, shared: 5, score: 0.2 });
   }
+  for (let i = 0; i < 2; i++) {
+    const id = `pair-${i}`;
+    nodes.push({ id, chatters: 10, participants: 12, community: "small-pair", x: 900 + i * 100, y: 800 });
+    users.push([id, `smallpair${i}`, `SmallPair${i}`]);
+  }
+  edges.push({ source: "pair-0", target: "pair-1", shared: 6, score: 0.5 });
   for (const user of [...users, ["qa-admin", "mapadmin", "MapAdmin"], ["qa-chatter", "testichat", "TestiChat"], ["qa-empty", "quietviewer", "QuietViewer"]]) {
     await pool.query("insert into twitch_users(twitch_user_id,login,display_name) values($1,$2,$3)", user);
   }
@@ -54,5 +60,5 @@ try {
   const user = await pool.query("insert into app_users(twitch_user_id,is_admin) values('qa-admin',true) returning id");
   await pool.query("insert into sessions(session_id_hash,app_user_id,expires_at) values($1,$2,now()+interval '3 hours')", [hashSessionToken("synthetic-community-admin", secret), user.rows[0].id]);
   await pool.query("insert into oauth_accounts(app_user_id,provider,provider_user_id,encrypted_access_token,last_validated_at,expires_at) values($1,'twitch','qa-admin',$2,now(),now()+interval '3 hours')", [user.rows[0].id, encryptSecret("synthetic-not-a-twitch-token", secret)]);
-  console.log(JSON.stringify({ channels: nodes.length, edges: edges.length, sparse: 18, isolated: 6, chatter: "testichat", highlighted: ["qa-0-0", "qa-1-3", "sparse-2"] }));
+  console.log(JSON.stringify({ channels: nodes.length, edges: edges.length, sparse: 20, isolated: 6, chatter: "testichat", highlighted: ["qa-0-0", "qa-1-3", "sparse-2"] }));
 } finally { await pool.end(); }
