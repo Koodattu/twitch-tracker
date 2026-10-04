@@ -31,6 +31,16 @@ export function ChannelDetails({ node, connections, community, onSelect, onClose
     </div>
     <p className="community-detail-period">In this 30-day map</p>
     <dl className="community-detail-stats"><div><dt>People in chat</dt><dd>{formatCount(participants(node))}</dd></div><div><dt>Connected channels</dt><dd>{formatCount(connections.length)}</dd></div></dl>
+    {node.community != null && <section className="community-category-summary" aria-labelledby="community-category-title">
+      <h3 id="community-category-title"><span className="community-color" style={{ background: communityColor(node.community) }} />Community details · {community.length} channels</h3>
+      {categories == null ? <p>There is not enough recorded category information to describe this community.</p> : <>
+        <h4>{categories.title}</h4>
+        <ul>{categories.categories.map(category => <li key={category.id}><span>{category.name}</span><span>{category.channels} / {categories.known} channels</span></li>)}</ul>
+        {categories.mixed > 0 && <p>{categories.mixed} channels split their time across categories.</p>}
+        <p>Based on recorded streaming time. Category information covers {categories.known} of {categories.total} channels; each channel counts once.</p>
+      </>}
+      <p>Grouped by shared chat participation, not by game.</p>
+    </section>}
     <section className="community-connections" aria-labelledby="community-connections-title">
       <h3 id="community-connections-title">Connected channels</h3>
       {connections.length === 0 ? <p>No other channel meets the shared-people threshold for a connection. This does not mean the channel has no community.</p> : <>
@@ -39,7 +49,7 @@ export function ChannelDetails({ node, connections, community, onSelect, onClose
         </select></div>
         <div className="community-list-heading"><span>Channel</span><span>Shared people</span></div>
         <ul className="community-channel-list community-connection-list">{ordered.slice(0, limit).map(edge => <li key={edge.node.id}><button onClick={() => onSelect(edge.node)}>
-          <span className="community-color" style={{ background: communityColor(edge.node.community) }} /><span>{channelName(edge.node)}</span>
+          <span className="community-color" style={{ background: communityColor(edge.node.community) }} /><span className="community-connection-name" title={channelName(edge.node)}>{channelName(edge.node)}</span>
           <span className="community-overlap"><strong>{formatCount(edge.shared)}</strong><small>{edge.shared * 100 < participants(node) ? "<1" : Math.round(edge.shared / participants(node) * 100)}% of this chat</small></span>
         </button></li>)}</ul>
         {limit < ordered.length && <button className="community-text-button" onClick={() => setLimit(limit + 10)}>Show more connections ({ordered.length - limit} remaining)</button>}
@@ -48,15 +58,6 @@ export function ChannelDetails({ node, connections, community, onSelect, onClose
         </details>
       </>}
     </section>
-    {node.community != null && <details className="community-category-summary"><summary><span className="community-color" style={{ background: communityColor(node.community) }} />Community details · {community.length} channels</summary>
-      <p>Grouped by shared chat participation, not by game.</p>
-      {categories == null ? <p>There is not enough recorded category information to describe this community.</p> : <>
-        <h3>{categories.title}</h3>
-        <ul>{categories.categories.map(category => <li key={category.id}><span>{category.name}</span><span>{category.channels} / {categories.known} channels</span></li>)}</ul>
-        {categories.mixed > 0 && <p>{categories.mixed} channels split their time across categories.</p>}
-        <p>Based on recorded streaming time. Category information covers {categories.known} of {categories.total} channels; each channel counts once.</p>
-      </>}
-    </details>}
     <div className="community-share"><button className="community-text-button" onClick={copy}>Copy channel map link</button><p>Reopens this channel in the latest map. Chatter highlights are not shared.</p>
       {share != null && <div role="status">{share.copied ? "Map link copied." : <label>Copy this map link<input className="search-input" readOnly value={share.url} onFocus={event => event.currentTarget.select()} /></label>}</div>}
     </div>

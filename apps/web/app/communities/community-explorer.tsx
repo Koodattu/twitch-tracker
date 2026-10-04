@@ -29,44 +29,45 @@ function locateChannel(node: MapNode, size: number, bounds: { width: number; hei
   return transformCamera(view, { ...bounds, left: 0, top: 0 }, center, { ...center, y: bounds.height * 0.38 });
 }
 
-// Camera movement only changes the SVG viewBox, leaving the graph artwork intact.
-const MapArtwork = memo(function MapArtwork({ map, matches, selected, hovered, showConnections, highlighted, onHover, onSelect }: {
-  map: CommunityMap; matches: MapNode[]; selected: string | null; hovered: string | null;
-  showConnections: boolean; highlighted: Set<string> | null;
-  onHover: (id: string | null) => void; onSelect: (node: MapNode) => void;
+// Connections do not use screen-sized CSS properties and need no work on hover or zoom.
+const MapConnections = memo(function MapConnections({ map, selected, dimmed }: {
+  map: CommunityMap; selected: string | null; dimmed: Set<string>;
 }) {
   const byId = new Map(map.graph.nodes.map((node) => [node.id, node]));
-  const matching = new Set(matches.map((node) => node.id));
-  const neighbors = new Set(map.graph.edges.filter((edge) => edge.source === selected || edge.target === selected)
-    .flatMap((edge) => [edge.source, edge.target]));
-  const dimmed = (id: string) => !matching.has(id) || (highlighted != null ? !highlighted.has(id) && id !== selected
-    : selected != null && id !== selected && !neighbors.has(id));
+  return <g aria-hidden="true" data-community-connections>{map.graph.edges.map((edge) => {
+    const a = byId.get(edge.source)!, b = byId.get(edge.target)!;
+    const highlighted = selected != null && (edge.source === selected || edge.target === selected);
+    return <line key={`${edge.source}-${edge.target}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+      stroke={color(highlighted ? byId.get(selected!)!.community : a.community)}
+      strokeOpacity={highlighted ? 0.75 : dimmed.has(a.id) || dimmed.has(b.id) ? 0.025 : 0.16}
+      strokeWidth={highlighted ? 1.2 + edge.score * 1.5 : 0.35 + edge.score} />;
+  })}</g>;
+});
+
+const MapArtwork = memo(function MapArtwork({ map, selected, hovered, dimmed, highlighted, onHover, onSelect }: {
+  map: CommunityMap; selected: string | null; hovered: string | null; dimmed: Set<string>; highlighted: Set<string> | null;
+  onHover: (id: string | null) => void; onSelect: (node: MapNode) => void;
+}) {
   return <>
-    {showConnections && <g aria-hidden="true" data-community-connections>{map.graph.edges.map((edge) => {
-      const a = byId.get(edge.source)!, b = byId.get(edge.target)!;
-      const highlighted = selected != null && (edge.source === selected || edge.target === selected);
-      return <line key={`${edge.source}-${edge.target}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-        stroke={color(highlighted ? byId.get(selected!)!.community : a.community)}
-        strokeOpacity={highlighted ? 0.75 : dimmed(a.id) || dimmed(b.id) ? 0.025 : 0.16}
-        strokeWidth={highlighted ? 1.2 + edge.score * 1.5 : 0.35 + edge.score} />;
-    })}</g>}
     {map.graph.nodes.map((node) => {
       const emphasized = node.id === selected || node.id === hovered;
       const chatterMatch = highlighted?.has(node.id) === true;
       const radius = nodeRadius(node);
+      // Fade the shapes without creating a separate opacity group for every channel.
+      const opacity = dimmed.has(node.id) ? 0.16 : 1;
       return <g key={node.id} data-channel={node.id} data-chatter-match={chatterMatch || undefined} className="community-node" style={{ "--community-node-radius": `${radius}px` } as CSSProperties} role="button" tabIndex={node.id === selected ? 0 : -1}
         aria-label={`${name(node)}, ${formatCount(participants(node))} people observed in chat`} aria-pressed={node.id === selected}
         onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect(node); } }}
-        onFocus={() => onHover(node.id)} onBlur={() => onHover(null)} opacity={dimmed(node.id) ? 0.16 : 1}>
+        onFocus={() => onHover(node.id)} onBlur={() => onHover(null)}>
         <circle className="community-node-hit" cx={node.x} cy={node.y} r={radius + 7} fill="transparent" />
-        {(emphasized || chatterMatch) && <circle className="community-node-halo" cx={node.x} cy={node.y} r={radius + 5} fill="none" stroke={chatterMatch ? "#fff" : color(node.community)} strokeOpacity={chatterMatch ? 1 : 0.6} />}
-        <circle className="community-node-dot" cx={node.x} cy={node.y} r={radius} fill={color(node.community)} stroke={emphasized ? "#fff" : "none"} strokeWidth={1.5} />
+        {(emphasized || chatterMatch) && <circle className="community-node-halo" cx={node.x} cy={node.y} r={radius + 5} fill="none" stroke={chatterMatch ? "#fff" : color(node.community)} strokeOpacity={(chatterMatch ? 1 : 0.6) * opacity} />}
+        <circle className="community-node-dot" cx={node.x} cy={node.y} r={radius} fill={color(node.community)} fillOpacity={opacity} stroke={emphasized ? "#fff" : "none"} strokeOpacity={opacity} strokeWidth={1.5} />
       </g>;
     })}
   </>;
 });
 
-function MapLabels({ map, matches, selected, view, width, height, highlighted, areas }: {
+const MapLabels = memo(function MapLabels({ map, matches, selected, view, width, height, highlighted, areas }: {
   map: CommunityMap; matches: MapNode[]; selected: string | null;
   view: MapView; width: number; height: number; highlighted: Set<string> | null; areas: CategoryArea[];
 }) {
@@ -92,13 +93,14 @@ function MapLabels({ map, matches, selected, view, width, height, highlighted, a
     audience: participants(node), priority: node.id === selected ? 3 : neighbors.has(node.id) || highlighted?.has(node.id) ? 2 : 1 })),
     ...areas.map(area => ({ id: `area:${area.id}`, x: area.x, y: area.y - area.radius, radius: 0,
       width: textWidths.get(`area:${area.id}`) ?? area.title.length * 8, audience: 0, priority: 4 }))], view, width, height);
-  return <g ref={layer} aria-hidden="true">{placed.map(({ id, x, y }) => {
+  const unit = view.size / Math.max(1, Math.min(width, height));
+  return <g ref={layer} aria-hidden="true" style={{ "--community-unit": `${unit}px`, "--community-label-size": `${unit * 12}px` } as CSSProperties}>{placed.map(({ id, x, y }) => {
     const area = areaById.get(id);
     return area != null ? <text key={id} x={x} y={y} textAnchor="middle" className="community-area-label">{area.title}</text>
       : <text key={id} data-label-channel={id} x={x} y={y} textAnchor="middle" className="community-node-label"
         opacity={highlighted != null && !highlighted.has(id) && id !== selected ? 0.28 : 1}>{name(byId.get(id)!)}</text>;
   })}</g>;
-}
+});
 
 export function CommunityExplorer({ map, canLookupChatter = false }: { map: CommunityMap; canLookupChatter?: boolean }) {
   const params = useSearchParams();
@@ -139,6 +141,13 @@ export function CommunityExplorer({ map, canLookupChatter = false }: { map: Comm
     const visible = new Set(nodes.map(node => node.id));
     return { ...map, graph: { nodes, edges: map.graph.edges.filter(edge => visible.has(edge.source) && visible.has(edge.target)) } };
   }, [map, selected, highlighted, connections, group, query, matches, hideUnconnected, hideSparse, degrees]);
+  const dimmed = useMemo(() => {
+    const matching = new Set(matches.map(node => node.id));
+    const neighbors = new Set(connections.map(connection => connection.node.id));
+    return new Set(visibleMap.graph.nodes.filter(node => !matching.has(node.id) || (highlighted != null
+      ? !highlighted.has(node.id) && node.id !== selected
+      : selected != null && node.id !== selected && !neighbors.has(node.id))).map(node => node.id));
+  }, [visibleMap, matches, connections, highlighted, selected]);
   const connectedView = useMemo(() => fitCommunityView(map.graph.nodes.filter((node) => node.community != null)), [map]);
   const allView = useMemo(() => fitCommunityView(map.graph.nodes), [map]);
   const homeView = hideUnconnected ? connectedView : allView;
@@ -214,7 +223,6 @@ export function CommunityExplorer({ map, canLookupChatter = false }: { map: Comm
     if (event.key === "Escape") { setSelected(null); setSearchOpen(false); setHelpOpen(false); setOptionsOpen(false); setLookupOpen(false); svg.current?.focus({ preventScroll: true }); }
   }}>
     <svg className="community-canvas" ref={svg} viewBox={`${view.x} ${view.y} ${view.size} ${view.size}`} tabIndex={0}
-      style={{ "--community-unit": `${view.size / mapSide}px`, "--community-label-size": `${view.size / mapSide * 12}px` } as CSSProperties}
       aria-label={selectedNode == null ? "Finnish channel community map" : `Community map, ${name(selectedNode)} selected`}
       aria-describedby="community-gesture-help"
       onKeyDown={(event) => {
@@ -269,7 +277,10 @@ export function CommunityExplorer({ map, canLookupChatter = false }: { map: Comm
       {showAreas && <g className="community-areas" aria-hidden="true">{areas.map(area =>
         <circle key={area.id} cx={area.x} cy={area.y} r={area.radius} fill={color(area.id)} fillOpacity={0.045} stroke={color(area.id)} strokeOpacity={0.4} vectorEffect="non-scaling-stroke" />
       )}</g>}
-      <MapArtwork map={visibleMap} matches={matches} selected={selected} hovered={hovered} showConnections={showConnections} highlighted={highlighted} onHover={setHovered} onSelect={select} />
+      {showConnections && <MapConnections map={visibleMap} selected={selected} dimmed={dimmed} />}
+      <g style={{ "--community-unit": `${view.size / mapSide}px` } as CSSProperties}>
+        <MapArtwork map={visibleMap} selected={selected} hovered={hovered} dimmed={dimmed} highlighted={highlighted} onHover={setHovered} onSelect={select} />
+      </g>
       <MapLabels map={visibleMap} matches={matches} selected={selected} view={view} highlighted={highlighted} areas={areas}
         width={mapSize.width} height={mapSize.height} />
     </svg>
