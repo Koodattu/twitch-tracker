@@ -3,8 +3,9 @@ import Link from "next/link";
 import type { ChannelDirectoryEntry, DetailPage } from "@twitch-tracker/shared";
 import { getApiData, getDetailPageNumber, getPublicApiInit } from "../api-client";
 import { formatDateTime, formatRelativeTime } from "../format";
-import { Avatar, EmptyState, StatusPill } from "../ui";
+import { Avatar, EmptyState } from "../ui";
 import { RetryButton } from "../retry-button";
+import { StreamStatusBadge } from "../stream-status-badge";
 
 export const metadata: Metadata = { title: "Channels" };
 
@@ -52,7 +53,7 @@ export default async function ChannelsPage({ searchParams }: { searchParams: Pro
               <span className="muted">{channel.latestCategoryName ?? "Category unavailable"}</span>
             </div>
             <div className="channel-directory-time">
-              {channel.endedAt == null ? <StatusPill tone="success">Live now</StatusPill> : <span>Ended {formatRelativeTime(channel.endedAt, now)}</span>}
+              {channel.endedAt == null ? <><StreamStatusBadge stream={channel} now={now} /><span>Seen live {formatRelativeTime(channel.lastSeenLiveAt, now)}</span></> : <span>Ended {formatRelativeTime(channel.endedAt, now)}</span>}
               <time dateTime={channel.startedAt}>Started {formatDateTime(channel.startedAt)}</time>
             </div>
           </li>;

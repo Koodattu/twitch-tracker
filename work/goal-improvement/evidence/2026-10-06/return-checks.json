@@ -1,0 +1,25 @@
+{
+  "input": "CUA CDP DOM activation; native browser input unavailable",
+  "mobile": {
+    "start": "/channels/sisulive/streams?days=7&end=2026-10-06&measure=messages&day=2026-10-06",
+    "selection": "2026-10-06T07:31:38.231Z",
+    "returned": true,
+    "geometry": {
+      "navScroll": 277,
+      "navWidth": 277,
+      "scroll": 305,
+      "width": 320
+    }
+  },
+  "desktop": {
+    "start": "/channels/sisulive/streams?days=7&end=2026-10-06&measure=messages&day=2026-10-06",
+    "selection": "2026-10-06T07:31:38.231Z",
+    "returned": true,
+    "geometry": {
+      "navScroll": 933,
+      "navWidth": 933,
+      "scroll": 1265,
+      "width": 1280
+    }
+  }
+}

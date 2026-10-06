@@ -4,7 +4,9 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 const require = createRequire(new URL("../../packages/db/package.json", import.meta.url));
 const { Pool } = require("pg");
-export const fixtureUrl = "postgres://goal_test:goal_test_local_only@127.0.0.1:55432/twitch_tracker_goal_ui_test";
+const databasePort = Number(process.env.GOAL_DATABASE_PORT ?? 55432);
+if (!Number.isInteger(databasePort) || databasePort < 1024 || databasePort > 65535) throw new Error("Invalid local QA database port.");
+export const fixtureUrl = `postgres://goal_test:goal_test_local_only@127.0.0.1:${databasePort}/twitch_tracker_goal_ui_test`;
 const command = pathToFileURL(resolve(process.argv[1])).href === import.meta.url ? process.argv[2] : undefined;
 
 if (command === "create") {

@@ -67,4 +67,5 @@ export type ChannelDirectoryEntry = {
   latestCategoryName: string | null;
   startedAt: string;
   endedAt: string | null;
+  lastSeenLiveAt: string;
 };

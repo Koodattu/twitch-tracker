@@ -5,6 +5,7 @@ import type { ChannelProfile } from "@twitch-tracker/shared";
 import { getApiData, getPublicApiInit } from "../../api-client";
 import { DetailNavigation } from "../../detail-navigation";
 import { Avatar, EmptyState } from "../../ui";
+import { RetryButton } from "../../retry-button";
 import "./channel.css";
 
 export async function generateMetadata({ params }: { params: Promise<{ login: string }> }): Promise<Metadata> {
@@ -14,7 +15,7 @@ export async function generateMetadata({ params }: { params: Promise<{ login: st
 export default async function ChannelLayout({ params, children }: { params: Promise<{ login: string }>; children: ReactNode }) {
   const { login } = await params;
   const channel = await getApiData<ChannelProfile>(`/api/channels/${encodeURIComponent(login)}`, await getPublicApiInit());
-  if (channel == null) return <section className="panel"><EmptyState title="Channel unavailable" description="This channel could not be loaded. It may be unavailable or require a different account." action={<Link className="button" href="/">Live streams</Link>} /></section>;
+  if (channel == null) return <section className="panel"><EmptyState title="Channel unavailable" description="This channel could not be loaded. Try again, or check whether you need a different account." action={<RetryButton />} /></section>;
   const name = channel.displayName ?? channel.login ?? login;
   const base = `/channels/${encodeURIComponent(login)}`;
   return <>

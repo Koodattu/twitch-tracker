@@ -6,6 +6,8 @@ import { formatCount, formatDateTime, formatDuration, formatRelativeTime, getSiz
 import { Avatar, EmptyState, MetricCard, StatusPill } from "./ui";
 import { StreamThumbnail } from "./stream-thumbnail";
 import { RetryButton } from "./retry-button";
+import { isRecentObservation, recentObservationMinutes, summarizeLiveObservations } from "./stream-status";
+import { StreamStatusBadge } from "./stream-status-badge";
 
 export const metadata: Metadata = { title: "Live streams" };
 
@@ -13,7 +15,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const search = await searchParams;
   const query = typeof search.q === "string" ? search.q.trim().slice(0, 100) : "";
   const normalizedQuery = query.toLowerCase();
-  const apiInit = await getPublicApiInit();
+  // A revalidated fetch can serve arbitrarily old data on the first visit after idle.
+  const apiInit = { ...await getPublicApiInit(), cache: "no-store" as const };
   const [streamResponse, recentResponse] = await Promise.all([
     getApiData<LiveStreamSummary[]>("/api/streams/live", apiInit),
     getApiData<RecentStreamSummary[]>("/api/streams/recent?limit=6&status=ended&finnish=true", apiInit)
@@ -31,28 +34,27 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const pageOffset = (page - 1) * pageSize;
   const rankedStreams = matchingStreams.slice(pageOffset, pageOffset + pageSize);
   const pageHref = (target: number) => `/?${new URLSearchParams({ ...(query === "" ? {} : { q: query }), page: String(target) })}#live-ranking`;
-  const totalViewers = streams.reduce((sum, stream) => sum + (stream.viewerCount ?? 0), 0);
-  const trackedStreams = streams.filter((stream) => stream.isChatTracked).length;
   const latestObservation = streams
-    .map((stream) => stream.viewerObservedAt)
+    .map((stream) => stream.lastSeenLiveAt)
     .filter((value): value is string => value != null)
     .sort()
     .at(-1);
   const now = new Date();
+  const summary = summarizeLiveObservations(streams, now);
 
   return (
     <>
       <section className="page-title page-title-wide">
-        <span className="eyebrow">Finnish Twitch · Live</span>
         <div className="page-heading-row">
           <div>
-            <h1>What’s live right now</h1>
-            <p>Finnish-language and Finnish-tagged streams ranked by the latest viewer snapshot, with chat coverage shown separately.</p>
+            <h1>Live streams</h1>
+            <p>Finnish streams, ranked by their last observed viewer count.</p>
           </div>
-          <StatusPill tone={!streamsAvailable ? "danger" : streams.length > 0 ? "success" : "neutral"}>{!streamsAvailable ? "Unavailable" : streams.length > 0 ? "Live data" : "Waiting for data"}</StatusPill>
+          {streamsAvailable ? null : <StatusPill tone="danger">Unavailable</StatusPill>}
         </div>
       </section>
 
+      <div className="directory-search">
       <form className="live-search" role="search" action="/#live-ranking" method="get">
         <label htmlFor="live-search">Search live streams</label>
         <div className="live-search-controls">
@@ -62,20 +64,28 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         </div>
       </form>
       <p className="channel-search-handoff">Looking for a channel’s past streams? <Link href={`/channels${query === "" ? "" : `?${new URLSearchParams({ q: query })}`}`} prefetch={false}>Search all channels</Link></p>
+      </div>
 
       {streamsAvailable ? (
-        <section className="stat-row" aria-label="Live stream summary">
-          <MetricCard label="Live streams" value={formatCount(streams.length)} detail="Currently broadcasting in Finnish" />
-          <MetricCard label="Chat tracked" value={formatCount(trackedStreams)} detail="Streams with active chat coverage" />
-          <MetricCard label="Current viewers" value={formatCount(totalViewers)} detail={latestObservation == null ? "No viewer snapshot yet" : `Latest snapshot ${formatRelativeTime(latestObservation, now)}`} />
+        <section className="stat-row live-summary" aria-label="Live stream summary">
+          <MetricCard label="Recently live" value={formatCount(summary.recentCount)} detail={`Seen live within ${recentObservationMinutes} minutes`} />
+          <MetricCard label="Chat assigned" value={formatCount(summary.chatTrackedCount)} detail="Joined chat on recently live streams" />
+          <MetricCard label="Observed viewers" value={formatCount(summary.viewerCount)} detail={summary.viewerSampleCount === 0 ? "No recent viewer samples" : `Recent samples for ${summary.viewerSampleCount} of ${summary.recentCount} recently live streams`} />
         </section>
       ) : null}
+
+      {streamsAvailable ? <div className="observation-notice">
+        <div><strong>{summary.unconfirmedCount > 0 ? `${formatCount(summary.unconfirmedCount)} unconfirmed ${summary.unconfirmedCount === 1 ? "session" : "sessions"}` : "Snapshot view"}</strong>
+          <p>{summary.unconfirmedCount > 0 ? "No recent live observation. These sessions may have ended." : "Refresh to load the latest observations."}</p>
+          <span>Loaded <time dateTime={now.toISOString()}>{formatDateTime(now)}</time>{latestObservation == null ? "" : ` · Last seen live ${formatRelativeTime(latestObservation, now)}`}</span>
+        </div><RetryButton label="Refresh data" pendingLabel="Refreshing…" />
+      </div> : null}
 
       {featuredStreams.length === 0 ? null : (
         <section className="directory-section" aria-labelledby="top-live-heading">
           <div className="section-heading-row">
             <div className="section-heading">
-              <h2 id="top-live-heading">Top live streams</h2>
+              <h2 id="top-live-heading">Top observed streams</h2>
               <p>Open a session for its viewer and chat-activity timeline.</p>
             </div>
             {latestObservation == null ? null : <span className="freshness-label">Updated {formatRelativeTime(latestObservation, now)}</span>}
@@ -91,16 +101,16 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       <section className="panel" id="live-ranking">
         <div className="panel-header">
           <div className="panel-heading">
-            <h2>{query === "" ? "Full live ranking" : "Search results"}</h2>
-            <p>{query === "" ? "Viewer counts are periodic snapshots, not real-time telemetry." : `Matches for “${query}” · Ranks stay relative to all live streams.`}</p>
+            <h2>{query === "" ? "Latest stream ranking" : "Search results"}</h2>
+            <p>{query === "" ? "Viewer counts are periodic snapshots, not real-time telemetry." : `Matches for “${query}” · Ranks stay relative to all listed sessions.`}</p>
           </div>
-          <StatusPill tone={streamsAvailable ? "accent" : "danger"}>{streamsAvailable ? query === "" ? `${streams.length} live` : `${matchingStreams.length} of ${streams.length} live` : "Unavailable"}</StatusPill>
+          <StatusPill tone={streamsAvailable ? "accent" : "danger"}>{streamsAvailable ? query === "" ? `${streams.length} sessions` : `${matchingStreams.length} of ${streams.length} sessions` : "Unavailable"}</StatusPill>
         </div>
 
         {streamResponse == null ? (
           <EmptyState title="Live data is unavailable" description="The analytics service could not be reached. Try loading it again." action={<RetryButton />} />
         ) : streams.length === 0 ? (
-          <EmptyState title="No live streams captured" description="No live Finnish stream has been discovered yet." />
+          <EmptyState title="No streams currently listed" description="No Finnish stream is currently listed as live. Browse channels for past streams." />
         ) : rankedStreams.length === 0 ? (
           <EmptyState title="No matching live streams" description="Try another channel, stream title or category, or clear your search to see all live streams." action={<Link className="button button-secondary" href="/#live-ranking" prefetch={false}>Clear search</Link>} />
         ) : (
@@ -133,6 +143,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                               <Link href={`/channels/${stream.broadcasterLogin}`}><strong>{identity}</strong></Link>
                             )}
                             <span>{stream.broadcasterLogin == null ? stream.broadcasterId : `@${stream.broadcasterLogin}`}</span>
+                            <StreamStatusBadge stream={stream} now={now} />
                           </div>
                         </div>
                       </td>
@@ -143,9 +154,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                         </div>
                       </td>
                       <td>{stream.categoryName ?? <span className="muted">Unknown</span>}</td>
-                      <td className="number-cell"><strong>{formatCount(stream.viewerCount)}</strong></td>
-                      <td className="time-cell">{formatDateTime(stream.startedAt)}</td>
-                      <td><ChatCoverage stream={stream} /></td>
+                      <td className="number-cell"><div className="cell-stack"><strong>{formatCount(stream.viewerCount)}</strong><span>{stream.viewerObservedAt == null ? "No sample" : `${formatRelativeTime(stream.viewerObservedAt, now)}${isRecentObservation(stream.viewerObservedAt, now) ? "" : " · old sample"}`}</span></div></td>
+                      <td className="time-cell"><div className="cell-stack"><time dateTime={stream.startedAt}>{formatDateTime(stream.startedAt)}</time><span>Seen live {formatRelativeTime(stream.lastSeenLiveAt, now)}</span></div></td>
+                      <td><ChatCoverage stream={stream} now={now} /></td>
                     </tr>
                   );
                 })}
@@ -155,7 +166,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         )}
         {totalPages > 1 ? (
           <nav className="pagination" aria-label="Live ranking pages">
-            <span>Page {page} of {totalPages} · {formatCount(matchingStreams.length)} {query === "" ? "live streams" : "matches"}</span>
+            <span>Page {page} of {totalPages} · {formatCount(matchingStreams.length)} {query === "" ? "sessions" : "matches"}</span>
             <div className="pagination-actions">
               {page > 1 ? <Link className="button button-secondary button-compact" href={pageHref(page - 1)} prefetch={false}>Previous</Link> : null}
               {page < totalPages ? <Link className="button button-secondary button-compact" href={pageHref(page + 1)} prefetch={false}>Next</Link> : null}
@@ -183,7 +194,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         )}
       </section>
 
-      <p className="data-note">A discovered stream is tracked at metadata level. “Chat tracked” means the tracker currently has chat coverage; it does not identify viewers.</p>
+      <p className="data-note">“Recently live” means observed within {recentObservationMinutes} minutes; this snapshot includes Finnish-language and Finnish-tagged streams. “Chat assigned” describes a joined chat connection; it does not guarantee complete capture or identify viewers. Missing and old viewer samples are excluded from the recent viewer total.</p>
     </>
   );
 }
@@ -191,14 +202,14 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 function LiveStreamCard({ stream, rank, now, priority }: { stream: LiveStreamSummary; rank: number; now: Date; priority: boolean }) {
   const identity = stream.broadcasterDisplayName ?? stream.broadcasterLogin ?? stream.broadcasterId;
   const thumbnailUrl = getSizedThumbnailUrl(stream.thumbnailUrl);
-  const liveSeconds = Math.max(0, Math.floor((now.getTime() - new Date(stream.startedAt).getTime()) / 1000));
+  const liveSeconds = Math.max(0, Math.floor((Date.parse(stream.lastSeenLiveAt) - Date.parse(stream.startedAt)) / 1000));
 
   return (
     <article className="live-card">
       <Link className="stream-preview" href={`/streams/${stream.streamId}`} aria-label={`Open ${identity} stream session`}>
         <StreamThumbnail src={thumbnailUrl} priority={priority} />
-        <span className="stream-preview-topline" aria-hidden="true">
-          <span className="live-badge">Live</span>
+        <span className="stream-preview-topline">
+          <StreamStatusBadge stream={stream} now={now} />
           <span className="rank-badge">#{rank}</span>
         </span>
         <span className="viewer-badge">{formatCount(stream.viewerCount)} viewers</span>
@@ -213,9 +224,9 @@ function LiveStreamCard({ stream, rank, now, priority }: { stream: LiveStreamSum
         </div>
         <Link className="live-card-title" href={`/streams/${stream.streamId}`}>{stream.title ?? "Untitled stream"}</Link>
         <div className="live-card-meta">
-          <span className="number-cell">Live for {formatDuration(liveSeconds)}</span>
+          <span className="number-cell">{formatDuration(liveSeconds)} observed · Seen live {formatRelativeTime(stream.lastSeenLiveAt, now)}</span>
           <span>{formatFinnishMatchReason(stream.finnishMatchReason)}</span>
-          <ChatCoverage stream={stream} />
+          <ChatCoverage stream={stream} now={now} />
         </div>
       </div>
     </article>
@@ -257,13 +268,16 @@ const formatFinnishMatchReason = (reason: LiveStreamSummary["finnishMatchReason"
   return "Finnish language";
 };
 
-function ChatCoverage({ stream }: { stream: LiveStreamSummary }) {
+function ChatCoverage({ stream, now }: { stream: LiveStreamSummary; now: Date }) {
+  if (!isRecentObservation(stream.lastSeenLiveAt, now)) {
+    return <StatusPill tone="warning">Coverage unconfirmed</StatusPill>;
+  }
   if (stream.chatAssignmentStatus == null) {
     return <StatusPill>Chat not tracked</StatusPill>;
   }
 
   if (stream.chatAssignmentStatus === "joined") {
-    return <StatusPill tone="success">Chat tracked</StatusPill>;
+    return <StatusPill tone="success">Chat assigned</StatusPill>;
   }
 
   if (stream.chatAssignmentStatus === "leaving") {

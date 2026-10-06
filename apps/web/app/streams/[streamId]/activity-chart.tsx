@@ -59,7 +59,7 @@ export function StreamActivityChart({ activity, streamId }: { activity: StreamOv
   function update(next: StreamView, replace = false) {
     setHoverIndex(null);
     setShare(null);
-    const query = streamViewQuery(next);
+    const query = streamViewQuery({ ...next, returnTo: view.returnTo });
     const href = query.size === 0 ? base : `${base}?${query}`;
     if (replace) window.history.replaceState(null, "", href);
     else window.history.pushState(null, "", href);

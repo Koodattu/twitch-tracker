@@ -5,8 +5,11 @@ import { createDb } from "../../packages/db/src/index.js";
 import { createApiApp } from "../../apps/api/src/routes.js";
 import { existsSync, readFileSync } from "node:fs";
 
+const databasePort = Number(process.env.GOAL_DATABASE_PORT ?? 55432);
+if (!Number.isInteger(databasePort) || databasePort < 1024 || databasePort > 65535) throw new Error("Invalid local QA database port.");
+
 const config = loadConfig({
-  DATABASE_URL: "postgres://goal_test:goal_test_local_only@127.0.0.1:55432/twitch_tracker_goal_ui_test",
+  DATABASE_URL: `postgres://goal_test:goal_test_local_only@127.0.0.1:${databasePort}/twitch_tracker_goal_ui_test`,
   SESSION_SECRET: "synthetic-local-goal-test-session-secret-only",
   APP_MODE: "local", PUBLIC_WEB_URL: "http://127.0.0.1:3300", PUBLIC_API_URL: "http://127.0.0.1:4400",
   ENABLE_TWITCH_INGESTION: "false", EVENTSUB_ENABLED: "false"

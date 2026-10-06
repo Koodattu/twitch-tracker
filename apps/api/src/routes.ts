@@ -555,7 +555,8 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
       latestTitle: streamSessions.latestTitle,
       latestCategoryName: streamSessions.latestCategoryName,
       startedAt: streamSessions.startedAt,
-      endedAt: streamSessions.endedAt
+      endedAt: streamSessions.endedAt,
+      lastSeenLiveAt: streamSessions.lastSeenLiveAt
     }).from(streamSessions)
       .where(or(eq(streamSessions.isFinnishEligible, true), isNotNull(streamSessions.finnishMatchReason)))
       .orderBy(streamSessions.broadcasterUserId, desc(streamSessions.startedAt), desc(streamSessions.twitchStreamId))
@@ -565,7 +566,8 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
       twitchUserId: twitchUsers.twitchUserId, login: twitchUsers.login,
       displayName: twitchUsers.displayName, profileImageUrl: twitchUsers.profileImageUrl,
       latestStreamId: latest.latestStreamId, latestTitle: latest.latestTitle,
-      latestCategoryName: latest.latestCategoryName, startedAt: latest.startedAt, endedAt: latest.endedAt
+      latestCategoryName: latest.latestCategoryName, startedAt: latest.startedAt, endedAt: latest.endedAt,
+      lastSeenLiveAt: latest.lastSeenLiveAt
     }).from(latest)
       .innerJoin(twitchUsers, eq(latest.broadcasterUserId, twitchUsers.twitchUserId))
       .leftJoin(subjectPrivacyStates, eq(twitchUsers.twitchUserId, subjectPrivacyStates.twitchUserId))

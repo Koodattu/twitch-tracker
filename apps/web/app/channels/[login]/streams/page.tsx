@@ -28,8 +28,9 @@ export default async function ChannelStreamsPage({ params, searchParams }: { par
     redirect(`${pathname}?${query}`);
   }
   const filters = Object.fromEntries(new URLSearchParams(channelViewQuery(view)));
+  const returnTo = `${pathname}?${new URLSearchParams({ ...filters, ...(page > 1 ? { page: String(page) } : {}) })}`;
   const allStreams = `${pathname}?${channelViewQuery({ ...view, day: undefined })}`;
-  const sessions = await getApiData<DetailPage<ChannelSession>>(`/api/channels/${encodeURIComponent(login)}/sessions?${new URLSearchParams({ page: String(page), ...(day == null ? {} : { day }) })}`, await getPublicApiInit());
+  const sessions = await getApiData<DetailPage<ChannelSession>>(`/api/channels/${encodeURIComponent(login)}/sessions?${new URLSearchParams({ page: String(page), ...(day == null ? {} : { day }) })}`, { ...await getPublicApiInit(), cache: "no-store" });
   return <section className="panel">
     <div className="panel-header"><div className="panel-heading"><h2>Stream history</h2><p>{day == null ? "All observed sessions, newest first" : `Active on ${day} · UTC · Includes streams that began earlier`}</p></div>{day == null ? null : <Link className="button button-secondary" href={allStreams} prefetch={false}>All dates</Link>}</div>
     <form className="channel-history-filter" action={pathname}>
@@ -37,6 +38,6 @@ export default async function ChannelStreamsPage({ params, searchParams }: { par
       <label>Active on (UTC)<input type="date" name="day" key={day ?? "all"} defaultValue={day} min="2010-10-04" max={today} required /></label><button className="button button-secondary" type="submit">Find streams</button>
     </form>
     {search.day != null && day == null ? <p className="data-note" role="status">That date was invalid. Showing all dates; choose a valid UTC day to filter.</p> : null}
-    {sessions == null ? <DetailUnavailable /> : sessions.items.length === 0 ? <EmptyState title={day == null ? "No sessions on this page" : `No streams on ${day}${page > 1 ? " on this page" : ""}`} description="Try another date or browse all observed streams." action={<Link className="button button-secondary" href={allStreams} prefetch={false}>Browse all streams</Link>} /> : <><ChannelSessionList sessions={sessions.items} /><DetailPagination page={sessions.page} hasMore={sessions.hasMore} pathname={pathname} filters={filters} /></>}
+    {sessions == null ? <DetailUnavailable /> : sessions.items.length === 0 ? <EmptyState title={day == null ? "No sessions on this page" : `No streams on ${day}${page > 1 ? " on this page" : ""}`} description="Try another date or browse all observed streams." action={<Link className="button button-secondary" href={allStreams} prefetch={false}>Browse all streams</Link>} /> : <><ChannelSessionList sessions={sessions.items} returnTo={returnTo} /><DetailPagination page={sessions.page} hasMore={sessions.hasMore} pathname={pathname} filters={filters} /></>}
   </section>;
 }

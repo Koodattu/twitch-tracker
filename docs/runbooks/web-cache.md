@@ -4,9 +4,13 @@ The web container uses Next.js's in-process LRU cache with a 50 MiB accounting
 budget. Runtime incremental/fetch cache writes to disk are disabled. The budget
 is Next.js's estimate of cached entries, not a limit on total process memory.
 
-Public API responses retain their 15-second revalidation interval. Session
-lookups and requests with cookies remain `no-store`. Evicted entries and entries
-lost on restart are fetched again. Each web process has its own cache.
+Historical/detail API responses retain their 15-second revalidation interval.
+Views containing current stream status (the homepage, channel directory,
+channel overview/history, and stream header/overview), session lookups and
+requests with cookies use `no-store`. Time-based revalidation serves the old
+response on the first request after idle, so it is unsuitable for these current
+status views. Evicted entries and entries lost on restart are fetched again.
+Each web process has its own cache.
 
 The pinned Next.js version supports `experimental.isrFlushToDisk: false` in
 `apps/web/next.config.mjs`. Keep `apps/web/cache.test.mjs` passing when upgrading

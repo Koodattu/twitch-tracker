@@ -331,6 +331,14 @@ describe.skipIf(database == null)("Analytics routes with PostgreSQL", () => {
     expect((await admin.json()).data.items.map((item: { login: string }) => item.login)).toEqual(["channel", "hidden", "offline", "opted"]);
   });
 
+  it("includes the last live observation when browsing channels with unconfirmed endings", async () => {
+    const response = await app.request("/api/channels?q=channel");
+    expect(response.status).toBe(200);
+    expect((await response.json()).data.items[0]).toMatchObject({
+      latestStreamId: "stream", endedAt: null, lastSeenLiveAt: latestSeen.toISOString()
+    });
+  });
+
   it("searches channel names literally and returns the latest Finnish session once per channel", async () => {
     await db.update(twitchUsers).set({ displayName: "100%_Suomi" }).where(eq(twitchUsers.twitchUserId, "broadcaster"));
     await db.insert(streamSessions).values({ twitchStreamId: "older", broadcasterUserId: "broadcaster",

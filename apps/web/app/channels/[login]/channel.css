@@ -73,7 +73,6 @@
 .channel-recent-card h3 { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; margin: 7px 0; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
 .channel-recent-card p { margin: 0 0 4px; font-size: 11px; color: var(--muted-strong); overflow-wrap: anywhere; }
 .channel-recent-date { display: block; color: var(--muted); font-size: 10px; line-height: 1.5; }
-.channel-live-label { color: var(--success); }
 .channel-methodology { color: var(--muted); font-size: 11px; line-height: 1.7; }
 .channel-methodology p { max-width: 920px; margin: 8px 0 0; }
 .channel-chart-tabs { display: flex; gap: 4px; border-radius: 10px; padding: 3px; background: var(--background-soft); }

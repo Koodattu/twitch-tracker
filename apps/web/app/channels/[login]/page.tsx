@@ -1,9 +1,11 @@
 import Link from "next/link";
 import type { ChannelOverview } from "@twitch-tracker/shared";
 import { getApiData, getPublicApiInit } from "../../api-client";
-import { formatCount, formatDateTime, formatDuration } from "../../format";
+import { formatCount, formatDateTime, formatDuration, formatRelativeTime } from "../../format";
 import { DetailUnavailable } from "../../detail-ui";
-import { EmptyState, MetricCard, StatusPill } from "../../ui";
+import { EmptyState, MetricCard } from "../../ui";
+import { StreamStatusBadge } from "../../stream-status-badge";
+import { channelStreamHref } from "../../channel-return";
 import { ViewerTrendChart } from "./viewer-trend-chart";
 import { CategoryArt } from "./category-art";
 import { channelViewQuery, readChannelView, type ChannelSearch } from "./channel-view";
@@ -11,15 +13,17 @@ import { PeriodControls } from "./period-controls";
 
 export default async function ChannelPage({ params, searchParams }: { params: Promise<{ login: string }>; searchParams: Promise<ChannelSearch> }) {
   const { login } = await params;
-  const today = new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
   const view = readChannelView(await searchParams, today);
   const pathname = `/channels/${encodeURIComponent(login)}`;
   const toDay = view.end ?? today;
   const fromDay = new Date(Date.parse(toDay) - (view.days - 1) * 86_400_000).toISOString().slice(0, 10);
   const controls = <PeriodControls pathname={pathname} fromDay={fromDay} toDay={toDay} today={today} />;
-  const overview = await getApiData<ChannelOverview>(`/api/channels/${encodeURIComponent(login)}/overview?${new URLSearchParams({ days: String(view.days), end: toDay })}`, await getPublicApiInit());
+  const overview = await getApiData<ChannelOverview>(`/api/channels/${encodeURIComponent(login)}/overview?${new URLSearchParams({ days: String(view.days), end: toDay })}`, { ...await getPublicApiInit(), cache: "no-store" });
   if (overview == null) return <div className="channel-overview">{controls}<section className="panel"><DetailUnavailable /></section></div>;
   const { totals, liveSession, topCategories } = overview;
+  const returnTo = `${pathname}?${channelViewQuery(view)}`;
   const streamPath = `${pathname}/streams?${channelViewQuery({ ...view, day: undefined })}`;
   const chatDays = overview.daily.filter((day) => day.messageCount > 0);
   const busiestChat = [...chatDays].sort((a, b) => b.messageCount - a.messageCount)[0];
@@ -28,8 +32,8 @@ export default async function ChannelPage({ params, searchParams }: { params: Pr
   return <div className="channel-overview">
     {view.invalid ? <p className="data-note" role="status">Some view options were invalid. Showing the valid period and selections below.</p> : null}
     {liveSession == null ? null : <div className="channel-live">
-      <div className="channel-live-copy"><StatusPill tone="success">Live now</StatusPill><strong>{liveSession.latestTitle ?? "This channel is live"}</strong><span className="muted">{liveSession.latestCategoryName}</span></div>
-      <Link className="button button-secondary button-compact" href={`/streams/${encodeURIComponent(liveSession.twitchStreamId)}`} prefetch={false}>View live stream ↗</Link>
+      <div className="channel-live-copy"><StreamStatusBadge stream={liveSession} now={now} /><strong>{liveSession.latestTitle ?? "Latest stream session"}</strong><span className="muted">{liveSession.latestCategoryName} · Seen live {formatRelativeTime(liveSession.lastSeenLiveAt, now)}</span></div>
+      <Link className="button button-secondary button-compact" href={channelStreamHref(liveSession.twitchStreamId, returnTo)} prefetch={false}>View stream ↗</Link>
     </div>}
     {controls}
     <section className="stat-row stream-summary channel-metrics" aria-label={`Channel summary for ${overview.fromDay} to ${overview.toDay}`}>
@@ -73,9 +77,9 @@ export default async function ChannelPage({ params, searchParams }: { params: Pr
     </div>
     <section className="panel channel-recent">
       <div className="panel-header"><div className="panel-heading"><h2>Recent streams</h2><p>The latest from this channel · Across all dates</p></div><Link className="text-link" href={streamPath} prefetch={false}>All streams →</Link></div>
-      {overview.recentSessions.length === 0 ? <EmptyState title="No streams recorded yet" description="Recent streams will appear here when this channel goes live." /> : <div className="channel-recent-grid">{overview.recentSessions.slice(0, 3).map((session) => <Link className="channel-recent-card" key={session.twitchStreamId} href={`/streams/${encodeURIComponent(session.twitchStreamId)}`} prefetch={false}>
+      {overview.recentSessions.length === 0 ? <EmptyState title="No streams recorded yet" description="Recent streams will appear here when this channel goes live." /> : <div className="channel-recent-grid">{overview.recentSessions.slice(0, 3).map((session) => <Link className="channel-recent-card" key={session.twitchStreamId} href={channelStreamHref(session.twitchStreamId, returnTo)} prefetch={false}>
         <CategoryArt id={session.latestCategoryId} />
-        <div><span className="channel-recent-date">{session.endedAt == null ? <span className="channel-live-label">Live now</span> : <time dateTime={session.startedAt}>{formatDateTime(session.startedAt)}</time>}</span>
+        <div><span className="channel-recent-date">{session.endedAt == null ? <StreamStatusBadge stream={session} now={now} /> : <time dateTime={session.startedAt}>{formatDateTime(session.startedAt)}</time>}</span>
           <h3>{session.latestTitle ?? "Untitled stream"}</h3><p>{session.latestCategoryName ?? "Category unavailable"}</p>
           <span className="channel-caption">{formatDuration(Math.max(0, (Date.parse(session.endedAt ?? session.lastSeenLiveAt) - Date.parse(session.startedAt)) / 1000))}{session.endedAt == null ? " observed" : " streamed"}</span>
         </div>

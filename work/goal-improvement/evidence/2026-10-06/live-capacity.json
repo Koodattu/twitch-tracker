@@ -1,0 +1,27 @@
+{
+  "workload": "125 additional synthetic open sessions; one cold and 11 warm HTTP requests; local built app",
+  "node": "v24.19.0",
+  "results": [
+    {
+      "path": "/api/streams/live",
+      "bytes": 102345,
+      "coldMs": 46.664,
+      "medianMs": 14.080299999999994,
+      "maxMs": 25.08080000000001
+    },
+    {
+      "path": "/",
+      "bytes": 372477,
+      "coldMs": 51.065300000000036,
+      "medianMs": 43.105500000000006,
+      "maxMs": 49.719600000000014
+    },
+    {
+      "path": "/?page=2",
+      "bytes": 138953,
+      "coldMs": 17.866999999999962,
+      "medianMs": 29.74070000000006,
+      "maxMs": 35.931499999999915
+    }
+  ]
+}

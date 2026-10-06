@@ -1,6 +1,8 @@
+import { readChannelReturn } from "../../channel-return";
+
 export const streamSeries = ["viewers", "messagesPerMinute", "activeChatters"] as const;
 export type StreamSeries = typeof streamSeries[number];
-export type StreamView = { at?: string | undefined; series: StreamSeries[] };
+export type StreamView = { at?: string | undefined; series: StreamSeries[]; returnTo?: string | undefined };
 
 export function readStreamView(search: Pick<URLSearchParams, "getAll">) {
   const times = search.getAll("at");
@@ -8,11 +10,14 @@ export function readStreamView(search: Pick<URLSearchParams, "getAll">) {
   const date = new Date(rawTime ?? "");
   const at = rawTime != null && Number.isFinite(date.getTime()) && date.toISOString() === rawTime ? rawTime : undefined;
   const values = search.getAll("series");
+  const destinations = search.getAll("returnTo");
+  const returnTo = readChannelReturn(destinations.length === 1 ? destinations[0] : undefined)?.href;
   const keys = values[0] === "none" ? [] : values[0]?.split(",");
   const validSeries = values.length === 1 && keys != null && new Set(keys).size === keys.length
     && keys.every((key) => streamSeries.includes(key as StreamSeries));
   return {
     at,
+    returnTo,
     series: validSeries ? streamSeries.filter((key) => keys.includes(key)) : [...streamSeries],
     invalid: (times.length > 0 && at == null) || (values.length > 0 && !validSeries)
   };
@@ -21,6 +26,7 @@ export function readStreamView(search: Pick<URLSearchParams, "getAll">) {
 export function streamViewQuery(view: StreamView) {
   const query = new URLSearchParams();
   if (view.at != null) query.set("at", view.at);
+  if (view.returnTo != null) query.set("returnTo", view.returnTo);
   if (view.series.length !== streamSeries.length) query.set("series", view.series.join(",") || "none");
   return query;
 }

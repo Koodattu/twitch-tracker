@@ -1,5 +1,11 @@
 # Goal improvement state
 
+## Autonomous improvement — 2026-10-06 (active)
+
+Current scope, discoveries, standards, resource ownership, verification and release evidence are maintained in [2026-10-06.md](2026-10-06.md). Starting revision is `16bdee3c946dab7c6a47993b83363bb7f74f5ee3` on clean `main`; earlier entries below are historical. Single agent; commit, normal push and established deployment authorized by the current goal.
+
+Local implementation and verification are complete: trustworthy recent/stale/missing stream observations, context-preserving channel→stream→report navigation, retry recovery, and the source-map-js audit patch. 313 tests, structure/lint/typecheck/build, both audits, five Linux images, Compose/Caddy and backup checks passed. Built browser evidence and explicit native-input limitations are in the current record. Release is awaiting evidence satisfying the documented off-host backup/recent restore gate; production remains unchanged on the starting revision. Do not infer an exception from historical releases. Temporary local services/container/image tags are cleaned up.
+
 ## Final discovery and completion audit — 2026-10-04 (release checkpoint)
 
 - Active goal `03d2f9ac-f163-41d0-b66c-a6cd7fd77589/pasted-text-1.txt` re-read. Starting `main` / `origin/main` / production: `a187b63fca17d0249347ad970774b4f5144ac782`, working tree clean. Previous six-request community release is verified in `.temp/community-improvements-release-receipt.json`; older “active” labels below are historical pre-release checkpoints. Single agent; existing push/deploy/audit authorization retained.
