@@ -18,6 +18,7 @@ minimumReleaseAgeExclude:
 overrides:
   "@esbuild-kit/core-utils>esbuild": 0.25.0
   "brace-expansion@5.0.9": 5.0.12
+  "source-map-js@1.2.1": 1.2.2
   # This plugin only uses globSync for root directories. Pair the alias with
   # its path/expandDirectories patch until upstream removes vulnerable braces.
   "@next/eslint-plugin-next@16.3.6>fast-glob": npm:tinyglobby@0.2.17
