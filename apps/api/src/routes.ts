@@ -574,7 +574,10 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
       .where(and(
         isNotNull(twitchUsers.login), sql`${twitchUsers.login} <> ''`,
         canSeeSuppressed ? undefined : publicSubjectVisibilityCondition,
-        query.q === "" ? undefined : or(ilike(twitchUsers.login, searchPattern), ilike(twitchUsers.displayName, searchPattern))
+        query.q === "" ? undefined : or(
+          ilike(twitchUsers.login, searchPattern), ilike(twitchUsers.displayName, searchPattern),
+          ilike(latest.latestTitle, searchPattern), ilike(latest.latestCategoryName, searchPattern)
+        )
       ))
       .orderBy(desc(latest.startedAt), twitchUsers.login, twitchUsers.twitchUserId)
       .limit(detailPageSize + 1).offset((query.page - 1) * detailPageSize);

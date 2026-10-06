@@ -6,6 +6,7 @@ import { formatDateTime, formatRelativeTime } from "../format";
 import { Avatar, EmptyState } from "../ui";
 import { RetryButton } from "../retry-button";
 import { StreamStatusBadge } from "../stream-status-badge";
+import { ChannelSearch } from "../channel-search";
 
 export const metadata: Metadata = { title: "Channels" };
 
@@ -23,14 +24,7 @@ export default async function ChannelsPage({ searchParams }: { searchParams: Pro
       <h1>Channels</h1>
       <p>Find channels with observed Finnish streams, including past broadcasts. Open a channel for its audience trends, categories and stream history.</p>
     </section>
-    <form className="live-search" role="search" action="/channels" method="get">
-      <label htmlFor="channel-search">Search channels</label>
-      <div className="live-search-controls">
-        <input className="search-input" id="channel-search" name="q" type="search" defaultValue={query} key={query} maxLength={100} placeholder="Channel name or Twitch login" />
-        <button className="button" type="submit">Search</button>
-        {query === "" ? null : <Link className="button button-secondary" href="/channels" prefetch={false}>Clear search</Link>}
-      </div>
-    </form>
+    <ChannelSearch query={query} />
     <section className="panel channel-directory" aria-labelledby="channel-results-heading">
       <div className="panel-header"><div className="panel-heading">
         <h2 id="channel-results-heading">{query === "" ? "Observed Finnish channels" : `Results for “${query}”`}</h2>
@@ -39,7 +33,7 @@ export default async function ChannelsPage({ searchParams }: { searchParams: Pro
       {channels == null ? <EmptyState title="Channels are unavailable" description="The channel directory could not be loaded. Try again to keep your search." action={<RetryButton />} />
         : channels.items.length === 0 ? <EmptyState
           title={page > 1 ? "No channels on this page" : query === "" ? "No channels recorded yet" : "No matching channels"}
-          description={page > 1 ? "Return to the first page of these results." : query === "" ? "Channels will appear after a Finnish stream has been observed." : "Try part of the channel name or its Twitch login. Only channels already observed by this tracker are included."}
+          description={page > 1 ? "Return to the first page of these results." : query === "" ? "Channels will appear after a Finnish stream has been observed." : "Try a channel name, Twitch login, latest stream title or category. Only channels already observed by this tracker are included."}
           action={page > 1 ? <Link className="button button-secondary" href={href(1)} prefetch={false}>First page</Link> : query === "" ? undefined : <Link className="button button-secondary" href="/channels" prefetch={false}>Browse channels</Link>} />
         : <ul className="channel-directory-list">{channels.items.map(channel => {
           const name = channel.displayName ?? channel.login;

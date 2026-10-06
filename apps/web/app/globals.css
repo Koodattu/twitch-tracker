@@ -515,35 +515,10 @@ li,
   gap: 13px;
 }
 
-.section-heading-row {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 18px;
-  padding: 0 2px;
-}
-
-.section-heading {
-  display: grid;
-  gap: 4px;
-}
-
-.section-heading h2 {
+.directory-section > h2 {
   margin: 0;
   font-size: 18px;
   letter-spacing: -0.025em;
-}
-
-.section-heading p,
-.freshness-label {
-  margin: 0;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.freshness-label {
-  flex: 0 0 auto;
-  font-variant-numeric: tabular-nums;
 }
 
 .observation-notice {
@@ -566,7 +541,6 @@ li,
 .observation-notice > div > span { color: var(--muted); font-size: 12px; }
 .observation-notice .button { flex: 0 0 auto; }
 .stream-page-title .observation-notice { margin: 16px 0 0; }
-.stream-preview-topline .status-pill { background: var(--panel); }
 
 .live-card-grid {
   display: grid;
@@ -669,7 +643,7 @@ li,
   left: 10px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 8px;
 }
 
@@ -706,6 +680,9 @@ li,
 
 .live-card-copy {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  min-width: 0;
   gap: 11px;
   padding: 14px;
 }
@@ -723,17 +700,16 @@ li,
   min-width: 0;
 }
 
-.live-card-channel strong,
-.live-card-channel span,
-.recent-stream-channel strong,
-.recent-stream-channel span {
+.live-card-channel .cell-stack strong,
+.live-card-channel .cell-stack span,
+.recent-stream-channel .cell-stack strong,
+.recent-stream-channel .cell-stack span {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.live-card-title,
 .recent-stream-title {
   display: -webkit-box;
   overflow: hidden;
@@ -746,7 +722,13 @@ li,
 }
 
 .live-card-title {
-  min-height: 2.8em;
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  font-weight: 720;
+  line-height: 1.5;
+  text-wrap: pretty;
 }
 
 .live-card-title:hover,
@@ -756,7 +738,6 @@ li,
   color: var(--accent-bright);
 }
 
-.live-card-meta,
 .recent-stream-meta {
   display: flex;
   align-items: center;
@@ -1350,11 +1331,40 @@ li,
   box-shadow: var(--shadow-panel);
 }
 
-.live-search { display: grid; gap: 8px; margin-bottom: 24px; }
-.directory-search { display: grid; gap: 12px; }
-.directory-search .live-search, .directory-search .channel-search-handoff { margin: 0; }
-.channel-search-handoff { margin: -10px 0 24px; color: var(--muted-strong); font-size: 14px; line-height: 1.6; }
-.channel-search-handoff a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.live-page-header {
+  display: grid;
+  grid-template-columns: minmax(250px, 1fr) auto minmax(280px, 340px);
+  align-items: center;
+  gap: 24px;
+  padding-bottom: 8px;
+}
+.live-page-header .page-title { min-width: 0; gap: 8px; padding: 0; }
+.live-page-header .page-title h1 { font-size: 36px; }
+.live-page-header .page-title p { font-size: 14px; }
+.live-header-stats { display: flex; align-items: flex-start; gap: 24px; margin: 0; }
+.live-header-stats > div { display: grid; gap: 6px; }
+.live-header-stats dt { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.live-header-stats dd { margin: 0; font-size: 24px; font-weight: 720; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.live-sample-count { display: block; margin-top: 5px; color: var(--muted); font-size: 11px; font-weight: 400; }
+.channel-search { display: grid; align-content: start; gap: 8px; width: 100%; max-width: 480px; min-width: 0; }
+.channel-search > label { color: var(--muted-strong); font-size: 12px; font-weight: 600; }
+.channel-search-controls { display: flex; gap: 8px; }
+.channel-search-controls .search-input { flex: 1; min-width: 0; font-size: 14px; }
+.channel-search-controls .button { flex: 0 0 auto; min-height: 44px; }
+.channel-search-clear { justify-self: start; display: inline-flex; align-items: center; min-height: 44px; }
+@media (max-width: 1100px) {
+  .live-page-header { grid-template-columns: minmax(0, 1fr) minmax(280px, 340px); gap: 20px 24px; }
+  .live-page-header > .channel-search { grid-column: 2; grid-row: 1; }
+  .live-header-stats { grid-column: 1 / -1; }
+}
+@media (max-width: 640px) {
+  .live-page-header { grid-template-columns: minmax(0, 1fr); gap: 20px; padding-bottom: 4px; }
+  .live-page-header > .channel-search { grid-column: auto; grid-row: auto; max-width: none; }
+  .live-header-stats { justify-content: space-between; gap: 12px; }
+  .live-header-stats dt { font-size: 11px; }
+  .live-header-stats dd { font-size: 22px; }
+  .channel-search-controls .search-input { font-size: 16px; }
+}
 .channel-directory-list { margin: 0; padding: 0; list-style: none; }
 .channel-directory .panel-heading { min-width: 0; }
 .channel-directory .panel-heading h2 { overflow-wrap: anywhere; }
@@ -1376,14 +1386,8 @@ li,
 }
 
 .cell-stack > .status-pill { justify-self: start; }
-.live-search > label { color: var(--muted-strong); font-size: 14px; font-weight: 600; }
-.live-search-controls { display: flex; flex-wrap: wrap; gap: 10px; }
-.live-search-controls .search-input { flex: 1 1 280px; min-width: 0; }
-.live-search-controls .button { min-height: 44px; }
 @media (max-width: 430px) {
   .nav-link { padding-inline: 7px; min-width: 44px; justify-content: center; }
-  .live-search-controls .search-input { flex-basis: 100%; font-size: 16px; }
-  .live-search-controls .button { flex: 1; }
 }
 
 @media (max-width: 360px) {
@@ -1688,12 +1692,6 @@ li,
     flex-direction: column;
   }
 
-  .section-heading-row {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 6px;
-  }
-
   .profile-actions,
   .empty-action {
     width: 100%;
@@ -1763,10 +1761,6 @@ li,
   .stat-row.stream-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-
-  .live-summary .stat { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; row-gap: 4px; min-height: 0; padding: 12px 16px; }
-  .live-summary .stat-value { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
-  .live-summary .stat-detail { grid-column: 1; }
 
   .live-card-grid {
     grid-template-columns: 1fr;

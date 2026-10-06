@@ -326,6 +326,8 @@ describe.skipIf(database == null)("Analytics routes with PostgreSQL", () => {
     expect(data).toMatchObject({ page: 1, pageSize: 50, hasMore: false });
     const search = await app.request("/api/channels?q=%20OFFLINE%20");
     expect((await search.json()).data.items.map((item: { login: string }) => item.login)).toEqual(["offline"]);
+    const titleSearch = await app.request("/api/channels?q=earlier");
+    expect((await titleSearch.json()).data.items.map((item: { login: string }) => item.login)).toEqual(["offline"]);
     await db.update(appUsers).set({ isAdmin: true }).where(eq(appUsers.twitchUserId, "chatter"));
     const admin = await app.request("/api/channels", { headers });
     expect((await admin.json()).data.items.map((item: { login: string }) => item.login)).toEqual(["channel", "hidden", "offline", "opted"]);
@@ -353,6 +355,22 @@ describe.skipIf(database == null)("Analytics routes with PostgreSQL", () => {
     await db.update(streamSessions).set({ isFinnishEligible: false, finnishMatchReason: "language" }).where(eq(streamSessions.twitchStreamId, "stream"));
     expect((await (await app.request("/api/channels")).json()).data.items[0].latestStreamId).toBe("stream");
     for (const q of ["missing", "100_", "' OR 1=1 --"]) {
+      const result = await app.request(`/api/channels?${new URLSearchParams({ q })}`);
+      expect((await result.json()).data.items).toEqual([]);
+    }
+  });
+
+  it("searches the latest title and category case-insensitively with literal wildcards", async () => {
+    await db.update(streamSessions).set({ latestTitle: "Building a 100%_Finnish village", latestCategoryName: "Minecraft" })
+      .where(eq(streamSessions.twitchStreamId, "stream"));
+    await db.insert(streamSessions).values({ twitchStreamId: "older", broadcasterUserId: "broadcaster",
+      startedAt: new Date(firstSeen.getTime() - 86_400_000), firstSeenAt: firstSeen, lastSeenLiveAt: firstSeen,
+      endedAt: firstSeen, isFinnishEligible: true, latestTitle: "Old broadcast", latestCategoryName: "Art" });
+    for (const q of ["VILLAGE", "mineCRAFT", "100%_"]) {
+      const result = await app.request(`/api/channels?${new URLSearchParams({ q })}`);
+      expect((await result.json()).data.items.map((item: { latestStreamId: string }) => item.latestStreamId)).toEqual(["stream"]);
+    }
+    for (const q of ["100_", "Old broadcast", "Art"]) {
       const result = await app.request(`/api/channels?${new URLSearchParams({ q })}`);
       expect((await result.json()).data.items).toEqual([]);
     }
