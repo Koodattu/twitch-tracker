@@ -22,6 +22,7 @@ try {
   await client.query("set local lock_timeout = '5s'");
   await client.query("set local statement_timeout = '30min'");
   await client.query("set local work_mem = '256MB'");
+  await client.query("set local temp_file_limit = '2GB'");
   await client.query("set local time zone 'UTC'");
   // Array expansion is underestimated by the planner; avoid sorting millions of wire lines.
   await client.query("set local enable_mergejoin = off");
@@ -58,16 +59,50 @@ try {
       row = `(${row}) || jsonb_build_object(${keys.map(key => `'${key}',decode_external_key(${key})`).join(",")})`;
     }
     if (metadata && table === "chat_membership_events") row = `(${row}) || jsonb_build_object('source',decode_common_label(source,'irc_membership'))`;
-    const prefix = raw ? "with expanded as materialized (select id, slot, wire_line from raw_irc_payload_blocks cross join lateral unnest(lines) with ordinality as expanded(wire_line,slot)), " : "with ";
     const join = (raw ? " left join expanded on expanded.id=r.payload_block_id and expanded.slot=r.payload_position" : "")
       + (sharedContexts && table === "raw_irc_messages" ? " left join raw_irc_contexts c on c.id=r.context_id" : "");
     const cache = raw ? ", payload_block_id is not null and (expanded.wire_line is null or unrelayed_source is distinct from (expanded.wire_line like '@%' and split_part(expanded.wire_line, ' ', 1) !~ '(?:^@|;)source-room-id=[^;]+')) as cache_mismatch" : "";
     const check = raw ? ", count(*) filter(where cache_mismatch)::text as cache_errors" : "";
-    const checked = (await client.query(`${prefix}hashes as materialized (
-      select md5((${row})::text) as hash${cache} from ${table} r${join}
-    ) select count(*)::text as rows,
+    const aggregate = `select count(*)::text as rows,
       sum(('x'||substr(hash,1,16))::bit(64)::bigint::numeric)::text as hash1,
-      sum(('x'||substr(hash,17,16))::bit(64)::bigint::numeric)::text as hash2${check} from hashes`)).rows[0];
+      sum(('x'||substr(hash,17,16))::bit(64)::bigint::numeric)::text as hash2${check} from hashes`;
+    let checked: Fingerprint & { cache_errors?: string };
+    if (raw) {
+      // A whole-archive expansion can exceed the free space needed by the
+      // migration itself. Keyset batches bound both rows and expanded slots.
+      type RawCursor = { received_at: string; id: string };
+      let cursor: RawCursor | null = null;
+      let rows = 0n, hash1 = 0n, hash2 = 0n, cacheErrors = 0n;
+      for (;;) {
+        const batch: Fingerprint & { cache_errors: string; cursor: RawCursor | null } = (await client.query(`with selected as materialized (
+          select * from raw_irc_messages
+          where $1::timestamptz is null or (received_at,id)>($1::timestamptz,$2::uuid)
+          order by received_at,id limit 25000
+        ), needed as materialized (
+          select distinct payload_block_id,payload_position from selected where payload_block_id is not null
+        ), expanded as materialized (
+          select b.id,payload.slot,payload.wire_line from raw_irc_payload_blocks b
+          join (select distinct payload_block_id from needed) blocks on blocks.payload_block_id=b.id
+          cross join lateral unnest(b.lines) with ordinality as payload(wire_line,slot)
+          join needed n on n.payload_block_id=b.id and n.payload_position=payload.slot
+        ), hashes as materialized (
+          select md5((${row})::text) as hash${cache} from selected r${join}
+        ) select totals.*, (select json_build_object('received_at',received_at::text,'id',id)
+          from selected order by received_at desc,id desc limit 1) as cursor
+        from (${aggregate}) totals`, [cursor?.received_at ?? null, cursor?.id ?? null])).rows[0];
+        if (batch.rows === "0") break;
+        rows += BigInt(batch.rows); hash1 += BigInt(batch.hash1!); hash2 += BigInt(batch.hash2!);
+        cacheErrors += BigInt(batch.cache_errors); cursor = batch.cursor;
+        if (cursor == null) throw new Error("Missing raw verification cursor.");
+        if (rows % 1000000n === 0n) console.error(`Verified raw payload batch: ${rows} rows`);
+      }
+      checked = { rows: String(rows), hash1: rows === 0n ? null : String(hash1),
+        hash2: rows === 0n ? null : String(hash2), cache_errors: String(cacheErrors) };
+    } else {
+      checked = (await client.query(`with hashes as materialized (
+        select md5((${row})::text) as hash${cache} from ${table} r${join}
+      ) ${aggregate}`)).rows[0];
+    }
     if (raw) {
       if (checked.cache_errors !== "0") throw new Error("Raw payloads or source-attribution cache differ.");
       delete checked.cache_errors;

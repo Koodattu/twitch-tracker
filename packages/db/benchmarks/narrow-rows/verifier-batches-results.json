@@ -1,0 +1,9 @@
+{
+  "at": "2026-10-10T15:12:35.505Z",
+  "syntheticRows": 50005,
+  "checks": [
+    "Three keyset batches match original canonical fingerprints across timestamp ties and microseconds",
+    "Inline and archived records both included",
+    "Corrupted archived source cache is rejected"
+  ]
+}

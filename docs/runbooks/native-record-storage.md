@@ -140,6 +140,15 @@ because its final format is smaller.
    understands each migration checkpoint. Capture a fresh baseline; older
    reports omit those tables.
 
+   The verifier reads raw observations in 25,000-row keyset batches and expands
+   only their referenced archive slots. This preserves the original canonical
+   fingerprints without materializing the entire uncompressed archive on disk.
+   A 2 GiB temporary-file limit bounds each verifier backend. The production
+   rehearsal exposed excessive temporary disk use in the earlier whole-archive
+   scan; it was cancelled before any schema changes. The bounded replacement
+   matched the original on 50,005 synthetic rows across timestamp ties and
+   microseconds, and rejected a corrupted source-attribution cache.
+
    ```sh
    docker compose --env-file .env.production run --rm --no-deps migrate \
      node dist/verify-storage.js --database twitch_tracker --layout compact > storage-before.json
