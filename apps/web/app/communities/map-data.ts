@@ -19,12 +19,3 @@ export function connectionCounts(map: CommunityMap) {
   }
   return counts;
 }
-
-export function communityArea(nodes: MapNode[]) {
-  if (nodes.length < 3) return null;
-  const median = (values: number[]) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)]!;
-  const x = median(nodes.map(node => node.x)), y = median(nodes.map(node => node.y));
-  const distances = nodes.map(node => Math.hypot(node.x - x, node.y - y)).sort((a, b) => a - b);
-  // A guide to the central 80%, not a boundary or a claim that outliers are unrelated.
-  return { x, y, radius: Math.max(30, distances[Math.ceil(distances.length * 0.8) - 1]! + 20) };
-}

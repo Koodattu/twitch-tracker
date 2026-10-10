@@ -8,7 +8,8 @@ import { EmptyState } from "../ui";
 import { fitCommunityView, transformCamera, type MapView } from "./map-camera";
 import { placeMapLabels } from "./map-labels";
 import { summarizeCommunityCategories } from "./map-categories";
-import { channelName as name, communityColor as color, participants, connectionCounts, communityArea, type MapNode } from "./map-data";
+import { channelName as name, communityColor as color, participants, connectionCounts, type MapNode } from "./map-data";
+import { communityArea } from "./map-areas";
 import { ChannelDetails } from "./channel-details";
 import { ChatterLookup } from "./chatter-lookup";
 
@@ -177,9 +178,9 @@ export function CommunityExplorer({ map, canLookupChatter = false }: { map: Comm
   const labels = new Map(communities.map((item) => [item.id, item.nodes.slice(0, 2).map(name).join(" / ")]));
   const categorySummaries = useMemo(() => new Map(communities.map((item) => [item.id, summarizeCommunityCategories(item.nodes)])), [communities]);
   const areas = useMemo(() => showAreas ? communities.filter(community => group === "all" || group === community.id).flatMap(community => {
-    const area = communityArea(community.nodes);
-    return area == null ? [] : [{ ...area, id: community.id, title: categorySummaries.get(community.id)?.title ?? "Category unknown" }];
-  }) : [], [showAreas, communities, categorySummaries, group]);
+    const area = communityArea(community.nodes, map.graph.edges);
+    return area == null ? [] : [{ ...area, id: community.id, title: summarizeCommunityCategories(area.nodes)?.title ?? "Category unknown" }];
+  }) : [], [showAreas, communities, map.graph.edges, group]);
   const select = useCallback((node: MapNode, locate = false) => {
     setCamera((current) => {
       const currentView = current?.selected === selected ? current.view : initialView;
@@ -306,7 +307,7 @@ export function CommunityExplorer({ map, canLookupChatter = false }: { map: Comm
         {optionsOpen && <section id="community-options" className="community-options" aria-label="Map options">
           <label><input type="checkbox" checked={showConnections} onChange={event => setShowConnections(event.target.checked)} />Show connection lines</label>
           <label><input type="checkbox" checked={showAreas} onChange={event => setShowAreas(event.target.checked)} />Show community category areas</label>
-          <p>Circles mark the central area of each community. Labels describe recorded streaming categories, not why people watch.</p>
+          <p>Circles mark compact, well-connected cores, leaving out sparse channels and distant branches. Labels describe recorded streaming categories in these cores, not why people watch.</p>
           {sparseCount > 0 && <label><input type="checkbox" checked={hideSparse} onChange={event => setHideSparse(event.target.checked)} />Hide sparse channels ({formatCount(sparseCount)})</label>}
           {sparseCount > 0 && <p>Sparse means one or two connections on this map. These channels still belong to communities. Searches, chosen communities and connections to the selected channel stay visible.</p>}
         {unconnectedCount > 0 && <label><input type="checkbox" checked={hideUnconnected}
@@ -364,7 +365,7 @@ export function CommunityExplorer({ map, canLookupChatter = false }: { map: Comm
       <p>These are recorded chat communities, not all viewers or followers. Position is not geographic, and connections do not establish friendship or affiliation.</p>
       <p>People qualify after 3 messages in a channel{map.coverage.presence != null ? ", or presence on at least two UTC dates at least six hours apart" : ""}. Channels need {thresholds.channelPeople} qualifying people; connections need {thresholds.sharedPeople} shared people. Each channel keeps its 10 strongest connections; a connection is shown when either endpoint keeps it.</p>
       <p>Channel names appear wherever they fit without overlapping. Zooming opens more space; off-screen channels do not limit the number of names. Selecting a channel prioritizes its connections without hiding other names.</p>
-      <p>Optional category areas are circles around the central 80% of each community, not exact boundaries. Community category descriptions summarize recorded streaming time. A channel mainly streams a category when it accounts for at least 60% of its known category time. “Mostly” requires 60% of channels with category information to share that main category. Mixed categories can reflect variety streamers or different interests within a community; categories do not prove why people move between channels.</p>
+      <p>Optional category areas mark the central half of the largest locally connected core in each community, with at least four channels. Core channels must each connect to at least three others in the core; sparse channels and distant branches do not enlarge the circles. Communities without a core have no circle. These are visual guides, not exact membership boundaries. Area labels summarize recorded streaming categories for the channels used to draw each circle. A channel mainly streams a category when it accounts for at least 60% of its known category time. “Mostly” requires 60% of channels with category information to share that main category. Mixed categories can reflect variety streamers or different interests within a community; categories do not prove why people move between channels.</p>
       <p>The gray outer ring contains channels with no retained connections. They meet the {thresholds.channelPeople}-person threshold, but no other qualifying channel shares at least {thresholds.sharedPeople} qualifying people with them. Their position is only a way to keep them visible. Map options can hide them. Sparse channels have one or two retained connections and are hidden initially when denser groups exist; they still have a community. Search and chatter highlights can reveal hidden channels.</p>
       {map.coverage.presence != null && <>
         <p>Repeated presence includes people who do not write messages. It contributes one-quarter of the connection weight of messages. People seen through both sources count once.</p>
