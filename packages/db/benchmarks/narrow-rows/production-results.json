@@ -1,0 +1,159 @@
+{
+  "verifiedAt": "2026-10-10T16:24:13Z",
+  "schemaCommit": "8f8296c46bcc938801552d36be072eeaf890f562",
+  "verifierCommit": "1d6044a9eb7a19b2ee75b5992c54e96892e6a97c",
+  "ciUrl": "https://github.com/Koodattu/twitch-tracker/actions/runs/38062944266",
+  "database": {
+    "beforeBytes": 14115093527,
+    "afterBytes": 12184919063,
+    "savedBytes": 1930174464,
+    "fingerprintsMatch": true,
+    "tables": 7,
+    "rows": 35596672
+  },
+  "canonicalFingerprints": {
+    "raw_irc_messages": {
+      "rows": "11313170",
+      "hash1": "4416659420720867293784",
+      "hash2": "-6328752844677939017822"
+    },
+    "chat_messages": {
+      "rows": "8861100",
+      "hash1": "7884551923842220360941",
+      "hash2": "-23567920720673304346747"
+    },
+    "chat_membership_events": {
+      "rows": "8986103",
+      "hash1": "-24597635893129809882435",
+      "hash2": "22542287084522623539024"
+    },
+    "stream_snapshots": {
+      "rows": "3699447",
+      "hash1": "5300116272085914530886",
+      "hash2": "4796138078553653603851"
+    },
+    "stream_activity_buckets": {
+      "rows": "2403470",
+      "hash1": "6085120693223843782992",
+      "hash2": "2728093005231340279451"
+    },
+    "twitch_users": {
+      "rows": "262526",
+      "hash1": "-5590959907596002547857",
+      "hash2": "1388794905288119595327"
+    },
+    "stream_sessions": {
+      "rows": "70856",
+      "hash1": "-89528222006776376523",
+      "hash2": "-33429877578425006215"
+    }
+  },
+  "history": {
+    "method": "20 warm EXPLAIN ANALYZE samples after three warmups, SELECT *, same subjects retained only on VM; user offset 10000 returned no rows",
+    "before": {
+      "user-recent": {
+        "rows": 51,
+        "medianMs": 0.0635,
+        "p95Ms": 0.089
+      },
+      "user-offset-10000": {
+        "rows": 0,
+        "medianMs": 0.4925,
+        "p95Ms": 0.56
+      },
+      "channel-recent": {
+        "rows": 51,
+        "medianMs": 0.0745,
+        "p95Ms": 0.099
+      },
+      "channel-offset-500": {
+        "rows": 51,
+        "medianMs": 0.2355,
+        "p95Ms": 0.386
+      },
+      "stream-recent": {
+        "rows": 51,
+        "medianMs": 0.083,
+        "p95Ms": 0.105
+      },
+      "viewer-recent": {
+        "rows": 51,
+        "medianMs": 0.0815,
+        "p95Ms": 0.107
+      },
+      "viewer-offset-300": {
+        "rows": 51,
+        "medianMs": 0.199,
+        "p95Ms": 0.224
+      }
+    },
+    "after": {
+      "user-recent": {
+        "rows": 51,
+        "medianMs": 0.188,
+        "p95Ms": 0.225
+      },
+      "user-offset-10000": {
+        "rows": 0,
+        "medianMs": 1.445,
+        "p95Ms": 1.613
+      },
+      "channel-recent": {
+        "rows": 51,
+        "medianMs": 0.22,
+        "p95Ms": 0.295
+      },
+      "channel-offset-500": {
+        "rows": 51,
+        "medianMs": 1.941,
+        "p95Ms": 2.476
+      },
+      "stream-recent": {
+        "rows": 51,
+        "medianMs": 0.253,
+        "p95Ms": 0.352
+      },
+      "viewer-recent": {
+        "rows": 51,
+        "medianMs": 0.2875,
+        "p95Ms": 0.468
+      },
+      "viewer-offset-300": {
+        "rows": 51,
+        "medianMs": 1.2894999999999999,
+        "p95Ms": 1.913
+      }
+    }
+  },
+  "smokeChecks": 32,
+  "ingestion": {
+    "since": "2026-10-10T16:29:51Z",
+    "chatRows": 360,
+    "rawRows": 1581,
+    "viewerRows": 296,
+    "healthyLoops": 11,
+    "processingFailures": 0,
+    "allLoopsHealthy": true
+  },
+  "maintenance": {
+    "writersStopped": "2026-10-10T14:59:41Z",
+    "writersResumed": "2026-10-10T16:29:58Z",
+    "pauseSeconds": 5417,
+    "liveIrcMayHaveBeenMissed": true
+  },
+  "backup": {
+    "offHost": false,
+    "protectedPreMigrationArchiveBytes": 3758697925,
+    "location": "/mnt/HC_Volume_107097089/twitch-tracker-pre-native-records-20261010",
+    "postMigrationArchiveBytes": 3611831516,
+    "postMigrationSha256": "f165afbf21d5dc38434cfc3a3a0034a4434340fda4865ec8ec9bcef3339ba1a6",
+    "preMigrationRecoveryRetained": true
+  },
+  "caveats": [
+    "Measured savings include narrower storage and one-time bloat reclamation.",
+    "The fresh-layout width projection is 0.74 GiB at the recorded volume and 2.23 GiB at three times the same mix.",
+    "Warm full-row SQL reads have measurable overhead; these are not production p99 measurements.",
+    "Production erasure selectors were checked read-only; destructive erasure behavior was covered by integration tests and the local rehearsal.",
+    "No additional production observations were exported; extraction ledger remains unchanged."
+  ]
+}

@@ -2,8 +2,8 @@
 
 Migrations 0024–0028 reduce retained history and future writes without replacing
 the native history indexes. They require a coordinated maintenance release of
-the database, API and worker. They have been rehearsed locally; production has
-not been migrated.
+the database, API and worker. Production completed these migrations on
+2026-10-10; the measured outcome and limitations are recorded below.
 
 ## Representation and application behavior
 
@@ -41,6 +41,52 @@ retain their names. These view adapters and codecs use hand-written migrations;
 do not replace them with generated table DDL.
 
 ## Measured result
+
+The [production evidence](../../packages/db/benchmarks/narrow-rows/production-results.json)
+records a reduction from 14,115,093,527 to 12,184,919,063 database bytes:
+**1,930,174,464 bytes (1.80 GiB, 13.67%) saved**. Canonical row counts and both
+fingerprints matched across all seven tables and 35,596,672 retained records.
+This reduction includes one-time bloat reclamation as well as narrower rows;
+use the separate fresh-layout projection below for future growth estimates.
+
+Production warm full-row SQL measurements used the same subjects, three warmups
+and 20 samples per query. Native ordered indexes remain in use, but decoding
+logical rows has a measurable cost:
+
+| Production workload | Before median | After median |
+| --- | ---: | ---: |
+| User recent, 51 messages | 0.064 ms | 0.188 ms |
+| Channel recent, 51 messages | 0.075 ms | 0.220 ms |
+| Channel offset 500, 51 messages | 0.236 ms | 1.941 ms |
+| Stream recent, 51 messages | 0.083 ms | 0.253 ms |
+| Viewer recent, 51 observations | 0.082 ms | 0.288 ms |
+| Viewer offset 300, 51 observations | 0.199 ms | 1.289 ms |
+
+These are warm `SELECT *` execution timings, not API p99 measurements. Recent
+page medians increased by up to 0.206 ms; populated offset pages by up to
+1.706 ms. The user-offset-10,000 probe returned no rows and does not establish
+populated deep-user-page performance. Many API projections omit the reconstructed
+metadata timestamps, but their latency benefit was not measured here.
+
+All 32 production smoke checks passed, covering history and viewer pagination,
+aggregation, community reads, HTTP health and access boundaries. All 11 worker
+loops resumed successfully, with new chat/raw/viewer observations and no new
+processing failures at the check. Production erasure selectors retained indexed
+plans; destructive erasure was verified in integration tests and the local
+rehearsal, not against live user data.
+
+Writers were stopped from 14:59:41 to 16:29:58 UTC (90 minutes 17 seconds),
+including backup and complete before/after fingerprint scans. Live IRC events
+during that pause may have been missed. Retained data matched exactly. The DDL
+itself ran from 15:40:18 to 15:48:28 UTC. The operation evidence is retained on
+the VM at `/var/lib/twitch-native-records-20261010`.
+
+A validated 3,758,697,925-byte pre-migration recovery archive is protected outside
+normal rotation in
+`/mnt/HC_Volume_107097089/twitch-tracker-pre-native-records-20261010`.
+A fresh 3,611,831,516-byte post-migration archive passed catalog and checksum
+validation in the normal backup directory. Both remain on the attached volume;
+there is no off-host copy, as explicitly authorized for this release.
 
 The [integrated evidence](../../packages/db/benchmarks/narrow-rows/integrated-results.json)
 uses the already retained 20,856 chat, 869 viewer and 8,192 raw observations,
@@ -80,11 +126,12 @@ about 27% more in this fixture, roughly 23 microseconds per message. These local
 warm-cache measurements do not establish production p99 or cold-disk behavior.
 
 All 349 tests passed, including API history/privacy integration and codec edge
-cases. Type checking, source lint, application builds, Compose validation and
-the migration image build passed. The repository-wide lint command also scans
-an existing ignored `.cache/history-blocks-bench/benchmark-v1.mjs` and reports an
-unused import there; maintained source was linted with `eslint apps packages
-scripts --max-warnings=0`. The [resume rehearsal](../../packages/db/benchmarks/narrow-rows/resume-results.json)
+cases. Clean-checkout CI passed full repository lint, type checking, application
+and container builds, Compose validation, backup tests and dependency audits.
+Local maintained source was also linted with `eslint apps packages scripts
+--max-warnings=0`; an ignored local benchmark cache has an unrelated unused
+import when included by the local repository-wide command.
+The [resume rehearsal](../../packages/db/benchmarks/narrow-rows/resume-results.json)
 uses the actual CLI, forces a failure at the viewer migration, verifies the
 partial checkpoint, resumes, verifies a repeated run is a no-op, then rolls back
 and compares every canonical fingerprint again.
