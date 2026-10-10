@@ -48,7 +48,7 @@ export async function getStreamOverview(db: DbClient, streamId: string): Promise
     db.execute<{ data: Omit<StreamOverview, "events"> }>(sql`
       with source as (
         select *, lag(bucket_start + make_interval(mins => bucket_minutes)) over (order by bucket_start, bucket_minutes) as previous_end
-        from stream_activity_buckets where twitch_stream_id = ${streamId}
+        from stream_activity_buckets where twitch_stream_id = encode_external_key(${streamId})
       ), bounds as (
         select min(bucket_start) as first_at, max(bucket_start) as last_at,
           greatest(coalesce(max(bucket_minutes), 1), ceil(extract(epoch from (max(bucket_start) - min(bucket_start))) / 60 / 299)::int) as minutes
@@ -113,7 +113,7 @@ export async function getStreamDetail(db: DbClient, streamId: string, kind: "obs
       messageId: chatMessages.twitchMessageId, chatterLogin: chatMessages.chatterLogin,
       chatterDisplayName: twitchUsers.displayName, sentAt: chatMessages.sentAt, receivedAt: chatMessages.receivedAt,
       rawText: chatMessages.rawText, source: chatMessages.source, messageType: chatMessages.messageType
-    }).from(chatMessages).leftJoin(twitchUsers, eq(chatMessages.chatterUserId, twitchUsers.twitchUserId))
+    }).from(chatMessages).leftJoin(twitchUsers, eq(chatMessages.chatterUserId, twitchUsers.storageKey))
       .where(and(eq(chatMessages.twitchStreamId, streamId),
         query.chatter === "" ? undefined : eq(sql`lower(${chatMessages.chatterLogin})`, query.chatter.toLowerCase()),
         query.from == null ? undefined : gte(chatMessages.receivedAt, new Date(query.from)),

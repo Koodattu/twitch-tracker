@@ -9,7 +9,7 @@ export async function readCommunityPresence(db: Pick<DbClient, "execute">, claim
     events: number; unresolvedEvents: number; recoveredEvents: number; observedChannels: number; snapshotChannels: number;
   }>(sql`
     with evidence as materialized (
-      select lower(chatter_login) as login, (received_at at time zone 'UTC')::date as day, chatter_user_id as id
+      select lower(chatter_login) as login, (received_at at time zone 'UTC')::date as day, decode_external_key(chatter_user_id) as id
       from chat_messages where received_at >= ${claim.windowStart} and received_at < ${claim.windowEnd}
         and chatter_login is not null and chatter_user_id is not null
       union all

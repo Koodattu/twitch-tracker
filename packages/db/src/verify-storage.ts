@@ -32,12 +32,16 @@ try {
   const metadata = (await client.query("select to_regprocedure('decode_compact_json(bytea)') is not null as compact")).rows[0].compact as boolean;
   const derivedKeys = (await client.query("select exists(select 1 from pg_attribute where attrelid='chat_membership_events'::regclass and attname='dedupe_key_storage' and not attisdropped) as enabled")).rows[0].enabled as boolean;
   const sharedContexts = (await client.query("select to_regclass('raw_irc_contexts') is not null as enabled")).rows[0].enabled as boolean;
-  const tables = values["membership-only"] ? ["chat_membership_events"] : ["raw_irc_messages", "chat_messages", "chat_membership_events", "stream_snapshots"];
+  const compactKeys = new Set((await client.query<{table:string}>(`select c.relname as table from pg_class c join pg_attribute a on a.attrelid=c.oid
+    where c.oid in ('chat_messages'::regclass,'stream_snapshots'::regclass,'stream_activity_buckets'::regclass)
+    and a.attname='twitch_stream_id' and a.atttypid='bytea'::regtype`)).rows.map(r=>r.table));
+  const tables = values["membership-only"] ? ["chat_membership_events"] : ["raw_irc_messages", "chat_messages", "chat_membership_events", "stream_snapshots", "stream_activity_buckets", "twitch_users", "stream_sessions"];
   if (values.layout === "metadata" && !values["membership-only"]) tables.push("raw_irc_payload_blocks");
   for (const table of tables) {
     const compact = values.layout !== "inline";
     const raw = values.layout === "compact" && table === "raw_irc_messages";
     let row = "to_jsonb(r)";
+    if (table === "twitch_users" || table === "stream_sessions") row = "to_jsonb(r)-'storage_key'";
     if (sharedContexts && table === "raw_irc_messages") row = "(to_jsonb(r)-'context_id') || jsonb_build_object('channel_login',c.channel_login,'bot_account_id',c.bot_account_id,'irc_connection_id',c.irc_connection_id)";
     if (raw) row = `(${row}-'payload_block_id'-'payload_position'-'unrelayed_source') || jsonb_build_object('raw_line',case when payload_block_id is null then raw_line else expanded.wire_line end)`;
     if (compact && table === "chat_messages") row = "to_jsonb(r) || jsonb_build_object('twitch_message_id',decode_chat_message_id(twitch_message_id),'reply_parent_message_id',decode_chat_message_id(reply_parent_message_id))";
@@ -47,6 +51,12 @@ try {
     }
     if (metadata && table === "raw_irc_messages") row = `(${row}) || jsonb_build_object('tags',decode_compact_json(tags),'parsed_command',decode_common_label(parsed_command,'PRIVMSG'))`;
     if (metadata && table === "chat_messages") row = `(${row}) || jsonb_build_object('badges',decode_compact_json(badges),'emotes',decode_compact_json(emotes))`;
+    if (compactKeys.has(table) && table === "chat_messages") row = `(${row}) || jsonb_build_object('source',decode_common_label(source,'irc'),'message_type',decode_common_label(message_type,'privmsg'))`;
+    if (compactKeys.has(table) && table === "stream_snapshots") row = `(${row}) || jsonb_build_object('tags',decode_compact_json(tags))`;
+    if (compactKeys.has(table)) {
+      const keys = table === "stream_activity_buckets" ? ["twitch_stream_id"] : ["broadcaster_user_id", "twitch_stream_id", ...(table === "chat_messages" ? ["chatter_user_id", "shared_chat_source_channel_id"] : [])];
+      row = `(${row}) || jsonb_build_object(${keys.map(key => `'${key}',decode_external_key(${key})`).join(",")})`;
+    }
     if (metadata && table === "chat_membership_events") row = `(${row}) || jsonb_build_object('source',decode_common_label(source,'irc_membership'))`;
     const prefix = raw ? "with expanded as materialized (select id, slot, wire_line from raw_irc_payload_blocks cross join lateral unnest(lines) with ordinality as expanded(wire_line,slot)), " : "with ";
     const join = (raw ? " left join expanded on expanded.id=r.payload_block_id and expanded.slot=r.payload_position" : "")

@@ -41,15 +41,15 @@ describe.skipIf(database == null)("Aggregation boundaries with PostgreSQL", () =
       `);
       await tx.execute(sql`
         insert into chat_messages (twitch_message_id, broadcaster_user_id, twitch_stream_id, chatter_user_id, received_at, sent_at)
-        select encode_chat_message_id('00000000-0000-4000-8000-000000000001'), 'channel', 'stream', 'chatter', bucket, bucket from fixture_times
-        union all select encode_chat_message_id('00000000-0000-4000-8000-000000000002'), 'channel', 'stream', 'chatter', bucket + interval '5 minutes' - interval '1 microsecond', bucket + interval '5 minutes' - interval '1 microsecond' from fixture_times
-        union all select encode_chat_message_id('00000000-0000-4000-8000-000000000003'), 'channel', 'early-stream', 'chatter', day, day from fixture_times
+        select encode_chat_message_id('00000000-0000-4000-8000-000000000001'), encode_external_key('channel'), encode_external_key('stream'), encode_external_key('chatter'), bucket, bucket from fixture_times
+        union all select encode_chat_message_id('00000000-0000-4000-8000-000000000002'), encode_external_key('channel'), encode_external_key('stream'), encode_external_key('chatter'), bucket + interval '5 minutes' - interval '1 microsecond', bucket + interval '5 minutes' - interval '1 microsecond' from fixture_times
+        union all select encode_chat_message_id('00000000-0000-4000-8000-000000000003'), encode_external_key('channel'), encode_external_key('early-stream'), encode_external_key('chatter'), day, day from fixture_times
       `);
       await tx.execute(sql`
         insert into stream_snapshots (twitch_stream_id, broadcaster_user_id, observed_at, viewer_count)
-        select 'stream', 'channel', bucket, 200 from fixture_times
-        union all select 'stream', 'channel', bucket + interval '5 minutes' - interval '1 microsecond', 100 from fixture_times
-        union all select 'early-stream', 'channel', day, 300 from fixture_times
+        select encode_external_key('stream'), encode_external_key('channel'), bucket, 200 from fixture_times
+        union all select encode_external_key('stream'), encode_external_key('channel'), bucket + interval '5 minutes' - interval '1 microsecond', 100 from fixture_times
+        union all select encode_external_key('early-stream'), encode_external_key('channel'), day, 300 from fixture_times
       `);
       await tx.execute(sql`
         insert into chat_membership_events (broadcaster_user_id, twitch_stream_id, chatter_user_id, event_type, event_at, received_at, dedupe_key_storage)
@@ -66,7 +66,7 @@ describe.skipIf(database == null)("Aggregation boundaries with PostgreSQL", () =
       } else {
         await tx.execute(sql`
           insert into stream_activity_buckets (twitch_stream_id, bucket_start, bucket_minutes, message_count)
-          select 'stream', bucket, 5, 1 from fixture_times
+          select encode_external_key('stream'), bucket, 5, 1 from fixture_times
         `);
       }
       const context = {
@@ -75,7 +75,7 @@ describe.skipIf(database == null)("Aggregation boundaries with PostgreSQL", () =
         abortSignal: new AbortController().signal
       };
       await runAggregationLoop(context);
-      const stream = await tx.execute(sql`select * from stream_activity_buckets where twitch_stream_id = 'stream' and bucket_minutes = 5`);
+      const stream = await tx.execute(sql`select * from stream_activity_buckets where twitch_stream_id = encode_external_key('stream') and bucket_minutes = 5`);
       expect(stream.rows).toHaveLength(1);
       expect(stream.rows[0]).toMatchObject({
         message_count: 2, active_chatter_count: 1, join_count: 1, part_count: 1,

@@ -39,7 +39,7 @@ import {
   type DbClient
 } from "@twitch-tracker/db";
 import { createEventSubEnvelope, eventSubHeaders, exchangeTwitchAuthorizationCode, FetchHelixAdapter, isEventSubMessageTimestampFresh, refreshTwitchUserAccessToken, TwitchAuthError, validateTwitchAccessToken, verifyEventSubSignature } from "@twitch-tracker/twitch";
-import { and, desc, eq, gt, ilike, inArray, isNotNull, isNull, lt, max, min, or, sql } from "drizzle-orm";
+import { and, desc, eq, getTableColumns, gt, ilike, inArray, isNotNull, isNull, lt, max, min, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import { HTTPException } from "hono/http-exception";
@@ -52,6 +52,9 @@ import { channelDetailQuerySchema, channelOverviewQuerySchema, getChannelDetail,
 import { getCommunityMap, getCommunityBuildStatus } from "./community-map.js";
 import { getCommunityChatterActivity } from "./community-chatter.js";
 import { detailPage, detailPageNumberSchema, detailPageSize } from "./detail-records.js";
+
+const { storageKey: userStorageKey, ...userFields } = getTableColumns(twitchUsers);
+const { storageKey: streamStorageKey, ...streamFields } = getTableColumns(streamSessions);
 
 type ApiBindings = {
   Variables: {
@@ -207,7 +210,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
         )`.as("thumbnail_url")
       })
       .from(streamSnapshots)
-      .where(eq(streamSnapshots.twitchStreamId, streamSessions.twitchStreamId))
+      .where(eq(streamSnapshots.twitchStreamId, streamStorageKey))
       .orderBy(desc(streamSnapshots.observedAt), desc(streamSnapshots.id))
       .limit(1)
       .as("latest_snapshot");
@@ -369,7 +372,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
     const db = c.get("db");
     const [row] = await db
       .select({
-        stream: streamSessions,
+        stream: streamFields,
         publicProfileHidden: subjectPrivacyStates.publicProfileHidden,
         trackingOptedOut: subjectPrivacyStates.trackingOptedOut
       })
@@ -512,7 +515,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
     const [row] = await c
       .get("db")
       .select({
-        stream: streamSessions,
+        stream: streamFields,
         broadcasterLogin: twitchUsers.login,
         broadcasterDisplayName: twitchUsers.displayName,
         broadcasterProfileImageUrl: twitchUsers.profileImageUrl,
@@ -597,7 +600,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
     const [row] = await c
       .get("db")
       .select({
-        user: twitchUsers,
+        user: userFields,
         publicProfileHidden: subjectPrivacyStates.publicProfileHidden,
         trackingOptedOut: subjectPrivacyStates.trackingOptedOut
       })
@@ -671,7 +674,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
     const rows = await c
       .get("db")
       .select({
-        stream: streamSessions
+        stream: streamFields
       })
       .from(streamSessions)
       .leftJoin(twitchUsers, eq(streamSessions.broadcasterUserId, twitchUsers.twitchUserId))
@@ -830,7 +833,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
           eventCounts: streamActivityBuckets.eventCounts
         })
         .from(streamActivityBuckets)
-        .innerJoin(streamSessions, eq(streamActivityBuckets.twitchStreamId, streamSessions.twitchStreamId))
+        .innerJoin(streamSessions, eq(streamActivityBuckets.twitchStreamId, streamStorageKey))
         .where(eq(streamSessions.broadcasterUserId, channel.twitchUserId))
         .orderBy(desc(streamActivityBuckets.bucketStart))
         .limit(query.buckets),
@@ -944,7 +947,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
         source: chatMessages.source
       })
       .from(chatMessages)
-      .leftJoin(twitchUsers, eq(chatMessages.broadcasterUserId, twitchUsers.twitchUserId))
+      .leftJoin(twitchUsers, eq(chatMessages.broadcasterUserId, userStorageKey))
       .where(eq(chatMessages.chatterUserId, session.user.twitchUserId))
       .orderBy(desc(chatMessages.receivedAt))
       .limit(100);
@@ -1304,7 +1307,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
     const [summary] = await db
       .select({
         messageCount: sql<number>`count(*)::int`,
-        chatterCount: sql<number>`count(distinct coalesce(${chatMessages.chatterUserId}, ${chatMessages.chatterLogin}))::int`,
+        chatterCount: sql<number>`count(distinct coalesce(${chatMessages.chatterUserId}, encode_external_key(${chatMessages.chatterLogin})))::int`,
         channelCount: sql<number>`count(distinct ${chatMessages.broadcasterUserId})::int`,
         streamCount: sql<number>`count(distinct ${chatMessages.twitchStreamId})::int`
       })
@@ -1313,8 +1316,8 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
     const [matches] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(chatMessages)
-      .leftJoin(twitchUsers, eq(chatMessages.broadcasterUserId, twitchUsers.twitchUserId))
-      .leftJoin(streamSessions, eq(chatMessages.twitchStreamId, streamSessions.twitchStreamId))
+      .leftJoin(twitchUsers, eq(chatMessages.broadcasterUserId, userStorageKey))
+      .leftJoin(streamSessions, eq(chatMessages.twitchStreamId, streamStorageKey))
       .where(searchCondition);
 
     const totalMatches = matches?.count ?? 0;
@@ -1340,8 +1343,8 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
         clearedAt: chatMessages.clearedAt
       })
       .from(chatMessages)
-      .leftJoin(twitchUsers, eq(chatMessages.broadcasterUserId, twitchUsers.twitchUserId))
-      .leftJoin(streamSessions, eq(chatMessages.twitchStreamId, streamSessions.twitchStreamId))
+      .leftJoin(twitchUsers, eq(chatMessages.broadcasterUserId, userStorageKey))
+      .leftJoin(streamSessions, eq(chatMessages.twitchStreamId, streamStorageKey))
       .where(searchCondition)
       .orderBy(desc(chatMessages.receivedAt), desc(chatMessages.twitchMessageId))
       .limit(messageArchivePageSize)
@@ -1786,7 +1789,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
     const params = loginParamSchema.parse(c.req.param());
     const db = c.get("db");
     const [chatter] = await db
-      .select()
+      .select(userFields)
       .from(twitchUsers)
       .where(eq(twitchUsers.login, params.login.toLowerCase()))
       .limit(1);
@@ -1819,7 +1822,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
         messageType: chatMessages.messageType
       })
       .from(chatMessages)
-      .leftJoin(twitchUsers, eq(chatMessages.broadcasterUserId, twitchUsers.twitchUserId))
+      .leftJoin(twitchUsers, eq(chatMessages.broadcasterUserId, userStorageKey))
       .where(eq(chatMessages.chatterUserId, chatter.twitchUserId))
       .orderBy(desc(chatMessages.receivedAt))
       .limit(500);
@@ -1927,7 +1930,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
         rawIrcCommand: rawIrcMessages.parsedCommand
       })
       .from(chatMessages)
-      .leftJoin(twitchUsers, eq(chatMessages.chatterUserId, twitchUsers.twitchUserId))
+      .leftJoin(twitchUsers, eq(chatMessages.chatterUserId, userStorageKey))
       .leftJoin(rawIrcMessages, eq(chatMessages.rawIrcMessageId, rawIrcMessages.id))
       .where(eq(chatMessages.twitchStreamId, params.streamId))
       .orderBy(desc(chatMessages.receivedAt))
@@ -2265,7 +2268,7 @@ const redactSubjectData = async (db: DbClient, twitchUserId: string) => {
       select raw_irc_message_id as id
       from chat_messages
       where raw_irc_message_id is not null
-        and (chatter_user_id = ${twitchUserId} or (${subjectLogin} <> '' and chatter_login = ${subjectLogin}))
+        and (chatter_user_id = encode_external_key(${twitchUserId}) or (${subjectLogin} <> '' and chatter_login = ${subjectLogin}))
       union
       select raw_irc_message_id as id
       from chat_membership_events
@@ -2276,7 +2279,7 @@ const redactSubjectData = async (db: DbClient, twitchUserId: string) => {
       select raw_eventsub_event_id as id
       from chat_messages
       where raw_eventsub_event_id is not null
-        and (chatter_user_id = ${twitchUserId} or (${subjectLogin} <> '' and chatter_login = ${subjectLogin}))
+        and (chatter_user_id = encode_external_key(${twitchUserId}) or (${subjectLogin} <> '' and chatter_login = ${subjectLogin}))
       union
       select raw_eventsub_event_id as id
       from channel_events
@@ -2284,7 +2287,7 @@ const redactSubjectData = async (db: DbClient, twitchUserId: string) => {
         and actor_user_id = ${twitchUserId}
     ),
     redacted_irc as (
-      update raw_irc_messages
+      update raw_irc_records
       set raw_line = '[redacted by subject data deletion]',
           tags = encode_compact_json('{}'::jsonb),
           parse_error = null,
@@ -2300,14 +2303,14 @@ const redactSubjectData = async (db: DbClient, twitchUserId: string) => {
       returning 1
     ),
     redacted_messages as (
-      update chat_messages
+      update chat_message_records
       set chatter_user_id = null,
           chatter_login = null,
           raw_text = null,
           badges = encode_compact_json('{}'::jsonb),
           emotes = encode_compact_json('{}'::jsonb),
           updated_at = now()
-      where chatter_user_id = ${twitchUserId}
+      where chatter_user_id = encode_external_key(${twitchUserId})
         or (${subjectLogin} <> '' and chatter_login = ${subjectLogin})
       returning 1
     ),

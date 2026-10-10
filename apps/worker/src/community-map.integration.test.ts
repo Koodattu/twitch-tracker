@@ -72,13 +72,13 @@ describe.skipIf(database == null)("Community builds with PostgreSQL", () => {
       from unnest(array['100','200','300','400','500','600','700','800','900']) as id`);
     await pool.query("insert into bot_accounts (twitch_user_id, login) values ('bot','bot'); insert into subject_privacy_states (twitch_user_id, public_profile_hidden) values ('hidden',true),('800',true)");
     await pool.query(`insert into chat_messages (twitch_message_id, broadcaster_user_id, twitch_stream_id, chatter_user_id, received_at, shared_chat_source_channel_id)
-      select encode_chat_message_id(gen_random_uuid()::text), channel, case when channel = '500' then null else channel end, person,
-        date_trunc('day', now()) - interval '1 day', case when channel = '300' then '100' when channel = '600' then null else channel end
+      select encode_chat_message_id(gen_random_uuid()::text), encode_external_key(channel), encode_external_key(case when channel = '500' then null else channel end), encode_external_key(person),
+        date_trunc('day', now()) - interval '1 day', encode_external_key(case when channel = '300' then '100' when channel = '600' then null else channel end)
       from unnest(array['100','200','300','400','500','600','700','800','900']) as channel
       cross join unnest(array['bot','hidden','chatter-1','chatter-2','chatter-3','chatter-4','chatter-5','chatter-6','chatter-7','chatter-8','chatter-9','chatter-10']) as person
       cross join generate_series(1,3) as message where channel <> '700' or message < 3`);
     await pool.query(`insert into raw_irc_messages (id, raw_line) values ('00000000-0000-0000-0000-000000000001','@id=ordinary;room-id=900 :chatter PRIVMSG #channel :Hello');
-      update chat_messages set shared_chat_source_channel_id = null, raw_irc_message_id = '00000000-0000-0000-0000-000000000001' where broadcaster_user_id = '900'`);
+      update chat_messages set shared_chat_source_channel_id = null, raw_irc_message_id = '00000000-0000-0000-0000-000000000001' where broadcaster_user_id = encode_external_key('900')`);
     await requestCommunityBuild(db);
     const claim = (await claimCommunityBuild(db))!;
     const input = await readCommunityInput(db, claim);

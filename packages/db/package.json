@@ -21,6 +21,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:compact": "node dist/compact-storage.js",
     "db:verify-storage": "node dist/verify-storage.js",
+    "db:migrate-record-storage": "node dist/migrate-record-storage.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

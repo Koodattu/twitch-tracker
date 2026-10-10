@@ -1,0 +1,65 @@
+{
+  "catalogAt": "2026-10-10T15:46:49.406293+03:00",
+  "groups": [
+    {
+      "table": "chat_messages",
+      "sampleRows": 20856,
+      "productionRowEstimate": 8821561,
+      "baselineAlignedBytes": 237.01419255849635,
+      "candidateAlignedBytes": 204.82125047947832,
+      "heapBytesSavedPerRow": 32.192942079018025,
+      "indexBytesSavedPerRow": 27.102416570771002,
+      "projectedBytesSaved": 523077623.3459915
+    },
+    {
+      "table": "stream_snapshots",
+      "sampleRows": 869,
+      "productionRowEstimate": 3688643,
+      "baselineAlignedBytes": 139.2451093210587,
+      "candidateAlignedBytes": 115.7054085155351,
+      "heapBytesSavedPerRow": 23.539700805523594,
+      "indexBytesSavedPerRow": 18.85385500575374,
+      "projectedBytesSaved": 156374692.8883775
+    },
+    {
+      "table": "raw_irc_messages",
+      "sampleRows": 8192,
+      "productionRowEstimate": 11252334,
+      "baselineAlignedBytes": 109.3720703125,
+      "candidateAlignedBytes": 101.3720703125,
+      "heapBytesSavedPerRow": 8,
+      "indexBytesSavedPerRow": 0,
+      "projectedBytesSaved": 90018672
+    },
+    {
+      "table": "stream_activity_buckets",
+      "source": "20,000 synthetic rows",
+      "productionRowEstimate": 2396229,
+      "bytesSavedPerRow": 16.7936,
+      "projectedBytesSaved": 40241311.334400006
+    }
+  ],
+  "parentCosts": [
+    {
+      "table": "twitch_users",
+      "productionRowEstimate": 260968,
+      "bytesAddedPerRow": 32.33152442032561
+    },
+    {
+      "table": "stream_sessions",
+      "productionRowEstimate": 70662,
+      "bytesAddedPerRow": 50.93471502590673
+    }
+  ],
+  "projectedNetGiB": 0.7428933470236928,
+  "growthSameMixGiB": [
+    0.7428933470236928,
+    1.4857866940473856,
+    2.2286800410710783
+  ],
+  "caveats": [
+    "Projection, not production disk savings. Row counts are estimates; the retained sample is not random.",
+    "Small viewer indexes and synthetic activity buckets add uncertainty. No bloat, dead tuples, existing compression, or rejected block/posting savings are credited.",
+    "Parent generated keys and their unique indexes are charged; there is no historical-login dictionary."
+  ]
+}

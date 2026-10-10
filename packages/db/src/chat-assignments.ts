@@ -797,7 +797,7 @@ const readCandidates = async (db: DbClient): Promise<AssignmentCandidate[]> => {
       viewerCount: streamSnapshots.viewerCount
     })
     .from(streamSnapshots)
-    .where(eq(streamSnapshots.twitchStreamId, streamSessions.twitchStreamId))
+    .where(eq(streamSnapshots.twitchStreamId, streamSessions.storageKey))
     .orderBy(desc(streamSnapshots.observedAt), desc(streamSnapshots.id))
     .limit(1)
     .as("latest_snapshot");

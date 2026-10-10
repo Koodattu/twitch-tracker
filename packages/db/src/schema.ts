@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { compactMessageId, membershipKeyStorage } from "./compact-types.js";
 import { compactJson, compactLabel } from "./compact-metadata.js";
+import { compactExternalKey } from "./compact-external-key.js";
 import type { CommunityGraph, CommunityCoverage, CommunityBuildStatus } from "@twitch-tracker/shared";
 import { bigint, check, smallint, index, integer, jsonb, pgEnum, pgTable, primaryKey, text, timestamp, unique, uniqueIndex, uuid, boolean } from "drizzle-orm/pg-core";
 
@@ -18,8 +19,16 @@ const timestamps = {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
 };
 
+// Read-only expressions on automatically updatable observation views. Physical
+// records pack creation time; a NULL update time means it is unchanged.
+const recordTimestamps = (anchor: "received_at" | "observed_at") => ({
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().generatedAlwaysAs(sql`unpack_record_time(record_times,${sql.identifier(anchor)})`),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().generatedAlwaysAs(sql`coalesce(updated_at,unpack_record_time(record_times,${sql.identifier(anchor)}))`)
+});
+
 export const twitchUsers = pgTable("twitch_users", {
   twitchUserId: text("twitch_user_id").primaryKey(),
+  storageKey: compactExternalKey("storage_key").generatedAlwaysAs(sql`encode_external_key(twitch_user_id)`).unique(),
   login: text("login"),
   displayName: text("display_name"),
   accountType: text("account_type"),
@@ -65,6 +74,7 @@ export const channels = pgTable("channels", {
 
 export const streamSessions = pgTable("stream_sessions", {
   twitchStreamId: text("twitch_stream_id").primaryKey(),
+  storageKey: compactExternalKey("storage_key").generatedAlwaysAs(sql`encode_external_key(twitch_stream_id)`).unique(),
   broadcasterUserId: text("broadcaster_user_id").notNull().references(() => twitchUsers.twitchUserId),
   startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
   endedAt: timestamp("ended_at", { withTimezone: true }),
@@ -94,18 +104,18 @@ export const streamSessions = pgTable("stream_sessions", {
 
 export const streamSnapshots = pgTable("stream_snapshots", {
   id: uuid("id").defaultRandom().primaryKey(),
-  twitchStreamId: text("twitch_stream_id").notNull().references(() => streamSessions.twitchStreamId),
-  broadcasterUserId: text("broadcaster_user_id").notNull().references(() => twitchUsers.twitchUserId),
+  twitchStreamId: compactExternalKey("twitch_stream_id").notNull().references(() => streamSessions.storageKey),
+  broadcasterUserId: compactExternalKey("broadcaster_user_id").notNull().references(() => twitchUsers.storageKey),
   observedAt: timestamp("observed_at", { withTimezone: true }).defaultNow().notNull(),
   viewerCount: integer("viewer_count"),
   title: text("title"),
   categoryId: text("category_id"),
   categoryName: text("category_name"),
   language: text("language"),
-  tags: jsonb("tags").$type<string[]>().default([]).notNull(),
+  tags: compactJson<string[]>()("tags").default(sql`encode_compact_json('[]'::jsonb)`).notNull(),
   thumbnailUrl: text("thumbnail_url"),
   sourceRunId: uuid("source_run_id"),
-  ...timestamps
+  ...recordTimestamps("observed_at")
 }, (table) => ({
   streamObservedIdx: index("stream_snapshots_stream_observed_idx").on(table.twitchStreamId, table.observedAt),
   broadcasterObservedIdx: index("stream_snapshots_broadcaster_observed_idx").on(table.broadcasterUserId, table.observedAt)
@@ -241,7 +251,7 @@ export const rawIrcMessages = pgTable("raw_irc_messages", {
   receivedAt: timestamp("received_at", { withTimezone: true }).defaultNow().notNull(),
   processingStatus: rawProcessingStatusEnum("processing_status").default("pending").notNull(),
   parseError: text("parse_error"),
-  ...timestamps
+  ...recordTimestamps("received_at")
 }, (table) => ({
   receivedIdx: index("raw_irc_messages_received_idx").on(table.receivedAt),
   unpackedIdx: index("raw_irc_messages_unpacked_idx").on(table.receivedAt).where(sql`${table.payloadBlockId} is null and ${table.rawLine} <> ''`),
@@ -292,24 +302,24 @@ export const eventsubSubscriptions = pgTable("eventsub_subscriptions", {
 
 export const chatMessages = pgTable("chat_messages", {
   twitchMessageId: compactMessageId("twitch_message_id").primaryKey(),
-  broadcasterUserId: text("broadcaster_user_id").notNull().references(() => twitchUsers.twitchUserId),
-  twitchStreamId: text("twitch_stream_id").references(() => streamSessions.twitchStreamId),
-  chatterUserId: text("chatter_user_id").references(() => twitchUsers.twitchUserId),
+  broadcasterUserId: compactExternalKey("broadcaster_user_id").notNull().references(() => twitchUsers.storageKey),
+  twitchStreamId: compactExternalKey("twitch_stream_id").references(() => streamSessions.storageKey),
+  chatterUserId: compactExternalKey("chatter_user_id").references(() => twitchUsers.storageKey),
   chatterLogin: text("chatter_login"),
-  source: text("source").default("irc").notNull(),
+  source: compactLabel("irc")("source").default(sql`''`).notNull(),
   sentAt: timestamp("sent_at", { withTimezone: true }),
   receivedAt: timestamp("received_at", { withTimezone: true }).defaultNow().notNull(),
-  messageType: text("message_type").default("privmsg").notNull(),
+  messageType: compactLabel("privmsg")("message_type").default(sql`''`).notNull(),
   rawText: text("raw_text"),
   badges: compactJson<Record<string, string>>()("badges").default(sql`decode('00', 'hex')`).notNull(),
   emotes: compactJson<Record<string, unknown>>()("emotes").default(sql`decode('00', 'hex')`).notNull(),
   replyParentMessageId: compactMessageId("reply_parent_message_id"),
-  sharedChatSourceChannelId: text("shared_chat_source_channel_id"),
+  sharedChatSourceChannelId: compactExternalKey("shared_chat_source_channel_id"),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
   clearedAt: timestamp("cleared_at", { withTimezone: true }),
   rawIrcMessageId: uuid("raw_irc_message_id").references(() => rawIrcMessages.id),
   rawEventsubEventId: uuid("raw_eventsub_event_id").references(() => rawEventsubEvents.id),
-  ...timestamps
+  ...recordTimestamps("received_at")
 }, (table) => ({
   receivedIdx: index("chat_messages_received_idx").on(table.receivedAt),
   streamReceivedIdx: index("chat_messages_stream_received_idx").on(table.twitchStreamId, table.receivedAt),
@@ -427,7 +437,7 @@ export const raids = pgTable("raids", {
 }));
 
 export const streamActivityBuckets = pgTable("stream_activity_buckets", {
-  twitchStreamId: text("twitch_stream_id").notNull().references(() => streamSessions.twitchStreamId),
+  twitchStreamId: compactExternalKey("twitch_stream_id").notNull().references(() => streamSessions.storageKey),
   bucketStart: timestamp("bucket_start", { withTimezone: true }).notNull(),
   bucketMinutes: integer("bucket_minutes").notNull(),
   viewerCountMin: integer("viewer_count_min"),

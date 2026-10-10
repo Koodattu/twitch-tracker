@@ -18,8 +18,8 @@ export async function addCommunityCategories(db: Pick<DbClient, "transaction">, 
         select twitch_stream_id as stream, broadcaster_user_id as channel, greatest(first_seen_at, started_at) as observed,
           initial_category_id as category, initial_category_name as name, 0 as priority from sessions
         union all
-        select p.twitch_stream_id, p.broadcaster_user_id, p.observed_at, p.category_id, p.category_name, 1
-        from stream_snapshots p join sessions s on s.twitch_stream_id = p.twitch_stream_id and s.broadcaster_user_id = p.broadcaster_user_id
+        select s.twitch_stream_id, s.broadcaster_user_id, p.observed_at, p.category_id, p.category_name, 1
+        from stream_snapshots p join sessions s on s.storage_key = p.twitch_stream_id and encode_external_key(s.broadcaster_user_id) = p.broadcaster_user_id
         where p.category_id is not null and p.observed_at >= greatest(s.first_seen_at, s.started_at) and p.observed_at < s.window_end
       ), changes as (
         select distinct on (stream, observed) * from points order by stream, observed, priority desc, category, name

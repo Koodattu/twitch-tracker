@@ -1,0 +1,5535 @@
+{
+  "columns": [
+    {
+      "name": "twitch_user_id",
+      "type": "text",
+      "table": "admin_users",
+      "dropped": false,
+      "position": 1,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "granted_by",
+      "type": "text",
+      "table": "admin_users",
+      "dropped": false,
+      "position": 2,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "granted_at",
+      "type": "timestamp with time zone",
+      "table": "admin_users",
+      "dropped": false,
+      "position": 3,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "admin_users",
+      "dropped": false,
+      "position": 4,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "table": "admin_users",
+      "dropped": false,
+      "position": 5,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "id",
+      "type": "uuid",
+      "table": "app_users",
+      "dropped": false,
+      "position": 1,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "twitch_user_id",
+      "type": "text",
+      "table": "app_users",
+      "dropped": false,
+      "position": 2,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "is_admin",
+      "type": "boolean",
+      "table": "app_users",
+      "dropped": false,
+      "position": 3,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "last_login_at",
+      "type": "timestamp with time zone",
+      "table": "app_users",
+      "dropped": false,
+      "position": 4,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "app_users",
+      "dropped": false,
+      "position": 5,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "table": "app_users",
+      "dropped": false,
+      "position": 6,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "id",
+      "type": "uuid",
+      "table": "bot_account_tokens",
+      "dropped": false,
+      "position": 1,
+      "avg_width": 16,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "bot_account_id",
+      "type": "uuid",
+      "table": "bot_account_tokens",
+      "dropped": false,
+      "position": 2,
+      "avg_width": 16,
+      "null_fraction": 0,
+      "distinct_estimate": -0.71428573
+    },
+    {
+      "name": "scopes",
+      "type": "jsonb",
+      "table": "bot_account_tokens",
+      "dropped": false,
+      "position": 3,
+      "avg_width": 95,
+      "null_fraction": 0,
+      "distinct_estimate": -0.14285715
+    },
+    {
+      "name": "encrypted_access_token",
+      "type": "text",
+      "table": "bot_account_tokens",
+      "dropped": false,
+      "position": 4,
+      "avg_width": 84,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "encrypted_refresh_token",
+      "type": "text",
+      "table": "bot_account_tokens",
+      "dropped": false,
+      "position": 5,
+      "avg_width": 111,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "expires_at",
+      "type": "timestamp with time zone",
+      "table": "bot_account_tokens",
+      "dropped": false,
+      "position": 6,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "last_validated_at",
+      "type": "timestamp with time zone",
+      "table": "bot_account_tokens",
+      "dropped": false,
+      "position": 7,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "refresh_status",
+      "type": "text",
+      "table": "bot_account_tokens",
+      "dropped": false,
+      "position": 8,
+      "avg_width": 10,
+      "null_fraction": 0,
+      "distinct_estimate": -0.2857143
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "bot_account_tokens",
+      "dropped": false,
+      "position": 9,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "table": "bot_account_tokens",
+      "dropped": false,
+      "position": 10,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -0.85714287
+    },
+    {
+      "name": "id",
+      "type": "uuid",
+      "table": "bot_accounts",
+      "dropped": false,
+      "position": 1,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "twitch_user_id",
+      "type": "text",
+      "table": "bot_accounts",
+      "dropped": false,
+      "position": 2,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "login",
+      "type": "text",
+      "table": "bot_accounts",
+      "dropped": false,
+      "position": 3,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "enabled",
+      "type": "boolean",
+      "table": "bot_accounts",
+      "dropped": false,
+      "position": 4,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "max_joined_rooms",
+      "type": "integer",
+      "table": "bot_accounts",
+      "dropped": false,
+      "position": 5,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "join_rate_per_10_seconds",
+      "type": "integer",
+      "table": "bot_accounts",
+      "dropped": false,
+      "position": 6,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "priority",
+      "type": "integer",
+      "table": "bot_accounts",
+      "dropped": false,
+      "position": 7,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "health_status",
+      "type": "text",
+      "table": "bot_accounts",
+      "dropped": false,
+      "position": 8,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "bot_accounts",
+      "dropped": false,
+      "position": 9,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "table": "bot_accounts",
+      "dropped": false,
+      "position": 10,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "broadcaster_user_id",
+      "type": "text",
+      "table": "channel_daily_stats",
+      "dropped": false,
+      "position": 1,
+      "avg_width": 9,
+      "null_fraction": 0,
+      "distinct_estimate": -0.11182866
+    },
+    {
+      "name": "day",
+      "type": "text",
+      "table": "channel_daily_stats",
+      "dropped": false,
+      "position": 2,
+      "avg_width": 11,
+      "null_fraction": 0,
+      "distinct_estimate": 59
+    },
+    {
+      "name": "stream_count",
+      "type": "integer",
+      "table": "channel_daily_stats",
+      "dropped": false,
+      "position": 3,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 15
+    },
+    {
+      "name": "live_seconds",
+      "type": "integer",
+      "table": "channel_daily_stats",
+      "dropped": false,
+      "position": 4,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": -0.41460523
+    },
+    {
+      "name": "viewer_count_max",
+      "type": "integer",
+      "table": "channel_daily_stats",
+      "dropped": false,
+      "position": 5,
+      "avg_width": 4,
+      "null_fraction": 0.0284,
+      "distinct_estimate": 617
+    },
+    {
+      "name": "viewer_count_avg",
+      "type": "integer",
+      "table": "channel_daily_stats",
+      "dropped": false,
+      "position": 6,
+      "avg_width": 4,
+      "null_fraction": 0.0284,
+      "distinct_estimate": 440
+    },
+    {
+      "name": "message_count",
+      "type": "integer",
+      "table": "channel_daily_stats",
+      "dropped": false,
+      "position": 7,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 1690
+    },
+    {
+      "name": "aggregate_engagement",
+      "type": "jsonb",
+      "table": "channel_daily_stats",
+      "dropped": false,
+      "position": 8,
+      "avg_width": 5,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "channel_daily_stats",
+      "dropped": false,
+      "position": 9,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -0.22208844
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "table": "channel_daily_stats",
+      "dropped": false,
+      "position": 10,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": 5014
+    },
+    {
+      "name": "id",
+      "type": "uuid",
+      "table": "channel_events",
+      "dropped": false,
+      "position": 1,
+      "avg_width": 16,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "event_type",
+      "type": "text",
+      "table": "channel_events",
+      "dropped": false,
+      "position": 2,
+      "avg_width": 22,
+      "null_fraction": 0,
+      "distinct_estimate": 39
+    },
+    {
+      "name": "broadcaster_user_id",
+      "type": "text",
+      "table": "channel_events",
+      "dropped": false,
+      "position": 3,
+      "avg_width": 9,
+      "null_fraction": 0,
+      "distinct_estimate": 2271
+    },
+    {
+      "name": "twitch_stream_id",
+      "type": "text",
+      "table": "channel_events",
+      "dropped": false,
+      "position": 4,
+      "avg_width": 13,
+      "null_fraction": 0.0868,
+      "distinct_estimate": 14575
+    },
+    {
+      "name": "actor_user_id",
+      "type": "text",
+      "table": "channel_events",
+      "dropped": false,
+      "position": 5,
+      "avg_width": 9,
+      "null_fraction": 0.39176667,
+      "distinct_estimate": 6751
+    },
+    {
+      "name": "occurred_at",
+      "type": "timestamp with time zone",
+      "table": "channel_events",
+      "dropped": false,
+      "position": 6,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -0.9850066
+    },
+    {
+      "name": "source",
+      "type": "text",
+      "table": "channel_events",
+      "dropped": false,
+      "position": 7,
+      "avg_width": 5,
+      "null_fraction": 0,
+      "distinct_estimate": 2
+    },
+    {
+      "name": "source_event_id",
+      "type": "text",
+      "table": "channel_events",
+      "dropped": false,
+      "position": 8,
+      "avg_width": 36,
+      "null_fraction": 0,
+      "distinct_estimate": -0.88319606
+    },
+    {
+      "name": "raw_eventsub_event_id",
+      "type": "uuid",
+      "table": "channel_events",
+      "dropped": false,
+      "position": 9,
+      "avg_width": 16,
+      "null_fraction": 0.7086667,
+      "distinct_estimate": -0.29133332
+    },
+    {
+      "name": "raw_irc_message_id",
+      "type": "uuid",
+      "table": "channel_events",
+      "dropped": false,
+      "position": 10,
+      "avg_width": 16,
+      "null_fraction": 0.29133335,
+      "distinct_estimate": -0.7086667
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "channel_events",
+      "dropped": false,
+      "position": 11,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "table": "channel_events",
+      "dropped": false,
+      "position": 12,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "twitch_user_id",
+      "type": "text",
+      "table": "channels",
+      "dropped": false,
+      "position": 1,
+      "avg_width": 9,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "has_been_seen_finnish",
+      "type": "boolean",
+      "table": "channels",
+      "dropped": false,
+      "position": 2,
+      "avg_width": 1,
+      "null_fraction": 0,
+      "distinct_estimate": 2
+    },
+    {
+      "name": "first_seen_finnish_at",
+      "type": "timestamp with time zone",
+      "table": "channels",
+      "dropped": false,
+      "position": 3,
+      "avg_width": 8,
+      "null_fraction": 0.0026819922,
+      "distinct_estimate": -0.997318
+    },
+    {
+      "name": "last_seen_finnish_at",
+      "type": "timestamp with time zone",
+      "table": "channels",
+      "dropped": false,
+      "position": 4,
+      "avg_width": 8,
+      "null_fraction": 0.0026819922,
+      "distinct_estimate": -0.997318
+    },
+    {
+      "name": "is_manually_pinned",
+      "type": "boolean",
+      "table": "channels",
+      "dropped": false,
+      "position": 5,
+      "avg_width": 1,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "is_opted_in",
+      "type": "boolean",
+      "table": "channels",
+      "dropped": false,
+      "position": 6,
+      "avg_width": 1,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "is_known_moderator",
+      "type": "boolean",
+      "table": "channels",
+      "dropped": false,
+      "position": 7,
+      "avg_width": 1,
+      "null_fraction": 0,
+      "distinct_estimate": 2
+    },
+    {
+      "name": "tracking_priority",
+      "type": "integer",
+      "table": "channels",
+      "dropped": false,
+      "position": 8,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "notes",
+      "type": "text",
+      "table": "channels",
+      "dropped": false,
+      "position": 9,
+      "avg_width": 0,
+      "null_fraction": 1,
+      "distinct_estimate": 0
+    },
+    {
+      "name": "tags",
+      "type": "jsonb",
+      "table": "channels",
+      "dropped": false,
+      "position": 10,
+      "avg_width": 5,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "channels",
+      "dropped": false,
+      "position": 11,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "table": "channels",
+      "dropped": false,
+      "position": 12,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "id",
+      "type": "uuid",
+      "table": "chat_assignment_events",
+      "dropped": false,
+      "position": 1,
+      "avg_width": 16,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "chat_assignment_id",
+      "type": "uuid",
+      "table": "chat_assignment_events",
+      "dropped": false,
+      "position": 2,
+      "avg_width": 16,
+      "null_fraction": 0,
+      "distinct_estimate": -0.112116165
+    },
+    {
+      "name": "event_type",
+      "type": "text",
+      "table": "chat_assignment_events",
+      "dropped": false,
+      "position": 3,
+      "avg_width": 7,
+      "null_fraction": 0,
+      "distinct_estimate": 6
+    },
+    {
+      "name": "reason",
+      "type": "text",
+      "table": "chat_assignment_events",
+      "dropped": false,
+      "position": 4,
+      "avg_width": 24,
+      "null_fraction": 0,
+      "distinct_estimate": 10
+    },
+    {
+      "name": "details",
+      "type": "jsonb",
+      "table": "chat_assignment_events",
+      "dropped": false,
+      "position": 5,
+      "avg_width": 59,
+      "null_fraction": 0,
+      "distinct_estimate": 60
+    },
+    {
+      "name": "occurred_at",
+      "type": "timestamp with time zone",
+      "table": "chat_assignment_events",
+      "dropped": false,
+      "position": 6,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -0.246922
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "chat_assignment_events",
+      "dropped": false,
+      "position": 7,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -0.70436716
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "table": "chat_assignment_events",
+      "dropped": false,
+      "position": 8,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -0.246922
+    },
+    {
+      "name": "id",
+      "type": "uuid",
+      "table": "chat_assignments",
+      "dropped": false,
+      "position": 1,
+      "avg_width": 16,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "bot_account_id",
+      "type": "uuid",
+      "table": "chat_assignments",
+      "dropped": false,
+      "position": 2,
+      "avg_width": 16,
+      "null_fraction": 0,
+      "distinct_estimate": 5
+    },
+    {
+      "name": "broadcaster_user_id",
+      "type": "text",
+      "table": "chat_assignments",
+      "dropped": false,
+      "position": 3,
+      "avg_width": 9,
+      "null_fraction": 0,
+      "distinct_estimate": 5791
+    },
+    {
+      "name": "twitch_stream_id",
+      "type": "text",
+      "table": "chat_assignments",
+      "dropped": false,
+      "position": 4,
+      "avg_width": 13,
+      "null_fraction": 0,
+      "distinct_estimate": -0.9880122
+    },
+    {
+      "name": "status",
+      "type": "assignment_status",
+      "table": "chat_assignments",
+      "dropped": false,
+      "position": 5,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 4
+    },
+    {
+      "name": "priority_score",
+      "type": "integer",
+      "table": "chat_assignments",
+      "dropped": false,
+      "position": 6,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 100
+    },
+    {
+      "name": "join_method",
+      "type": "text",
+      "table": "chat_assignments",
+      "dropped": false,
+      "position": 7,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "reason",
+      "type": "text",
+      "table": "chat_assignments",
+      "dropped": false,
+      "position": 8,
+      "avg_width": 19,
+      "null_fraction": 0,
+      "distinct_estimate": 7
+    },
+    {
+      "name": "joined_at",
+      "type": "timestamp with time zone",
+      "table": "chat_assignments",
+      "dropped": false,
+      "position": 9,
+      "avg_width": 8,
+      "null_fraction": 0.018566666,
+      "distinct_estimate": -0.97177446
+    },
+    {
+      "name": "left_at",
+      "type": "timestamp with time zone",
+      "table": "chat_assignments",
+      "dropped": false,
+      "position": 10,
+      "avg_width": 8,
+      "null_fraction": 0.007833334,
+      "distinct_estimate": -0.96850634
+    },
+    {
+      "name": "last_message_at",
+      "type": "timestamp with time zone",
+      "table": "chat_assignments",
+      "dropped": false,
+      "position": 11,
+      "avg_width": 8,
+      "null_fraction": 0.26306668,
+      "distinct_estimate": -0.73437774
+    },
+    {
+      "name": "last_membership_event_at",
+      "type": "timestamp with time zone",
+      "table": "chat_assignments",
+      "dropped": false,
+      "position": 12,
+      "avg_width": 8,
+      "null_fraction": 0.049666665,
+      "distinct_estimate": -0.94074976
+    },
+    {
+      "name": "latest_error",
+      "type": "text",
+      "table": "chat_assignments",
+      "dropped": false,
+      "position": 13,
+      "avg_width": 77,
+      "null_fraction": 0.9961333,
+      "distinct_estimate": 46
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "chat_assignments",
+      "dropped": false,
+      "position": 14,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "table": "chat_assignments",
+      "dropped": false,
+      "position": 15,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -0.96808136
+    },
+    {
+      "name": "twitch_message_id",
+      "type": "bytea",
+      "table": "chat_messages",
+      "dropped": false,
+      "position": 1,
+      "avg_width": 18,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "broadcaster_user_id",
+      "type": "text",
+      "table": "chat_messages",
+      "dropped": false,
+      "position": 2,
+      "avg_width": 9,
+      "null_fraction": 0,
+      "distinct_estimate": 2460
+    },
+    {
+      "name": "twitch_stream_id",
+      "type": "text",
+      "table": "chat_messages",
+      "dropped": false,
+      "position": 3,
+      "avg_width": 13,
+      "null_fraction": 0.00093333336,
+      "distinct_estimate": 15118
+    },
+    {
+      "name": "chatter_user_id",
+      "type": "text",
+      "table": "chat_messages",
+      "dropped": false,
+      "position": 4,
+      "avg_width": 9,
+      "null_fraction": 0,
+      "distinct_estimate": 13998
+    },
+    {
+      "name": "chatter_login",
+      "type": "text",
+      "table": "chat_messages",
+      "dropped": false,
+      "position": 5,
+      "avg_width": 10,
+      "null_fraction": 0,
+      "distinct_estimate": 14099
+    },
+    {
+      "name": "source",
+      "type": "text",
+      "table": "chat_messages",
+      "dropped": false,
+      "position": 6,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "sent_at",
+      "type": "timestamp with time zone",
+      "table": "chat_messages",
+      "dropped": false,
+      "position": 7,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -0.84167266
+    },
+    {
+      "name": "received_at",
+      "type": "timestamp with time zone",
+      "table": "chat_messages",
+      "dropped": false,
+      "position": 8,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -0.98154175
+    },
+    {
+      "name": "message_type",
+      "type": "text",
+      "table": "chat_messages",
+      "dropped": false,
+      "position": 9,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "raw_text",
+      "type": "text",
+      "table": "chat_messages",
+      "dropped": false,
+      "position": 10,
+      "avg_width": 41,
+      "null_fraction": 0,
+      "distinct_estimate": 138808
+    },
+    {
+      "name": "badges",
+      "type": "bytea",
+      "table": "chat_messages",
+      "dropped": false,
+      "position": 11,
+      "avg_width": 24,
+      "null_fraction": 0,
+      "distinct_estimate": 4760
+    },
+    {
+      "name": "emotes",
+      "type": "bytea",
+      "table": "chat_messages",
+      "dropped": false,
+      "position": 12,
+      "avg_width": 6,
+      "null_fraction": 0,
+      "distinct_estimate": 2892
+    },
+    {
+      "name": "reply_parent_message_id",
+      "type": "bytea",
+      "table": "chat_messages",
+      "dropped": false,
+      "position": 13,
+      "avg_width": 18,
+      "null_fraction": 0.94096667,
+      "distinct_estimate": 379483
+    },
+    {
+      "name": "shared_chat_source_channel_id",
+      "type": "text",
+      "table": "chat_messages",
+      "dropped": false,
+      "position": 14,
+      "avg_width": 9,
+      "null_fraction": 0.96363336,
+      "distinct_estimate": 259
+    },
+    {
+      "name": "deleted_at",
+      "type": "timestamp with time zone",
+      "table": "chat_messages",
+      "dropped": false,
+      "position": 15,
+      "avg_width": 8,
+      "null_fraction": 0.9995,
+      "distinct_estimate": -0.00050002337
+    },
+    {
+      "name": "cleared_at",
+      "type": "timestamp with time zone",
+      "table": "chat_messages",
+      "dropped": false,
+      "position": 16,
+      "avg_width": 8,
+      "null_fraction": 0.9701667,
+      "distinct_estimate": 755
+    },
+    {
+      "name": "raw_irc_message_id",
+      "type": "uuid",
+      "table": "chat_messages",
+      "dropped": false,
+      "position": 17,
+      "avg_width": 16,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "raw_eventsub_event_id",
+      "type": "uuid",
+      "table": "chat_messages",
+      "dropped": false,
+      "position": 18,
+      "avg_width": 16,
+      "null_fraction": 1,
+      "distinct_estimate": 0
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "chat_messages",
+      "dropped": false,
+      "position": 19,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "table": "chat_messages",
+      "dropped": false,
+      "position": 20,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -0.10024358
+    },
+    {
+      "name": "id",
+      "type": "uuid",
+      "table": "chat_presence_observations",
+      "dropped": false,
+      "position": 1,
+      "avg_width": 16,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "snapshot_id",
+      "type": "uuid",
+      "table": "chat_presence_observations",
+      "dropped": false,
+      "position": 2,
+      "avg_width": 16,
+      "null_fraction": 0,
+      "distinct_estimate": -0.5546219
+    },
+    {
+      "name": "broadcaster_user_id",
+      "type": "text",
+      "table": "chat_presence_observations",
+      "dropped": false,
+      "position": 3,
+      "avg_width": 11,
+      "null_fraction": 0,
+      "distinct_estimate": 2
+    },
+    {
+      "name": "chatter_user_id",
+      "type": "text",
+      "table": "chat_presence_observations",
+      "dropped": false,
+      "position": 4,
+      "avg_width": 10,
+      "null_fraction": 0,
+      "distinct_estimate": 8
+    },
+    {
+      "name": "chatter_login",
+      "type": "text",
+      "table": "chat_presence_observations",
+      "dropped": false,
+      "position": 5,
+      "avg_width": 11,
+      "null_fraction": 0,
+      "distinct_estimate": 8
+    },
+    {
+      "name": "chatter_display_name",
+      "type": "text",
+      "table": "chat_presence_observations",
+      "dropped": false,
+      "position": 6,
+      "avg_width": 11,
+      "null_fraction": 0,
+      "distinct_estimate": 8
+    },
+    {
+      "name": "twitch_stream_id",
+      "type": "text",
+      "table": "chat_presence_observations",
+      "dropped": false,
+      "position": 7,
+      "avg_width": 13,
+      "null_fraction": 0,
+      "distinct_estimate": 9
+    },
+    {
+      "name": "observed_at",
+      "type": "timestamp with time zone",
+      "table": "chat_presence_observations",
+      "dropped": false,
+      "position": 8,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -0.5546219
+    },
+    {
+      "name": "source",
+      "type": "text",
+      "table": "chat_presence_observations",
+      "dropped": false,
+      "position": 9,
+      "avg_width": 19,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "confidence",
+      "type": "integer",
+      "table": "chat_presence_observations",
+      "dropped": false,
+      "position": 10,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "dedupe_key",
+      "type": "text",
+      "table": "chat_presence_observations",
+      "dropped": false,
+      "position": 11,
+      "avg_width": 78,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "chat_presence_observations",
+      "dropped": false,
+      "position": 12,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "table": "chat_presence_observations",
+      "dropped": false,
+      "position": 13,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "id",
+      "type": "uuid",
+      "table": "chat_presence_snapshots",
+      "dropped": false,
+      "position": 1,
+      "avg_width": 16,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "broadcaster_user_id",
+      "type": "text",
+      "table": "chat_presence_snapshots",
+      "dropped": false,
+      "position": 2,
+      "avg_width": 11,
+      "null_fraction": 0,
+      "distinct_estimate": 2
+    },
+    {
+      "name": "twitch_stream_id",
+      "type": "text",
+      "table": "chat_presence_snapshots",
+      "dropped": false,
+      "position": 3,
+      "avg_width": 13,
+      "null_fraction": 0,
+      "distinct_estimate": 7
+    },
+    {
+      "name": "bot_account_id",
+      "type": "uuid",
+      "table": "chat_presence_snapshots",
+      "dropped": false,
+      "position": 4,
+      "avg_width": 16,
+      "null_fraction": 0,
+      "distinct_estimate": 2
+    },
+    {
+      "name": "source",
+      "type": "text",
+      "table": "chat_presence_snapshots",
+      "dropped": false,
+      "position": 5,
+      "avg_width": 19,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "confidence",
+      "type": "integer",
+      "table": "chat_presence_snapshots",
+      "dropped": false,
+      "position": 6,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "sampled_at",
+      "type": "timestamp with time zone",
+      "table": "chat_presence_snapshots",
+      "dropped": false,
+      "position": 7,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "chatter_count",
+      "type": "integer",
+      "table": "chat_presence_snapshots",
+      "dropped": false,
+      "position": 8,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 3
+    },
+    {
+      "name": "page_count",
+      "type": "integer",
+      "table": "chat_presence_snapshots",
+      "dropped": false,
+      "position": 9,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "request_status",
+      "type": "text",
+      "table": "chat_presence_snapshots",
+      "dropped": false,
+      "position": 10,
+      "avg_width": 10,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "latest_error",
+      "type": "text",
+      "table": "chat_presence_snapshots",
+      "dropped": false,
+      "position": 11,
+      "avg_width": 0,
+      "null_fraction": 1,
+      "distinct_estimate": 0
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "chat_presence_snapshots",
+      "dropped": false,
+      "position": 12,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "table": "chat_presence_snapshots",
+      "dropped": false,
+      "position": 13,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "id",
+      "type": "uuid",
+      "table": "chat_room_state_events",
+      "dropped": false,
+      "position": 1,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "broadcaster_user_id",
+      "type": "text",
+      "table": "chat_room_state_events",
+      "dropped": false,
+      "position": 2,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "bot_account_id",
+      "type": "uuid",
+      "table": "chat_room_state_events",
+      "dropped": false,
+      "position": 3,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "state_type",
+      "type": "text",
+      "table": "chat_room_state_events",
+      "dropped": false,
+      "position": 4,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "payload",
+      "type": "jsonb",
+      "table": "chat_room_state_events",
+      "dropped": false,
+      "position": 5,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "observed_at",
+      "type": "timestamp with time zone",
+      "table": "chat_room_state_events",
+      "dropped": false,
+      "position": 6,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "raw_irc_message_id",
+      "type": "uuid",
+      "table": "chat_room_state_events",
+      "dropped": false,
+      "position": 7,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "chat_room_state_events",
+      "dropped": false,
+      "position": 8,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "table": "chat_room_state_events",
+      "dropped": false,
+      "position": 9,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "chatter_user_id",
+      "type": "text",
+      "table": "chatter_daily_stats",
+      "dropped": false,
+      "position": 1,
+      "avg_width": 9,
+      "null_fraction": 0,
+      "distinct_estimate": 33518
+    },
+    {
+      "name": "day",
+      "type": "text",
+      "table": "chatter_daily_stats",
+      "dropped": false,
+      "position": 2,
+      "avg_width": 11,
+      "null_fraction": 0,
+      "distinct_estimate": 58
+    },
+    {
+      "name": "message_count",
+      "type": "integer",
+      "table": "chatter_daily_stats",
+      "dropped": false,
+      "position": 3,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 370
+    },
+    {
+      "name": "channels_active",
+      "type": "integer",
+      "table": "chatter_daily_stats",
+      "dropped": false,
+      "position": 4,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 41
+    },
+    {
+      "name": "active_minutes",
+      "type": "integer",
+      "table": "chatter_daily_stats",
+      "dropped": false,
+      "position": 5,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 258
+    },
+    {
+      "name": "summary",
+      "type": "jsonb",
+      "table": "chatter_daily_stats",
+      "dropped": false,
+      "position": 6,
+      "avg_width": 32,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "chatter_daily_stats",
+      "dropped": false,
+      "position": 7,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": 17370
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "table": "chatter_daily_stats",
+      "dropped": false,
+      "position": 8,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": 9765
+    },
+    {
+      "name": "id",
+      "type": "uuid",
+      "table": "community_map_snapshots",
+      "dropped": false,
+      "position": 1,
+      "avg_width": 16,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "recipe",
+      "type": "text",
+      "table": "community_map_snapshots",
+      "dropped": false,
+      "position": 2,
+      "avg_width": 19,
+      "null_fraction": 0,
+      "distinct_estimate": -0.11764706
+    },
+    {
+      "name": "window_start",
+      "type": "timestamp with time zone",
+      "table": "community_map_snapshots",
+      "dropped": false,
+      "position": 3,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -0.9117647
+    },
+    {
+      "name": "window_end",
+      "type": "timestamp with time zone",
+      "table": "community_map_snapshots",
+      "dropped": false,
+      "position": 4,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -0.9117647
+    },
+    {
+      "name": "generated_at",
+      "type": "timestamp with time zone",
+      "table": "community_map_snapshots",
+      "dropped": false,
+      "position": 5,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "privacy_version",
+      "type": "integer",
+      "table": "community_map_snapshots",
+      "dropped": false,
+      "position": 6,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "valid",
+      "type": "boolean",
+      "table": "community_map_snapshots",
+      "dropped": false,
+      "position": 7,
+      "avg_width": 1,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "graph",
+      "type": "jsonb",
+      "table": "community_map_snapshots",
+      "dropped": false,
+      "position": 8,
+      "avg_width": 0,
+      "null_fraction": 1,
+      "distinct_estimate": 0
+    },
+    {
+      "name": "coverage",
+      "type": "jsonb",
+      "table": "community_map_snapshots",
+      "dropped": false,
+      "position": 9,
+      "avg_width": 0,
+      "null_fraction": 1,
+      "distinct_estimate": 0
+    },
+    {
+      "name": "id",
+      "type": "text",
+      "table": "community_map_state",
+      "dropped": false,
+      "position": 1,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "request_version",
+      "type": "integer",
+      "table": "community_map_state",
+      "dropped": false,
+      "position": 2,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "completed_version",
+      "type": "integer",
+      "table": "community_map_state",
+      "dropped": false,
+      "position": 3,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "privacy_version",
+      "type": "integer",
+      "table": "community_map_state",
+      "dropped": false,
+      "position": 4,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "status",
+      "type": "text",
+      "table": "community_map_state",
+      "dropped": false,
+      "position": 5,
+      "avg_width": 6,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "snapshot_id",
+      "type": "uuid",
+      "table": "community_map_state",
+      "dropped": false,
+      "position": 6,
+      "avg_width": 16,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "requested_at",
+      "type": "timestamp with time zone",
+      "table": "community_map_state",
+      "dropped": false,
+      "position": 7,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "started_at",
+      "type": "timestamp with time zone",
+      "table": "community_map_state",
+      "dropped": false,
+      "position": 8,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "finished_at",
+      "type": "timestamp with time zone",
+      "table": "community_map_state",
+      "dropped": false,
+      "position": 9,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "last_success_at",
+      "type": "timestamp with time zone",
+      "table": "community_map_state",
+      "dropped": false,
+      "position": 10,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "retry_after",
+      "type": "timestamp with time zone",
+      "table": "community_map_state",
+      "dropped": false,
+      "position": 11,
+      "avg_width": 8,
+      "null_fraction": 1,
+      "distinct_estimate": 0
+    },
+    {
+      "name": "error",
+      "type": "text",
+      "table": "community_map_state",
+      "dropped": false,
+      "position": 12,
+      "avg_width": 0,
+      "null_fraction": 1,
+      "distinct_estimate": 0
+    },
+    {
+      "name": "id",
+      "type": "uuid",
+      "table": "event_processing_failures",
+      "dropped": false,
+      "position": 1,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "raw_source",
+      "type": "text",
+      "table": "event_processing_failures",
+      "dropped": false,
+      "position": 2,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "raw_id",
+      "type": "uuid",
+      "table": "event_processing_failures",
+      "dropped": false,
+      "position": 3,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "handler_name",
+      "type": "text",
+      "table": "event_processing_failures",
+      "dropped": false,
+      "position": 4,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "error_class",
+      "type": "text",
+      "table": "event_processing_failures",
+      "dropped": false,
+      "position": 5,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "error_message",
+      "type": "text",
+      "table": "event_processing_failures",
+      "dropped": false,
+      "position": 6,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "retry_count",
+      "type": "integer",
+      "table": "event_processing_failures",
+      "dropped": false,
+      "position": 7,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "next_retry_at",
+      "type": "timestamp with time zone",
+      "table": "event_processing_failures",
+      "dropped": false,
+      "position": 8,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "event_processing_failures",
+      "dropped": false,
+      "position": 9,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "table": "event_processing_failures",
+      "dropped": false,
+      "position": 10,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "id",
+      "type": "uuid",
+      "table": "eventsub_subscriptions",
+      "dropped": false,
+      "position": 1,
+      "avg_width": 16,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "twitch_subscription_id",
+      "type": "text",
+      "table": "eventsub_subscriptions",
+      "dropped": false,
+      "position": 2,
+      "avg_width": 37,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "event_type",
+      "type": "text",
+      "table": "eventsub_subscriptions",
+      "dropped": false,
+      "position": 3,
+      "avg_width": 17,
+      "null_fraction": 0,
+      "distinct_estimate": 8
+    },
+    {
+      "name": "event_version",
+      "type": "text",
+      "table": "eventsub_subscriptions",
+      "dropped": false,
+      "position": 4,
+      "avg_width": 2,
+      "null_fraction": 0,
+      "distinct_estimate": 2
+    },
+    {
+      "name": "condition",
+      "type": "jsonb",
+      "table": "eventsub_subscriptions",
+      "dropped": false,
+      "position": 5,
+      "avg_width": 40,
+      "null_fraction": 0,
+      "distinct_estimate": -0.44444445
+    },
+    {
+      "name": "condition_key",
+      "type": "text",
+      "table": "eventsub_subscriptions",
+      "dropped": false,
+      "position": 6,
+      "avg_width": 35,
+      "null_fraction": 0,
+      "distinct_estimate": -0.44444445
+    },
+    {
+      "name": "broadcaster_user_id",
+      "type": "text",
+      "table": "eventsub_subscriptions",
+      "dropped": false,
+      "position": 7,
+      "avg_width": 9,
+      "null_fraction": 0,
+      "distinct_estimate": -0.11111111
+    },
+    {
+      "name": "transport_method",
+      "type": "text",
+      "table": "eventsub_subscriptions",
+      "dropped": false,
+      "position": 8,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "callback_url",
+      "type": "text",
+      "table": "eventsub_subscriptions",
+      "dropped": false,
+      "position": 9,
+      "avg_width": 64,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "status",
+      "type": "text",
+      "table": "eventsub_subscriptions",
+      "dropped": false,
+      "position": 10,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "cost",
+      "type": "integer",
+      "table": "eventsub_subscriptions",
+      "dropped": false,
+      "position": 11,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "last_synced_at",
+      "type": "timestamp with time zone",
+      "table": "eventsub_subscriptions",
+      "dropped": false,
+      "position": 12,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -0.84
+    },
+    {
+      "name": "latest_error",
+      "type": "text",
+      "table": "eventsub_subscriptions",
+      "dropped": false,
+      "position": 13,
+      "avg_width": 0,
+      "null_fraction": 1,
+      "distinct_estimate": 0
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "eventsub_subscriptions",
+      "dropped": false,
+      "position": 14,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "table": "eventsub_subscriptions",
+      "dropped": false,
+      "position": 15,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -0.84
+    },
+    {
+      "name": "is_desired",
+      "type": "boolean",
+      "table": "eventsub_subscriptions",
+      "dropped": false,
+      "position": 16,
+      "avg_width": 1,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "id",
+      "type": "uuid",
+      "table": "ingestion_runs",
+      "dropped": false,
+      "position": 1,
+      "avg_width": 16,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "job_type",
+      "type": "text",
+      "table": "ingestion_runs",
+      "dropped": false,
+      "position": 2,
+      "avg_width": 9,
+      "null_fraction": 0,
+      "distinct_estimate": 8
+    },
+    {
+      "name": "status",
+      "type": "ingestion_run_status",
+      "table": "ingestion_runs",
+      "dropped": false,
+      "position": 3,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "started_at",
+      "type": "timestamp with time zone",
+      "table": "ingestion_runs",
+      "dropped": false,
+      "position": 4,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -0.7508532
+    },
+    {
+      "name": "finished_at",
+      "type": "timestamp with time zone",
+      "table": "ingestion_runs",
+      "dropped": false,
+      "position": 5,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -0.99900407
+    },
+    {
+      "name": "items_requested",
+      "type": "integer",
+      "table": "ingestion_runs",
+      "dropped": false,
+      "position": 6,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "items_inserted",
+      "type": "integer",
+      "table": "ingestion_runs",
+      "dropped": false,
+      "position": 7,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "items_updated",
+      "type": "integer",
+      "table": "ingestion_runs",
+      "dropped": false,
+      "position": 8,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "items_skipped",
+      "type": "integer",
+      "table": "ingestion_runs",
+      "dropped": false,
+      "position": 9,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "error_class",
+      "type": "text",
+      "table": "ingestion_runs",
+      "dropped": false,
+      "position": 10,
+      "avg_width": 0,
+      "null_fraction": 1,
+      "distinct_estimate": 0
+    },
+    {
+      "name": "error_message",
+      "type": "text",
+      "table": "ingestion_runs",
+      "dropped": false,
+      "position": 11,
+      "avg_width": 0,
+      "null_fraction": 1,
+      "distinct_estimate": 0
+    },
+    {
+      "name": "summary",
+      "type": "jsonb",
+      "table": "ingestion_runs",
+      "dropped": false,
+      "position": 12,
+      "avg_width": 672,
+      "null_fraction": 0,
+      "distinct_estimate": -0.17807911
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "ingestion_runs",
+      "dropped": false,
+      "position": 13,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -0.99834216
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "table": "ingestion_runs",
+      "dropped": false,
+      "position": 14,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -0.99900407
+    },
+    {
+      "name": "id",
+      "type": "uuid",
+      "table": "irc_connections",
+      "dropped": false,
+      "position": 1,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "bot_account_id",
+      "type": "uuid",
+      "table": "irc_connections",
+      "dropped": false,
+      "position": 2,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "status",
+      "type": "text",
+      "table": "irc_connections",
+      "dropped": false,
+      "position": 3,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "connected_at",
+      "type": "timestamp with time zone",
+      "table": "irc_connections",
+      "dropped": false,
+      "position": 4,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "disconnected_at",
+      "type": "timestamp with time zone",
+      "table": "irc_connections",
+      "dropped": false,
+      "position": 5,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "last_ping_at",
+      "type": "timestamp with time zone",
+      "table": "irc_connections",
+      "dropped": false,
+      "position": 6,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "last_pong_at",
+      "type": "timestamp with time zone",
+      "table": "irc_connections",
+      "dropped": false,
+      "position": 7,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "reconnect_count",
+      "type": "integer",
+      "table": "irc_connections",
+      "dropped": false,
+      "position": 8,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "latest_error",
+      "type": "text",
+      "table": "irc_connections",
+      "dropped": false,
+      "position": 9,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "irc_connections",
+      "dropped": false,
+      "position": 10,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "table": "irc_connections",
+      "dropped": false,
+      "position": 11,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "name",
+      "type": "text",
+      "table": "job_locks",
+      "dropped": false,
+      "position": 1,
+      "avg_width": 14,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "owner",
+      "type": "text",
+      "table": "job_locks",
+      "dropped": false,
+      "position": 2,
+      "avg_width": 37,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "locked_at",
+      "type": "timestamp with time zone",
+      "table": "job_locks",
+      "dropped": false,
+      "position": 3,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "expires_at",
+      "type": "timestamp with time zone",
+      "table": "job_locks",
+      "dropped": false,
+      "position": 4,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "job_locks",
+      "dropped": false,
+      "position": 5,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "table": "job_locks",
+      "dropped": false,
+      "position": 6,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "id",
+      "type": "integer",
+      "table": "membership_event_contexts",
+      "dropped": false,
+      "position": 1,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "broadcaster_user_id",
+      "type": "text",
+      "table": "membership_event_contexts",
+      "dropped": false,
+      "position": 2,
+      "avg_width": 9,
+      "null_fraction": 0,
+      "distinct_estimate": 5684
+    },
+    {
+      "name": "twitch_stream_id",
+      "type": "text",
+      "table": "membership_event_contexts",
+      "dropped": false,
+      "position": 3,
+      "avg_width": 13,
+      "null_fraction": 0.031366665,
+      "distinct_estimate": -0.96863335
+    },
+    {
+      "name": "id",
+      "type": "integer",
+      "table": "membership_event_identities",
+      "dropped": false,
+      "position": 1,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "chatter_user_id",
+      "type": "text",
+      "table": "membership_event_identities",
+      "dropped": false,
+      "position": 2,
+      "avg_width": 9,
+      "null_fraction": 0.080233335,
+      "distinct_estimate": 54494
+    },
+    {
+      "name": "chatter_login",
+      "type": "text",
+      "table": "membership_event_identities",
+      "dropped": false,
+      "position": 3,
+      "avg_width": 10,
+      "null_fraction": 0,
+      "distinct_estimate": 62349
+    },
+    {
+      "name": "pending_bucket",
+      "type": "timestamp with time zone",
+      "table": "membership_event_identities",
+      "dropped": false,
+      "position": 4,
+      "avg_width": 8,
+      "null_fraction": 0.21233334,
+      "distinct_estimate": 458
+    },
+    {
+      "name": "resolved_at",
+      "type": "timestamp with time zone",
+      "table": "membership_event_identities",
+      "dropped": false,
+      "position": 5,
+      "avg_width": 8,
+      "null_fraction": 0.21233334,
+      "distinct_estimate": 21164
+    },
+    {
+      "name": "resolved_updated_at",
+      "type": "timestamp with time zone",
+      "table": "membership_event_identities",
+      "dropped": false,
+      "position": 6,
+      "avg_width": 8,
+      "null_fraction": 0.21233334,
+      "distinct_estimate": 21164
+    },
+    {
+      "name": "id",
+      "type": "uuid",
+      "table": "membership_events",
+      "dropped": false,
+      "position": 1,
+      "avg_width": 16,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "received_at",
+      "type": "timestamp with time zone",
+      "table": "membership_events",
+      "dropped": false,
+      "position": 2,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -0.2586418
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "membership_events",
+      "dropped": false,
+      "position": 3,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "digest_bucket",
+      "type": "bigint",
+      "table": "membership_events",
+      "dropped": false,
+      "position": 4,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "context_id",
+      "type": "integer",
+      "table": "membership_events",
+      "dropped": false,
+      "position": 5,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 14061
+    },
+    {
+      "name": "identity_id",
+      "type": "integer",
+      "table": "membership_events",
+      "dropped": false,
+      "position": 6,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 50524
+    },
+    {
+      "name": "digest_slot",
+      "type": "smallint",
+      "table": "membership_events",
+      "dropped": false,
+      "position": 7,
+      "avg_width": 2,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "event_time_kind",
+      "type": "smallint",
+      "table": "membership_events",
+      "dropped": false,
+      "position": 8,
+      "avg_width": 2,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "identity_time_kind",
+      "type": "smallint",
+      "table": "membership_events",
+      "dropped": false,
+      "position": 9,
+      "avg_width": 2,
+      "null_fraction": 0,
+      "distinct_estimate": 3
+    },
+    {
+      "name": "is_join",
+      "type": "boolean",
+      "table": "membership_events",
+      "dropped": false,
+      "position": 10,
+      "avg_width": 1,
+      "null_fraction": 0,
+      "distinct_estimate": 2
+    },
+    {
+      "name": "event_at_override",
+      "type": "timestamp with time zone",
+      "table": "membership_events",
+      "dropped": false,
+      "position": 11,
+      "avg_width": 8,
+      "null_fraction": 1,
+      "distinct_estimate": 0
+    },
+    {
+      "name": "checked_at_override",
+      "type": "timestamp with time zone",
+      "table": "membership_events",
+      "dropped": false,
+      "position": 12,
+      "avg_width": 8,
+      "null_fraction": 0.8538,
+      "distinct_estimate": 9950
+    },
+    {
+      "name": "updated_at_override",
+      "type": "timestamp with time zone",
+      "table": "membership_events",
+      "dropped": false,
+      "position": 13,
+      "avg_width": 8,
+      "null_fraction": 0.8538,
+      "distinct_estimate": 9950
+    },
+    {
+      "name": "source_override",
+      "type": "text",
+      "table": "membership_events",
+      "dropped": false,
+      "position": 14,
+      "avg_width": 0,
+      "null_fraction": 1,
+      "distinct_estimate": 0
+    },
+    {
+      "name": "confidence_override",
+      "type": "integer",
+      "table": "membership_events",
+      "dropped": false,
+      "position": 15,
+      "avg_width": 4,
+      "null_fraction": 1,
+      "distinct_estimate": 0
+    },
+    {
+      "name": "dedupe_key_storage",
+      "type": "bytea",
+      "table": "membership_events",
+      "dropped": false,
+      "position": 16,
+      "avg_width": 1,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "raw_irc_message_id",
+      "type": "uuid",
+      "table": "membership_events",
+      "dropped": false,
+      "position": 17,
+      "avg_width": 16,
+      "null_fraction": 0.7956333,
+      "distinct_estimate": -0.20436668
+    },
+    {
+      "name": "irc_connection_id",
+      "type": "uuid",
+      "table": "membership_events",
+      "dropped": false,
+      "position": 18,
+      "avg_width": 16,
+      "null_fraction": 1,
+      "distinct_estimate": 0
+    },
+    {
+      "name": "id",
+      "type": "uuid",
+      "table": "oauth_accounts",
+      "dropped": false,
+      "position": 1,
+      "avg_width": 16,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "app_user_id",
+      "type": "uuid",
+      "table": "oauth_accounts",
+      "dropped": false,
+      "position": 2,
+      "avg_width": 16,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "provider",
+      "type": "text",
+      "table": "oauth_accounts",
+      "dropped": false,
+      "position": 3,
+      "avg_width": 7,
+      "null_fraction": 0,
+      "distinct_estimate": -0.16666667
+    },
+    {
+      "name": "provider_user_id",
+      "type": "text",
+      "table": "oauth_accounts",
+      "dropped": false,
+      "position": 4,
+      "avg_width": 9,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "scopes",
+      "type": "jsonb",
+      "table": "oauth_accounts",
+      "dropped": false,
+      "position": 5,
+      "avg_width": 5,
+      "null_fraction": 0,
+      "distinct_estimate": -0.16666667
+    },
+    {
+      "name": "encrypted_access_token",
+      "type": "text",
+      "table": "oauth_accounts",
+      "dropped": false,
+      "position": 6,
+      "avg_width": 84,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "encrypted_refresh_token",
+      "type": "text",
+      "table": "oauth_accounts",
+      "dropped": false,
+      "position": 7,
+      "avg_width": 111,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "expires_at",
+      "type": "timestamp with time zone",
+      "table": "oauth_accounts",
+      "dropped": false,
+      "position": 8,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "oauth_accounts",
+      "dropped": false,
+      "position": 9,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "table": "oauth_accounts",
+      "dropped": false,
+      "position": 10,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "last_validated_at",
+      "type": "timestamp with time zone",
+      "table": "oauth_accounts",
+      "dropped": false,
+      "position": 11,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "refresh_status",
+      "type": "text",
+      "table": "oauth_accounts",
+      "dropped": false,
+      "position": 12,
+      "avg_width": 6,
+      "null_fraction": 0,
+      "distinct_estimate": -0.16666667
+    },
+    {
+      "name": "latest_error",
+      "type": "text",
+      "table": "oauth_accounts",
+      "dropped": false,
+      "position": 13,
+      "avg_width": 0,
+      "null_fraction": 1,
+      "distinct_estimate": 0
+    },
+    {
+      "name": "id",
+      "type": "uuid",
+      "table": "privacy_request_events",
+      "dropped": false,
+      "position": 1,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "privacy_request_id",
+      "type": "uuid",
+      "table": "privacy_request_events",
+      "dropped": false,
+      "position": 2,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "event_type",
+      "type": "text",
+      "table": "privacy_request_events",
+      "dropped": false,
+      "position": 3,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "actor_app_user_id",
+      "type": "uuid",
+      "table": "privacy_request_events",
+      "dropped": false,
+      "position": 4,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "details",
+      "type": "jsonb",
+      "table": "privacy_request_events",
+      "dropped": false,
+      "position": 5,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "occurred_at",
+      "type": "timestamp with time zone",
+      "table": "privacy_request_events",
+      "dropped": false,
+      "position": 6,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "privacy_request_events",
+      "dropped": false,
+      "position": 7,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "table": "privacy_request_events",
+      "dropped": false,
+      "position": 8,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "id",
+      "type": "uuid",
+      "table": "privacy_requests",
+      "dropped": false,
+      "position": 1,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "request_type",
+      "type": "privacy_request_type",
+      "table": "privacy_requests",
+      "dropped": false,
+      "position": 2,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "status",
+      "type": "privacy_request_status",
+      "table": "privacy_requests",
+      "dropped": false,
+      "position": 3,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "subject_twitch_user_id",
+      "type": "text",
+      "table": "privacy_requests",
+      "dropped": false,
+      "position": 4,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "requested_by_app_user_id",
+      "type": "uuid",
+      "table": "privacy_requests",
+      "dropped": false,
+      "position": 5,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "reviewed_by_app_user_id",
+      "type": "uuid",
+      "table": "privacy_requests",
+      "dropped": false,
+      "position": 6,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "details",
+      "type": "jsonb",
+      "table": "privacy_requests",
+      "dropped": false,
+      "position": 7,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "requested_at",
+      "type": "timestamp with time zone",
+      "table": "privacy_requests",
+      "dropped": false,
+      "position": 8,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "resolved_at",
+      "type": "timestamp with time zone",
+      "table": "privacy_requests",
+      "dropped": false,
+      "position": 9,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "latest_error",
+      "type": "text",
+      "table": "privacy_requests",
+      "dropped": false,
+      "position": 10,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "privacy_requests",
+      "dropped": false,
+      "position": 11,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "table": "privacy_requests",
+      "dropped": false,
+      "position": 12,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "id",
+      "type": "uuid",
+      "table": "raids",
+      "dropped": false,
+      "position": 1,
+      "avg_width": 16,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "source_broadcaster_user_id",
+      "type": "text",
+      "table": "raids",
+      "dropped": false,
+      "position": 2,
+      "avg_width": 9,
+      "null_fraction": 0,
+      "distinct_estimate": -0.3857143
+    },
+    {
+      "name": "target_broadcaster_user_id",
+      "type": "text",
+      "table": "raids",
+      "dropped": false,
+      "position": 3,
+      "avg_width": 9,
+      "null_fraction": 0,
+      "distinct_estimate": -0.2847358
+    },
+    {
+      "name": "viewer_count",
+      "type": "integer",
+      "table": "raids",
+      "dropped": false,
+      "position": 4,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 410
+    },
+    {
+      "name": "occurred_at",
+      "type": "timestamp with time zone",
+      "table": "raids",
+      "dropped": false,
+      "position": 5,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "source_stream_id",
+      "type": "text",
+      "table": "raids",
+      "dropped": false,
+      "position": 6,
+      "avg_width": 13,
+      "null_fraction": 0.7272016,
+      "distinct_estimate": -0.26908022
+    },
+    {
+      "name": "target_stream_id",
+      "type": "text",
+      "table": "raids",
+      "dropped": false,
+      "position": 7,
+      "avg_width": 13,
+      "null_fraction": 0.4409002,
+      "distinct_estimate": -0.32426614
+    },
+    {
+      "name": "raw_eventsub_event_id",
+      "type": "uuid",
+      "table": "raids",
+      "dropped": false,
+      "position": 8,
+      "avg_width": 16,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "raids",
+      "dropped": false,
+      "position": 9,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "table": "raids",
+      "dropped": false,
+      "position": 10,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "id",
+      "type": "uuid",
+      "table": "rate_limit_observations",
+      "dropped": false,
+      "position": 1,
+      "avg_width": 16,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "source",
+      "type": "text",
+      "table": "rate_limit_observations",
+      "dropped": false,
+      "position": 2,
+      "avg_width": 6,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "endpoint",
+      "type": "text",
+      "table": "rate_limit_observations",
+      "dropped": false,
+      "position": 3,
+      "avg_width": 10,
+      "null_fraction": 0,
+      "distinct_estimate": 4
+    },
+    {
+      "name": "bot_account_id",
+      "type": "uuid",
+      "table": "rate_limit_observations",
+      "dropped": false,
+      "position": 4,
+      "avg_width": 16,
+      "null_fraction": 0,
+      "distinct_estimate": 3
+    },
+    {
+      "name": "limit",
+      "type": "integer",
+      "table": "rate_limit_observations",
+      "dropped": false,
+      "position": 5,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "remaining",
+      "type": "integer",
+      "table": "rate_limit_observations",
+      "dropped": false,
+      "position": 6,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 3
+    },
+    {
+      "name": "reset_at",
+      "type": "timestamp with time zone",
+      "table": "rate_limit_observations",
+      "dropped": false,
+      "position": 7,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -0.5776962
+    },
+    {
+      "name": "headers",
+      "type": "jsonb",
+      "table": "rate_limit_observations",
+      "dropped": false,
+      "position": 8,
+      "avg_width": 646,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "observed_at",
+      "type": "timestamp with time zone",
+      "table": "rate_limit_observations",
+      "dropped": false,
+      "position": 9,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "rate_limit_observations",
+      "dropped": false,
+      "position": 10,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "table": "rate_limit_observations",
+      "dropped": false,
+      "position": 11,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "id",
+      "type": "uuid",
+      "table": "raw_eventsub_events",
+      "dropped": false,
+      "position": 1,
+      "avg_width": 16,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "twitch_message_id",
+      "type": "text",
+      "table": "raw_eventsub_events",
+      "dropped": false,
+      "position": 2,
+      "avg_width": 43,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "twitch_event_id",
+      "type": "text",
+      "table": "raw_eventsub_events",
+      "dropped": false,
+      "position": 3,
+      "avg_width": 13,
+      "null_fraction": 0.6013,
+      "distinct_estimate": -0.20621239
+    },
+    {
+      "name": "subscription_id",
+      "type": "text",
+      "table": "raw_eventsub_events",
+      "dropped": false,
+      "position": 4,
+      "avg_width": 37,
+      "null_fraction": 0,
+      "distinct_estimate": -0.14169206
+    },
+    {
+      "name": "event_type",
+      "type": "text",
+      "table": "raw_eventsub_events",
+      "dropped": false,
+      "position": 5,
+      "avg_width": 15,
+      "null_fraction": 0,
+      "distinct_estimate": 8
+    },
+    {
+      "name": "event_version",
+      "type": "text",
+      "table": "raw_eventsub_events",
+      "dropped": false,
+      "position": 6,
+      "avg_width": 2,
+      "null_fraction": 0,
+      "distinct_estimate": 2
+    },
+    {
+      "name": "payload",
+      "type": "jsonb",
+      "table": "raw_eventsub_events",
+      "dropped": false,
+      "position": 7,
+      "avg_width": 621,
+      "null_fraction": 0,
+      "distinct_estimate": -0.87980235
+    },
+    {
+      "name": "received_at",
+      "type": "timestamp with time zone",
+      "table": "raw_eventsub_events",
+      "dropped": false,
+      "position": 8,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -0.9998328
+    },
+    {
+      "name": "processing_status",
+      "type": "raw_processing_status",
+      "table": "raw_eventsub_events",
+      "dropped": false,
+      "position": 9,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 2
+    },
+    {
+      "name": "error_message",
+      "type": "text",
+      "table": "raw_eventsub_events",
+      "dropped": false,
+      "position": 10,
+      "avg_width": 0,
+      "null_fraction": 1,
+      "distinct_estimate": 0
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "raw_eventsub_events",
+      "dropped": false,
+      "position": 11,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "table": "raw_eventsub_events",
+      "dropped": false,
+      "position": 12,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "message_type",
+      "type": "text",
+      "table": "raw_eventsub_events",
+      "dropped": false,
+      "position": 13,
+      "avg_width": 13,
+      "null_fraction": 0.9856667,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "id",
+      "type": "uuid",
+      "table": "raw_helix_responses",
+      "dropped": false,
+      "position": 1,
+      "avg_width": 16,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "endpoint",
+      "type": "text",
+      "table": "raw_helix_responses",
+      "dropped": false,
+      "position": 2,
+      "avg_width": 10,
+      "null_fraction": 0,
+      "distinct_estimate": 4
+    },
+    {
+      "name": "request_params",
+      "type": "jsonb",
+      "table": "raw_helix_responses",
+      "dropped": false,
+      "position": 3,
+      "avg_width": 63,
+      "null_fraction": 0,
+      "distinct_estimate": 8583
+    },
+    {
+      "name": "status_code",
+      "type": "integer",
+      "table": "raw_helix_responses",
+      "dropped": false,
+      "position": 4,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 3
+    },
+    {
+      "name": "response_json",
+      "type": "jsonb",
+      "table": "raw_helix_responses",
+      "dropped": false,
+      "position": 5,
+      "avg_width": 121,
+      "null_fraction": 0.5219667,
+      "distinct_estimate": -0.12435703
+    },
+    {
+      "name": "pagination",
+      "type": "jsonb",
+      "table": "raw_helix_responses",
+      "dropped": false,
+      "position": 6,
+      "avg_width": 47,
+      "null_fraction": 0,
+      "distinct_estimate": 7056
+    },
+    {
+      "name": "rate_limit_headers",
+      "type": "jsonb",
+      "table": "raw_helix_responses",
+      "dropped": false,
+      "position": 7,
+      "avg_width": 5,
+      "null_fraction": 0,
+      "distinct_estimate": 5
+    },
+    {
+      "name": "observed_at",
+      "type": "timestamp with time zone",
+      "table": "raw_helix_responses",
+      "dropped": false,
+      "position": 8,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "ingestion_run_id",
+      "type": "uuid",
+      "table": "raw_helix_responses",
+      "dropped": false,
+      "position": 9,
+      "avg_width": 16,
+      "null_fraction": 1,
+      "distinct_estimate": 0
+    },
+    {
+      "name": "processing_status",
+      "type": "raw_processing_status",
+      "table": "raw_helix_responses",
+      "dropped": false,
+      "position": 10,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "raw_helix_responses",
+      "dropped": false,
+      "position": 11,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "table": "raw_helix_responses",
+      "dropped": false,
+      "position": 12,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -0.29447946
+    },
+    {
+      "name": "id",
+      "type": "integer",
+      "table": "raw_irc_contexts",
+      "dropped": false,
+      "position": 1,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "channel_login",
+      "type": "text",
+      "table": "raw_irc_contexts",
+      "dropped": false,
+      "position": 2,
+      "avg_width": 10,
+      "null_fraction": 0.0002910869,
+      "distinct_estimate": -0.41316876
+    },
+    {
+      "name": "bot_account_id",
+      "type": "uuid",
+      "table": "raw_irc_contexts",
+      "dropped": false,
+      "position": 3,
+      "avg_width": 16,
+      "null_fraction": 0,
+      "distinct_estimate": 5
+    },
+    {
+      "name": "irc_connection_id",
+      "type": "uuid",
+      "table": "raw_irc_contexts",
+      "dropped": false,
+      "position": 4,
+      "avg_width": 16,
+      "null_fraction": 1,
+      "distinct_estimate": 0
+    },
+    {
+      "name": "id",
+      "type": "uuid",
+      "table": "raw_irc_messages",
+      "dropped": false,
+      "position": 1,
+      "avg_width": 16,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "raw_line",
+      "type": "text",
+      "table": "raw_irc_messages",
+      "dropped": false,
+      "position": 2,
+      "avg_width": 11,
+      "null_fraction": 0,
+      "distinct_estimate": 689
+    },
+    {
+      "name": "parsed_command",
+      "type": "text",
+      "table": "raw_irc_messages",
+      "dropped": false,
+      "position": 3,
+      "avg_width": 2,
+      "null_fraction": 0,
+      "distinct_estimate": 18
+    },
+    {
+      "name": "tags",
+      "type": "bytea",
+      "table": "raw_irc_messages",
+      "dropped": false,
+      "position": 4,
+      "avg_width": 2,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "........pg.dropped.5........",
+      "type": "-",
+      "table": "raw_irc_messages",
+      "dropped": true,
+      "position": 5,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "........pg.dropped.6........",
+      "type": "-",
+      "table": "raw_irc_messages",
+      "dropped": true,
+      "position": 6,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "........pg.dropped.7........",
+      "type": "-",
+      "table": "raw_irc_messages",
+      "dropped": true,
+      "position": 7,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "received_at",
+      "type": "timestamp with time zone",
+      "table": "raw_irc_messages",
+      "dropped": false,
+      "position": 8,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -0.104594044
+    },
+    {
+      "name": "processing_status",
+      "type": "raw_processing_status",
+      "table": "raw_irc_messages",
+      "dropped": false,
+      "position": 9,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "parse_error",
+      "type": "text",
+      "table": "raw_irc_messages",
+      "dropped": false,
+      "position": 10,
+      "avg_width": 0,
+      "null_fraction": 1,
+      "distinct_estimate": 0
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "raw_irc_messages",
+      "dropped": false,
+      "position": 11,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "table": "raw_irc_messages",
+      "dropped": false,
+      "position": 12,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "payload_block_id",
+      "type": "bigint",
+      "table": "raw_irc_messages",
+      "dropped": false,
+      "position": 13,
+      "avg_width": 8,
+      "null_fraction": 0.0225,
+      "distinct_estimate": 35644
+    },
+    {
+      "name": "payload_position",
+      "type": "smallint",
+      "table": "raw_irc_messages",
+      "dropped": false,
+      "position": 14,
+      "avg_width": 2,
+      "null_fraction": 0.0225,
+      "distinct_estimate": 256
+    },
+    {
+      "name": "unrelayed_source",
+      "type": "boolean",
+      "table": "raw_irc_messages",
+      "dropped": false,
+      "position": 15,
+      "avg_width": 1,
+      "null_fraction": 0.0225,
+      "distinct_estimate": 2
+    },
+    {
+      "name": "context_id",
+      "type": "integer",
+      "table": "raw_irc_messages",
+      "dropped": false,
+      "position": 16,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 5132
+    },
+    {
+      "name": "id",
+      "type": "bigint",
+      "table": "raw_irc_payload_blocks",
+      "dropped": false,
+      "position": 1,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "lines",
+      "type": "text[]",
+      "table": "raw_irc_payload_blocks",
+      "dropped": false,
+      "position": 2,
+      "avg_width": 24,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "session_id_hash",
+      "type": "text",
+      "table": "sessions",
+      "dropped": false,
+      "position": 1,
+      "avg_width": 44,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "app_user_id",
+      "type": "uuid",
+      "table": "sessions",
+      "dropped": false,
+      "position": 2,
+      "avg_width": 16,
+      "null_fraction": 0,
+      "distinct_estimate": -0.2
+    },
+    {
+      "name": "expires_at",
+      "type": "timestamp with time zone",
+      "table": "sessions",
+      "dropped": false,
+      "position": 3,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "last_seen_at",
+      "type": "timestamp with time zone",
+      "table": "sessions",
+      "dropped": false,
+      "position": 4,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "revoked_at",
+      "type": "timestamp with time zone",
+      "table": "sessions",
+      "dropped": false,
+      "position": 5,
+      "avg_width": 8,
+      "null_fraction": 1,
+      "distinct_estimate": 0
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "sessions",
+      "dropped": false,
+      "position": 6,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "table": "sessions",
+      "dropped": false,
+      "position": 7,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "twitch_stream_id",
+      "type": "text",
+      "table": "stream_activity_buckets",
+      "dropped": false,
+      "position": 1,
+      "avg_width": 13,
+      "null_fraction": 0,
+      "distinct_estimate": 41614
+    },
+    {
+      "name": "bucket_start",
+      "type": "timestamp with time zone",
+      "table": "stream_activity_buckets",
+      "dropped": false,
+      "position": 2,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": 13206
+    },
+    {
+      "name": "bucket_minutes",
+      "type": "integer",
+      "table": "stream_activity_buckets",
+      "dropped": false,
+      "position": 3,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "viewer_count_min",
+      "type": "integer",
+      "table": "stream_activity_buckets",
+      "dropped": false,
+      "position": 4,
+      "avg_width": 4,
+      "null_fraction": 0.0582,
+      "distinct_estimate": 538
+    },
+    {
+      "name": "viewer_count_max",
+      "type": "integer",
+      "table": "stream_activity_buckets",
+      "dropped": false,
+      "position": 5,
+      "avg_width": 4,
+      "null_fraction": 0.0582,
+      "distinct_estimate": 562
+    },
+    {
+      "name": "viewer_count_avg",
+      "type": "integer",
+      "table": "stream_activity_buckets",
+      "dropped": false,
+      "position": 6,
+      "avg_width": 4,
+      "null_fraction": 0.0582,
+      "distinct_estimate": 542
+    },
+    {
+      "name": "message_count",
+      "type": "integer",
+      "table": "stream_activity_buckets",
+      "dropped": false,
+      "position": 7,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 118
+    },
+    {
+      "name": "join_count",
+      "type": "integer",
+      "table": "stream_activity_buckets",
+      "dropped": false,
+      "position": 8,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 106
+    },
+    {
+      "name": "part_count",
+      "type": "integer",
+      "table": "stream_activity_buckets",
+      "dropped": false,
+      "position": 9,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 96
+    },
+    {
+      "name": "active_chatter_count",
+      "type": "integer",
+      "table": "stream_activity_buckets",
+      "dropped": false,
+      "position": 10,
+      "avg_width": 4,
+      "null_fraction": 0.6252,
+      "distinct_estimate": 74
+    },
+    {
+      "name": "event_counts",
+      "type": "jsonb",
+      "table": "stream_activity_buckets",
+      "dropped": false,
+      "position": 11,
+      "avg_width": 6,
+      "null_fraction": 0,
+      "distinct_estimate": 110
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "stream_activity_buckets",
+      "dropped": false,
+      "position": 12,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": 21430
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "table": "stream_activity_buckets",
+      "dropped": false,
+      "position": 13,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": 22834
+    },
+    {
+      "name": "twitch_stream_id",
+      "type": "text",
+      "table": "stream_sessions",
+      "dropped": false,
+      "position": 1,
+      "avg_width": 13,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "broadcaster_user_id",
+      "type": "text",
+      "table": "stream_sessions",
+      "dropped": false,
+      "position": 2,
+      "avg_width": 9,
+      "null_fraction": 0,
+      "distinct_estimate": 5905
+    },
+    {
+      "name": "started_at",
+      "type": "timestamp with time zone",
+      "table": "stream_sessions",
+      "dropped": false,
+      "position": 3,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -0.9842997
+    },
+    {
+      "name": "ended_at",
+      "type": "timestamp with time zone",
+      "table": "stream_sessions",
+      "dropped": false,
+      "position": 4,
+      "avg_width": 8,
+      "null_fraction": 0.0036666666,
+      "distinct_estimate": -0.28951994
+    },
+    {
+      "name": "first_seen_at",
+      "type": "timestamp with time zone",
+      "table": "stream_sessions",
+      "dropped": false,
+      "position": 5,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "last_seen_live_at",
+      "type": "timestamp with time zone",
+      "table": "stream_sessions",
+      "dropped": false,
+      "position": 6,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -0.9995466
+    },
+    {
+      "name": "end_detection_source",
+      "type": "text",
+      "table": "stream_sessions",
+      "dropped": false,
+      "position": 7,
+      "avg_width": 25,
+      "null_fraction": 0.0036666666,
+      "distinct_estimate": 4
+    },
+    {
+      "name": "language",
+      "type": "text",
+      "table": "stream_sessions",
+      "dropped": false,
+      "position": 8,
+      "avg_width": 3,
+      "null_fraction": 0.021666666,
+      "distinct_estimate": 12
+    },
+    {
+      "name": "initial_title",
+      "type": "text",
+      "table": "stream_sessions",
+      "dropped": false,
+      "position": 9,
+      "avg_width": 39,
+      "null_fraction": 0.133,
+      "distinct_estimate": -0.42420506
+    },
+    {
+      "name": "latest_title",
+      "type": "text",
+      "table": "stream_sessions",
+      "dropped": false,
+      "position": 10,
+      "avg_width": 39,
+      "null_fraction": 0.021666666,
+      "distinct_estimate": -0.46901038
+    },
+    {
+      "name": "initial_category_id",
+      "type": "text",
+      "table": "stream_sessions",
+      "dropped": false,
+      "position": 11,
+      "avg_width": 7,
+      "null_fraction": 0.133,
+      "distinct_estimate": 1741
+    },
+    {
+      "name": "initial_category_name",
+      "type": "text",
+      "table": "stream_sessions",
+      "dropped": false,
+      "position": 12,
+      "avg_width": 14,
+      "null_fraction": 0.133,
+      "distinct_estimate": 1720
+    },
+    {
+      "name": "latest_category_id",
+      "type": "text",
+      "table": "stream_sessions",
+      "dropped": false,
+      "position": 13,
+      "avg_width": 7,
+      "null_fraction": 0.021666666,
+      "distinct_estimate": 1894
+    },
+    {
+      "name": "latest_category_name",
+      "type": "text",
+      "table": "stream_sessions",
+      "dropped": false,
+      "position": 14,
+      "avg_width": 14,
+      "null_fraction": 0.021666666,
+      "distinct_estimate": 1868
+    },
+    {
+      "name": "mature",
+      "type": "boolean",
+      "table": "stream_sessions",
+      "dropped": false,
+      "position": 15,
+      "avg_width": 1,
+      "null_fraction": 0.031266667,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "stream_sessions",
+      "dropped": false,
+      "position": 16,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "table": "stream_sessions",
+      "dropped": false,
+      "position": 17,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -0.71031004
+    },
+    {
+      "name": "finnish_match_reason",
+      "type": "finnish_stream_match_reason",
+      "table": "stream_sessions",
+      "dropped": false,
+      "position": 18,
+      "avg_width": 4,
+      "null_fraction": 0.0319,
+      "distinct_estimate": 2
+    },
+    {
+      "name": "is_finnish_eligible",
+      "type": "boolean",
+      "table": "stream_sessions",
+      "dropped": false,
+      "position": 19,
+      "avg_width": 1,
+      "null_fraction": 0,
+      "distinct_estimate": 2
+    },
+    {
+      "name": "id",
+      "type": "uuid",
+      "table": "stream_snapshots",
+      "dropped": false,
+      "position": 1,
+      "avg_width": 16,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "twitch_stream_id",
+      "type": "text",
+      "table": "stream_snapshots",
+      "dropped": false,
+      "position": 2,
+      "avg_width": 13,
+      "null_fraction": 0,
+      "distinct_estimate": 38142
+    },
+    {
+      "name": "broadcaster_user_id",
+      "type": "text",
+      "table": "stream_snapshots",
+      "dropped": false,
+      "position": 3,
+      "avg_width": 9,
+      "null_fraction": 0,
+      "distinct_estimate": 4293
+    },
+    {
+      "name": "observed_at",
+      "type": "timestamp with time zone",
+      "table": "stream_snapshots",
+      "dropped": false,
+      "position": 4,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "viewer_count",
+      "type": "integer",
+      "table": "stream_snapshots",
+      "dropped": false,
+      "position": 5,
+      "avg_width": 4,
+      "null_fraction": 0,
+      "distinct_estimate": 559
+    },
+    {
+      "name": "title",
+      "type": "text",
+      "table": "stream_snapshots",
+      "dropped": false,
+      "position": 6,
+      "avg_width": 41,
+      "null_fraction": 0.97396666,
+      "distinct_estimate": 11275
+    },
+    {
+      "name": "category_id",
+      "type": "text",
+      "table": "stream_snapshots",
+      "dropped": false,
+      "position": 7,
+      "avg_width": 7,
+      "null_fraction": 0.97396666,
+      "distinct_estimate": 330
+    },
+    {
+      "name": "category_name",
+      "type": "text",
+      "table": "stream_snapshots",
+      "dropped": false,
+      "position": 8,
+      "avg_width": 14,
+      "null_fraction": 0.97396666,
+      "distinct_estimate": 328
+    },
+    {
+      "name": "language",
+      "type": "text",
+      "table": "stream_snapshots",
+      "dropped": false,
+      "position": 9,
+      "avg_width": 3,
+      "null_fraction": 0.97396666,
+      "distinct_estimate": 5
+    },
+    {
+      "name": "tags",
+      "type": "jsonb",
+      "table": "stream_snapshots",
+      "dropped": false,
+      "position": 10,
+      "avg_width": 6,
+      "null_fraction": 0,
+      "distinct_estimate": 467
+    },
+    {
+      "name": "thumbnail_url",
+      "type": "text",
+      "table": "stream_snapshots",
+      "dropped": false,
+      "position": 11,
+      "avg_width": 83,
+      "null_fraction": 0.97396666,
+      "distinct_estimate": 2185
+    },
+    {
+      "name": "source_run_id",
+      "type": "uuid",
+      "table": "stream_snapshots",
+      "dropped": false,
+      "position": 12,
+      "avg_width": 16,
+      "null_fraction": 0.010333333,
+      "distinct_estimate": 32524
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "stream_snapshots",
+      "dropped": false,
+      "position": 13,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "table": "stream_snapshots",
+      "dropped": false,
+      "position": 14,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "twitch_user_id",
+      "type": "text",
+      "table": "subject_privacy_states",
+      "dropped": false,
+      "position": 1,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "public_profile_hidden",
+      "type": "boolean",
+      "table": "subject_privacy_states",
+      "dropped": false,
+      "position": 2,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "tracking_opted_out",
+      "type": "boolean",
+      "table": "subject_privacy_states",
+      "dropped": false,
+      "position": 3,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "raw_data_redacted_at",
+      "type": "timestamp with time zone",
+      "table": "subject_privacy_states",
+      "dropped": false,
+      "position": 4,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "data_deleted_at",
+      "type": "timestamp with time zone",
+      "table": "subject_privacy_states",
+      "dropped": false,
+      "position": 5,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "latest_request_id",
+      "type": "uuid",
+      "table": "subject_privacy_states",
+      "dropped": false,
+      "position": 6,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "subject_privacy_states",
+      "dropped": false,
+      "position": 7,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "table": "subject_privacy_states",
+      "dropped": false,
+      "position": 8,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "id",
+      "type": "uuid",
+      "table": "twitch_user_name_history",
+      "dropped": false,
+      "position": 1,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "twitch_user_id",
+      "type": "text",
+      "table": "twitch_user_name_history",
+      "dropped": false,
+      "position": 2,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "login",
+      "type": "text",
+      "table": "twitch_user_name_history",
+      "dropped": false,
+      "position": 3,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "display_name",
+      "type": "text",
+      "table": "twitch_user_name_history",
+      "dropped": false,
+      "position": 4,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "observed_from",
+      "type": "timestamp with time zone",
+      "table": "twitch_user_name_history",
+      "dropped": false,
+      "position": 5,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "observed_until",
+      "type": "timestamp with time zone",
+      "table": "twitch_user_name_history",
+      "dropped": false,
+      "position": 6,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "source",
+      "type": "text",
+      "table": "twitch_user_name_history",
+      "dropped": false,
+      "position": 7,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "twitch_user_name_history",
+      "dropped": false,
+      "position": 8,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "table": "twitch_user_name_history",
+      "dropped": false,
+      "position": 9,
+      "avg_width": null,
+      "null_fraction": null,
+      "distinct_estimate": null
+    },
+    {
+      "name": "twitch_user_id",
+      "type": "text",
+      "table": "twitch_users",
+      "dropped": false,
+      "position": 1,
+      "avg_width": 10,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "login",
+      "type": "text",
+      "table": "twitch_users",
+      "dropped": false,
+      "position": 2,
+      "avg_width": 10,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "display_name",
+      "type": "text",
+      "table": "twitch_users",
+      "dropped": false,
+      "position": 3,
+      "avg_width": 10,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "account_type",
+      "type": "text",
+      "table": "twitch_users",
+      "dropped": false,
+      "position": 4,
+      "avg_width": 1,
+      "null_fraction": 0.08106667,
+      "distinct_estimate": 2
+    },
+    {
+      "name": "broadcaster_type",
+      "type": "text",
+      "table": "twitch_users",
+      "dropped": false,
+      "position": 5,
+      "avg_width": 1,
+      "null_fraction": 0.08106667,
+      "distinct_estimate": 3
+    },
+    {
+      "name": "description",
+      "type": "text",
+      "table": "twitch_users",
+      "dropped": false,
+      "position": 6,
+      "avg_width": 20,
+      "null_fraction": 0.08106667,
+      "distinct_estimate": 9796
+    },
+    {
+      "name": "profile_image_url",
+      "type": "text",
+      "table": "twitch_users",
+      "dropped": false,
+      "position": 7,
+      "avg_width": 112,
+      "null_fraction": 0.08106667,
+      "distinct_estimate": -0.112404466
+    },
+    {
+      "name": "offline_image_url",
+      "type": "text",
+      "table": "twitch_users",
+      "dropped": false,
+      "position": 8,
+      "avg_width": 14,
+      "null_fraction": 0.08106667,
+      "distinct_estimate": 3515
+    },
+    {
+      "name": "twitch_created_at",
+      "type": "timestamp with time zone",
+      "table": "twitch_users",
+      "dropped": false,
+      "position": 9,
+      "avg_width": 8,
+      "null_fraction": 0.08106667,
+      "distinct_estimate": -0.9025659
+    },
+    {
+      "name": "first_seen_at",
+      "type": "timestamp with time zone",
+      "table": "twitch_users",
+      "dropped": false,
+      "position": 10,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -0.18344665
+    },
+    {
+      "name": "last_seen_at",
+      "type": "timestamp with time zone",
+      "table": "twitch_users",
+      "dropped": false,
+      "position": 11,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -0.13608392
+    },
+    {
+      "name": "last_metadata_refresh_at",
+      "type": "timestamp with time zone",
+      "table": "twitch_users",
+      "dropped": false,
+      "position": 12,
+      "avg_width": 8,
+      "null_fraction": 0.081,
+      "distinct_estimate": 25033
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "twitch_users",
+      "dropped": false,
+      "position": 13,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -0.18344665
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "table": "twitch_users",
+      "dropped": false,
+      "position": 14,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -0.13608392
+    },
+    {
+      "name": "worker_name",
+      "type": "text",
+      "table": "worker_heartbeats",
+      "dropped": false,
+      "position": 1,
+      "avg_width": 9,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "loop_name",
+      "type": "text",
+      "table": "worker_heartbeats",
+      "dropped": false,
+      "position": 2,
+      "avg_width": 14,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "status",
+      "type": "text",
+      "table": "worker_heartbeats",
+      "dropped": false,
+      "position": 3,
+      "avg_width": 3,
+      "null_fraction": 0,
+      "distinct_estimate": 1
+    },
+    {
+      "name": "last_heartbeat_at",
+      "type": "timestamp with time zone",
+      "table": "worker_heartbeats",
+      "dropped": false,
+      "position": 4,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "details",
+      "type": "jsonb",
+      "table": "worker_heartbeats",
+      "dropped": false,
+      "position": 5,
+      "avg_width": 452,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "table": "worker_heartbeats",
+      "dropped": false,
+      "position": 6,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "table": "worker_heartbeats",
+      "dropped": false,
+      "position": 7,
+      "avg_width": 8,
+      "null_fraction": 0,
+      "distinct_estimate": -1
+    }
+  ],
+  "indexes": [
+    {
+      "name": "admin_users_pkey",
+      "bytes": 16384,
+      "table": "admin_users",
+      "definition": "CREATE UNIQUE INDEX admin_users_pkey ON public.admin_users USING btree (twitch_user_id)"
+    },
+    {
+      "name": "app_users_pkey",
+      "bytes": 16384,
+      "table": "app_users",
+      "definition": "CREATE UNIQUE INDEX app_users_pkey ON public.app_users USING btree (id)"
+    },
+    {
+      "name": "app_users_twitch_user_idx",
+      "bytes": 16384,
+      "table": "app_users",
+      "definition": "CREATE UNIQUE INDEX app_users_twitch_user_idx ON public.app_users USING btree (twitch_user_id)"
+    },
+    {
+      "name": "bot_account_tokens_pkey",
+      "bytes": 16384,
+      "table": "bot_account_tokens",
+      "definition": "CREATE UNIQUE INDEX bot_account_tokens_pkey ON public.bot_account_tokens USING btree (id)"
+    },
+    {
+      "name": "bot_accounts_login_idx",
+      "bytes": 16384,
+      "table": "bot_accounts",
+      "definition": "CREATE UNIQUE INDEX bot_accounts_login_idx ON public.bot_accounts USING btree (login)"
+    },
+    {
+      "name": "bot_accounts_pkey",
+      "bytes": 16384,
+      "table": "bot_accounts",
+      "definition": "CREATE UNIQUE INDEX bot_accounts_pkey ON public.bot_accounts USING btree (id)"
+    },
+    {
+      "name": "channel_daily_stats_broadcaster_user_id_day_pk",
+      "bytes": 2875392,
+      "table": "channel_daily_stats",
+      "definition": "CREATE UNIQUE INDEX channel_daily_stats_broadcaster_user_id_day_pk ON public.channel_daily_stats USING btree (broadcaster_user_id, day)"
+    },
+    {
+      "name": "channel_events_pkey",
+      "bytes": 6881280,
+      "table": "channel_events",
+      "definition": "CREATE UNIQUE INDEX channel_events_pkey ON public.channel_events USING btree (id)"
+    },
+    {
+      "name": "channel_events_source_event_unique_idx",
+      "bytes": 19357696,
+      "table": "channel_events",
+      "definition": "CREATE UNIQUE INDEX channel_events_source_event_unique_idx ON public.channel_events USING btree (source, event_type, source_event_id)"
+    },
+    {
+      "name": "channel_events_stream_occurred_idx",
+      "bytes": 8953856,
+      "table": "channel_events",
+      "definition": "CREATE INDEX channel_events_stream_occurred_idx ON public.channel_events USING btree (twitch_stream_id, occurred_at)"
+    },
+    {
+      "name": "channels_pkey",
+      "bytes": 434176,
+      "table": "channels",
+      "definition": "CREATE UNIQUE INDEX channels_pkey ON public.channels USING btree (twitch_user_id)"
+    },
+    {
+      "name": "chat_assignment_events_pkey",
+      "bytes": 19111936,
+      "table": "chat_assignment_events",
+      "definition": "CREATE UNIQUE INDEX chat_assignment_events_pkey ON public.chat_assignment_events USING btree (id)"
+    },
+    {
+      "name": "chat_assignments_active_idx",
+      "bytes": 2039808,
+      "table": "chat_assignments",
+      "definition": "CREATE INDEX chat_assignments_active_idx ON public.chat_assignments USING btree (status, priority_score)"
+    },
+    {
+      "name": "chat_assignments_channel_idx",
+      "bytes": 2064384,
+      "table": "chat_assignments",
+      "definition": "CREATE INDEX chat_assignments_channel_idx ON public.chat_assignments USING btree (broadcaster_user_id, status)"
+    },
+    {
+      "name": "chat_assignments_identity_idx",
+      "bytes": 5685248,
+      "table": "chat_assignments",
+      "definition": "CREATE UNIQUE INDEX chat_assignments_identity_idx ON public.chat_assignments USING btree (bot_account_id, broadcaster_user_id, twitch_stream_id)"
+    },
+    {
+      "name": "chat_assignments_pkey",
+      "bytes": 3399680,
+      "table": "chat_assignments",
+      "definition": "CREATE UNIQUE INDEX chat_assignments_pkey ON public.chat_assignments USING btree (id)"
+    },
+    {
+      "name": "chat_assignments_stream_status_idx",
+      "bytes": 6111232,
+      "table": "chat_assignments",
+      "definition": "CREATE INDEX chat_assignments_stream_status_idx ON public.chat_assignments USING btree (twitch_stream_id, status)"
+    },
+    {
+      "name": "chat_messages_channel_received_idx",
+      "bytes": 517472256,
+      "table": "chat_messages",
+      "definition": "CREATE INDEX chat_messages_channel_received_idx ON public.chat_messages USING btree (broadcaster_user_id, received_at)"
+    },
+    {
+      "name": "chat_messages_chatter_received_idx",
+      "bytes": 517046272,
+      "table": "chat_messages",
+      "definition": "CREATE INDEX chat_messages_chatter_received_idx ON public.chat_messages USING btree (chatter_user_id, received_at)"
+    },
+    {
+      "name": "chat_messages_event_time_brin",
+      "bytes": 303104,
+      "table": "chat_messages",
+      "definition": "CREATE INDEX chat_messages_event_time_brin ON public.chat_messages USING brin (COALESCE(sent_at, received_at)) WITH (pages_per_range='32', autosummarize='on')"
+    },
+    {
+      "name": "chat_messages_pkey",
+      "bytes": 474144768,
+      "table": "chat_messages",
+      "definition": "CREATE UNIQUE INDEX chat_messages_pkey ON public.chat_messages USING btree (twitch_message_id)"
+    },
+    {
+      "name": "chat_messages_received_idx",
+      "bytes": 199475200,
+      "table": "chat_messages",
+      "definition": "CREATE INDEX chat_messages_received_idx ON public.chat_messages USING btree (received_at)"
+    },
+    {
+      "name": "chat_messages_stream_received_idx",
+      "bytes": 490840064,
+      "table": "chat_messages",
+      "definition": "CREATE INDEX chat_messages_stream_received_idx ON public.chat_messages USING btree (twitch_stream_id, received_at)"
+    },
+    {
+      "name": "chat_presence_observations_channel_observed_idx",
+      "bytes": 16384,
+      "table": "chat_presence_observations",
+      "definition": "CREATE INDEX chat_presence_observations_channel_observed_idx ON public.chat_presence_observations USING btree (broadcaster_user_id, observed_at)"
+    },
+    {
+      "name": "chat_presence_observations_chatter_observed_idx",
+      "bytes": 40960,
+      "table": "chat_presence_observations",
+      "definition": "CREATE INDEX chat_presence_observations_chatter_observed_idx ON public.chat_presence_observations USING btree (chatter_user_id, observed_at)"
+    },
+    {
+      "name": "chat_presence_observations_dedupe_key_idx",
+      "bytes": 57344,
+      "table": "chat_presence_observations",
+      "definition": "CREATE UNIQUE INDEX chat_presence_observations_dedupe_key_idx ON public.chat_presence_observations USING btree (dedupe_key)"
+    },
+    {
+      "name": "chat_presence_observations_pkey",
+      "bytes": 16384,
+      "table": "chat_presence_observations",
+      "definition": "CREATE UNIQUE INDEX chat_presence_observations_pkey ON public.chat_presence_observations USING btree (id)"
+    },
+    {
+      "name": "chat_presence_snapshots_channel_sampled_idx",
+      "bytes": 16384,
+      "table": "chat_presence_snapshots",
+      "definition": "CREATE INDEX chat_presence_snapshots_channel_sampled_idx ON public.chat_presence_snapshots USING btree (broadcaster_user_id, sampled_at)"
+    },
+    {
+      "name": "chat_presence_snapshots_pkey",
+      "bytes": 16384,
+      "table": "chat_presence_snapshots",
+      "definition": "CREATE UNIQUE INDEX chat_presence_snapshots_pkey ON public.chat_presence_snapshots USING btree (id)"
+    },
+    {
+      "name": "chat_presence_snapshots_stream_sampled_idx",
+      "bytes": 16384,
+      "table": "chat_presence_snapshots",
+      "definition": "CREATE INDEX chat_presence_snapshots_stream_sampled_idx ON public.chat_presence_snapshots USING btree (twitch_stream_id, sampled_at)"
+    },
+    {
+      "name": "chat_room_state_events_pkey",
+      "bytes": 8192,
+      "table": "chat_room_state_events",
+      "definition": "CREATE UNIQUE INDEX chat_room_state_events_pkey ON public.chat_room_state_events USING btree (id)"
+    },
+    {
+      "name": "chatter_daily_stats_chatter_user_id_day_pk",
+      "bytes": 24903680,
+      "table": "chatter_daily_stats",
+      "definition": "CREATE UNIQUE INDEX chatter_daily_stats_chatter_user_id_day_pk ON public.chatter_daily_stats USING btree (chatter_user_id, day)"
+    },
+    {
+      "name": "community_map_snapshots_pkey",
+      "bytes": 16384,
+      "table": "community_map_snapshots",
+      "definition": "CREATE UNIQUE INDEX community_map_snapshots_pkey ON public.community_map_snapshots USING btree (id)"
+    },
+    {
+      "name": "community_map_snapshots_window_idx",
+      "bytes": 16384,
+      "table": "community_map_snapshots",
+      "definition": "CREATE UNIQUE INDEX community_map_snapshots_window_idx ON public.community_map_snapshots USING btree (recipe, window_end)"
+    },
+    {
+      "name": "community_map_state_pkey",
+      "bytes": 16384,
+      "table": "community_map_state",
+      "definition": "CREATE UNIQUE INDEX community_map_state_pkey ON public.community_map_state USING btree (id)"
+    },
+    {
+      "name": "event_processing_failures_pkey",
+      "bytes": 8192,
+      "table": "event_processing_failures",
+      "definition": "CREATE UNIQUE INDEX event_processing_failures_pkey ON public.event_processing_failures USING btree (id)"
+    },
+    {
+      "name": "eventsub_subscriptions_desired_identity_idx",
+      "bytes": 1671168,
+      "table": "eventsub_subscriptions",
+      "definition": "CREATE UNIQUE INDEX eventsub_subscriptions_desired_identity_idx ON public.eventsub_subscriptions USING btree (event_type, event_version, condition_key, callback_url)"
+    },
+    {
+      "name": "eventsub_subscriptions_pkey",
+      "bytes": 1187840,
+      "table": "eventsub_subscriptions",
+      "definition": "CREATE UNIQUE INDEX eventsub_subscriptions_pkey ON public.eventsub_subscriptions USING btree (id)"
+    },
+    {
+      "name": "eventsub_subscriptions_twitch_subscription_idx",
+      "bytes": 1040384,
+      "table": "eventsub_subscriptions",
+      "definition": "CREATE UNIQUE INDEX eventsub_subscriptions_twitch_subscription_idx ON public.eventsub_subscriptions USING btree (twitch_subscription_id)"
+    },
+    {
+      "name": "ingestion_runs_pkey",
+      "bytes": 7684096,
+      "table": "ingestion_runs",
+      "definition": "CREATE UNIQUE INDEX ingestion_runs_pkey ON public.ingestion_runs USING btree (id)"
+    },
+    {
+      "name": "irc_connections_pkey",
+      "bytes": 8192,
+      "table": "irc_connections",
+      "definition": "CREATE UNIQUE INDEX irc_connections_pkey ON public.irc_connections USING btree (id)"
+    },
+    {
+      "name": "job_locks_pkey",
+      "bytes": 16384,
+      "table": "job_locks",
+      "definition": "CREATE UNIQUE INDEX job_locks_pkey ON public.job_locks USING btree (name)"
+    },
+    {
+      "name": "membership_event_contexts_broadcaster_user_id_twitch_stream_key",
+      "bytes": 3612672,
+      "table": "membership_event_contexts",
+      "definition": "CREATE UNIQUE INDEX membership_event_contexts_broadcaster_user_id_twitch_stream_key ON public.membership_event_contexts USING btree (broadcaster_user_id, twitch_stream_id) NULLS NOT DISTINCT"
+    },
+    {
+      "name": "membership_event_contexts_pkey",
+      "bytes": 1523712,
+      "table": "membership_event_contexts",
+      "definition": "CREATE UNIQUE INDEX membership_event_contexts_pkey ON public.membership_event_contexts USING btree (id)"
+    },
+    {
+      "name": "membership_event_identities_pkey",
+      "bytes": 55754752,
+      "table": "membership_event_identities",
+      "definition": "CREATE UNIQUE INDEX membership_event_identities_pkey ON public.membership_event_identities USING btree (id)"
+    },
+    {
+      "name": "membership_identity_login_idx",
+      "bytes": 26189824,
+      "table": "membership_event_identities",
+      "definition": "CREATE INDEX membership_identity_login_idx ON public.membership_event_identities USING btree (chatter_login)"
+    },
+    {
+      "name": "membership_identity_pair_idx",
+      "bytes": 18546688,
+      "table": "membership_event_identities",
+      "definition": "CREATE UNIQUE INDEX membership_identity_pair_idx ON public.membership_event_identities USING btree (chatter_user_id, chatter_login) NULLS NOT DISTINCT WHERE (pending_bucket IS NULL)"
+    },
+    {
+      "name": "membership_identity_pending_idx",
+      "bytes": 8396800,
+      "table": "membership_event_identities",
+      "definition": "CREATE UNIQUE INDEX membership_identity_pending_idx ON public.membership_event_identities USING btree (chatter_login, pending_bucket) WHERE ((pending_bucket IS NOT NULL) AND (resolved_at IS NULL))"
+    },
+    {
+      "name": "membership_identity_unchecked_idx",
+      "bytes": 3194880,
+      "table": "membership_event_identities",
+      "definition": "CREATE INDEX membership_identity_unchecked_idx ON public.membership_event_identities USING btree (id) WHERE ((chatter_user_id IS NULL) AND (resolved_at IS NULL) AND (chatter_login IS NOT NULL))"
+    },
+    {
+      "name": "membership_identity_user_idx",
+      "bytes": 28483584,
+      "table": "membership_event_identities",
+      "definition": "CREATE INDEX membership_identity_user_idx ON public.membership_event_identities USING btree (chatter_user_id)"
+    },
+    {
+      "name": "membership_digest_slot_idx",
+      "bytes": 332562432,
+      "table": "membership_events",
+      "definition": "CREATE UNIQUE INDEX membership_digest_slot_idx ON public.membership_events USING btree (digest_bucket, digest_slot)"
+    },
+    {
+      "name": "membership_event_rows_pkey",
+      "bytes": 375136256,
+      "table": "membership_events",
+      "definition": "CREATE UNIQUE INDEX membership_event_rows_pkey ON public.membership_events USING btree (id)"
+    },
+    {
+      "name": "membership_events_identity_received_idx",
+      "bytes": 376807424,
+      "table": "membership_events",
+      "definition": "CREATE INDEX membership_events_identity_received_idx ON public.membership_events USING btree (identity_id, received_at)"
+    },
+    {
+      "name": "membership_events_time_brin",
+      "bytes": 196608,
+      "table": "membership_events",
+      "definition": "CREATE INDEX membership_events_time_brin ON public.membership_events USING brin (received_at, COALESCE(\nCASE event_time_kind\n    WHEN 0 THEN received_at\n    WHEN 1 THEN event_at_override\n    ELSE NULL::timestamp with time zone\nEND, received_at)) WITH (pages_per_range='32', autosummarize='on')"
+    },
+    {
+      "name": "oauth_accounts_pkey",
+      "bytes": 16384,
+      "table": "oauth_accounts",
+      "definition": "CREATE UNIQUE INDEX oauth_accounts_pkey ON public.oauth_accounts USING btree (id)"
+    },
+    {
+      "name": "oauth_accounts_provider_user_idx",
+      "bytes": 16384,
+      "table": "oauth_accounts",
+      "definition": "CREATE UNIQUE INDEX oauth_accounts_provider_user_idx ON public.oauth_accounts USING btree (provider, provider_user_id)"
+    },
+    {
+      "name": "privacy_request_events_pkey",
+      "bytes": 16384,
+      "table": "privacy_request_events",
+      "definition": "CREATE UNIQUE INDEX privacy_request_events_pkey ON public.privacy_request_events USING btree (id)"
+    },
+    {
+      "name": "privacy_request_events_request_occurred_idx",
+      "bytes": 16384,
+      "table": "privacy_request_events",
+      "definition": "CREATE INDEX privacy_request_events_request_occurred_idx ON public.privacy_request_events USING btree (privacy_request_id, occurred_at)"
+    },
+    {
+      "name": "privacy_requests_pkey",
+      "bytes": 16384,
+      "table": "privacy_requests",
+      "definition": "CREATE UNIQUE INDEX privacy_requests_pkey ON public.privacy_requests USING btree (id)"
+    },
+    {
+      "name": "privacy_requests_status_requested_idx",
+      "bytes": 16384,
+      "table": "privacy_requests",
+      "definition": "CREATE INDEX privacy_requests_status_requested_idx ON public.privacy_requests USING btree (status, requested_at)"
+    },
+    {
+      "name": "privacy_requests_subject_requested_idx",
+      "bytes": 16384,
+      "table": "privacy_requests",
+      "definition": "CREATE INDEX privacy_requests_subject_requested_idx ON public.privacy_requests USING btree (subject_twitch_user_id, requested_at)"
+    },
+    {
+      "name": "raids_pkey",
+      "bytes": 319488,
+      "table": "raids",
+      "definition": "CREATE UNIQUE INDEX raids_pkey ON public.raids USING btree (id)"
+    },
+    {
+      "name": "raids_raw_eventsub_event_idx",
+      "bytes": 303104,
+      "table": "raids",
+      "definition": "CREATE UNIQUE INDEX raids_raw_eventsub_event_idx ON public.raids USING btree (raw_eventsub_event_id)"
+    },
+    {
+      "name": "raids_source_stream_occurred_idx",
+      "bytes": 270336,
+      "table": "raids",
+      "definition": "CREATE INDEX raids_source_stream_occurred_idx ON public.raids USING btree (source_stream_id, occurred_at)"
+    },
+    {
+      "name": "raids_target_stream_occurred_idx",
+      "bytes": 311296,
+      "table": "raids",
+      "definition": "CREATE INDEX raids_target_stream_occurred_idx ON public.raids USING btree (target_stream_id, occurred_at)"
+    },
+    {
+      "name": "rate_limit_observations_pkey",
+      "bytes": 4857856,
+      "table": "rate_limit_observations",
+      "definition": "CREATE UNIQUE INDEX rate_limit_observations_pkey ON public.rate_limit_observations USING btree (id)"
+    },
+    {
+      "name": "raw_eventsub_events_message_idx",
+      "bytes": 5169152,
+      "table": "raw_eventsub_events",
+      "definition": "CREATE UNIQUE INDEX raw_eventsub_events_message_idx ON public.raw_eventsub_events USING btree (twitch_message_id)"
+    },
+    {
+      "name": "raw_eventsub_events_pkey",
+      "bytes": 2334720,
+      "table": "raw_eventsub_events",
+      "definition": "CREATE UNIQUE INDEX raw_eventsub_events_pkey ON public.raw_eventsub_events USING btree (id)"
+    },
+    {
+      "name": "raw_eventsub_events_type_received_idx",
+      "bytes": 4538368,
+      "table": "raw_eventsub_events",
+      "definition": "CREATE INDEX raw_eventsub_events_type_received_idx ON public.raw_eventsub_events USING btree (event_type, received_at)"
+    },
+    {
+      "name": "raw_helix_responses_pkey",
+      "bytes": 4898816,
+      "table": "raw_helix_responses",
+      "definition": "CREATE UNIQUE INDEX raw_helix_responses_pkey ON public.raw_helix_responses USING btree (id)"
+    },
+    {
+      "name": "raw_irc_contexts_identity",
+      "bytes": 1253376,
+      "table": "raw_irc_contexts",
+      "definition": "CREATE UNIQUE INDEX raw_irc_contexts_identity ON public.raw_irc_contexts USING btree (channel_login, bot_account_id, irc_connection_id) NULLS NOT DISTINCT"
+    },
+    {
+      "name": "raw_irc_contexts_pkey",
+      "bytes": 442368,
+      "table": "raw_irc_contexts",
+      "definition": "CREATE UNIQUE INDEX raw_irc_contexts_pkey ON public.raw_irc_contexts USING btree (id)"
+    },
+    {
+      "name": "raw_irc_messages_pkey",
+      "bytes": 404660224,
+      "table": "raw_irc_messages",
+      "definition": "CREATE UNIQUE INDEX raw_irc_messages_pkey ON public.raw_irc_messages USING btree (id)"
+    },
+    {
+      "name": "raw_irc_messages_received_idx",
+      "bytes": 337600512,
+      "table": "raw_irc_messages",
+      "definition": "CREATE INDEX raw_irc_messages_received_idx ON public.raw_irc_messages USING btree (received_at)"
+    },
+    {
+      "name": "raw_irc_messages_unpacked_idx",
+      "bytes": 14368768,
+      "table": "raw_irc_messages",
+      "definition": "CREATE INDEX raw_irc_messages_unpacked_idx ON public.raw_irc_messages USING btree (received_at) WHERE ((payload_block_id IS NULL) AND (raw_line <> ''::text))"
+    },
+    {
+      "name": "raw_irc_payload_blocks_pkey",
+      "bytes": 1073152,
+      "table": "raw_irc_payload_blocks",
+      "definition": "CREATE UNIQUE INDEX raw_irc_payload_blocks_pkey ON public.raw_irc_payload_blocks USING btree (id)"
+    },
+    {
+      "name": "sessions_pkey",
+      "bytes": 16384,
+      "table": "sessions",
+      "definition": "CREATE UNIQUE INDEX sessions_pkey ON public.sessions USING btree (session_id_hash)"
+    },
+    {
+      "name": "stream_activity_buckets_twitch_stream_id_bucket_start_bucket_mi",
+      "bytes": 175333376,
+      "table": "stream_activity_buckets",
+      "definition": "CREATE UNIQUE INDEX stream_activity_buckets_twitch_stream_id_bucket_start_bucket_mi ON public.stream_activity_buckets USING btree (twitch_stream_id, bucket_start, bucket_minutes)"
+    },
+    {
+      "name": "stream_sessions_broadcaster_live_idx",
+      "bytes": 3809280,
+      "table": "stream_sessions",
+      "definition": "CREATE INDEX stream_sessions_broadcaster_live_idx ON public.stream_sessions USING btree (broadcaster_user_id, ended_at)"
+    },
+    {
+      "name": "stream_sessions_broadcaster_started_idx",
+      "bytes": 3874816,
+      "table": "stream_sessions",
+      "definition": "CREATE INDEX stream_sessions_broadcaster_started_idx ON public.stream_sessions USING btree (broadcaster_user_id, started_at)"
+    },
+    {
+      "name": "stream_sessions_live_finnish_idx",
+      "bytes": 704512,
+      "table": "stream_sessions",
+      "definition": "CREATE INDEX stream_sessions_live_finnish_idx ON public.stream_sessions USING btree (last_seen_live_at) WHERE ((ended_at IS NULL) AND (is_finnish_eligible = true))"
+    },
+    {
+      "name": "stream_sessions_live_language_idx",
+      "bytes": 1294336,
+      "table": "stream_sessions",
+      "definition": "CREATE INDEX stream_sessions_live_language_idx ON public.stream_sessions USING btree (language, last_seen_live_at) WHERE (ended_at IS NULL)"
+    },
+    {
+      "name": "stream_sessions_pkey",
+      "bytes": 3727360,
+      "table": "stream_sessions",
+      "definition": "CREATE UNIQUE INDEX stream_sessions_pkey ON public.stream_sessions USING btree (twitch_stream_id)"
+    },
+    {
+      "name": "stream_sessions_recent_ended_idx",
+      "bytes": 3080192,
+      "table": "stream_sessions",
+      "definition": "CREATE INDEX stream_sessions_recent_ended_idx ON public.stream_sessions USING btree (language, ended_at) WHERE (ended_at IS NOT NULL)"
+    },
+    {
+      "name": "stream_sessions_recent_finnish_ended_idx",
+      "bytes": 1302528,
+      "table": "stream_sessions",
+      "definition": "CREATE INDEX stream_sessions_recent_finnish_ended_idx ON public.stream_sessions USING btree (ended_at) WHERE ((ended_at IS NOT NULL) AND (finnish_match_reason IS NOT NULL))"
+    },
+    {
+      "name": "stream_sessions_started_at_idx",
+      "bytes": 3874816,
+      "table": "stream_sessions",
+      "definition": "CREATE INDEX stream_sessions_started_at_idx ON public.stream_sessions USING btree (started_at)"
+    },
+    {
+      "name": "stream_snapshots_broadcaster_observed_idx",
+      "bytes": 230301696,
+      "table": "stream_snapshots",
+      "definition": "CREATE INDEX stream_snapshots_broadcaster_observed_idx ON public.stream_snapshots USING btree (broadcaster_user_id, observed_at)"
+    },
+    {
+      "name": "stream_snapshots_pkey",
+      "bytes": 148488192,
+      "table": "stream_snapshots",
+      "definition": "CREATE UNIQUE INDEX stream_snapshots_pkey ON public.stream_snapshots USING btree (id)"
+    },
+    {
+      "name": "stream_snapshots_stream_observed_idx",
+      "bytes": 196722688,
+      "table": "stream_snapshots",
+      "definition": "CREATE INDEX stream_snapshots_stream_observed_idx ON public.stream_snapshots USING btree (twitch_stream_id, observed_at)"
+    },
+    {
+      "name": "subject_privacy_states_pkey",
+      "bytes": 16384,
+      "table": "subject_privacy_states",
+      "definition": "CREATE UNIQUE INDEX subject_privacy_states_pkey ON public.subject_privacy_states USING btree (twitch_user_id)"
+    },
+    {
+      "name": "subject_privacy_states_public_hidden_idx",
+      "bytes": 16384,
+      "table": "subject_privacy_states",
+      "definition": "CREATE INDEX subject_privacy_states_public_hidden_idx ON public.subject_privacy_states USING btree (public_profile_hidden)"
+    },
+    {
+      "name": "subject_privacy_states_tracking_opted_out_idx",
+      "bytes": 16384,
+      "table": "subject_privacy_states",
+      "definition": "CREATE INDEX subject_privacy_states_tracking_opted_out_idx ON public.subject_privacy_states USING btree (tracking_opted_out)"
+    },
+    {
+      "name": "twitch_user_name_history_pkey",
+      "bytes": 8192,
+      "table": "twitch_user_name_history",
+      "definition": "CREATE UNIQUE INDEX twitch_user_name_history_pkey ON public.twitch_user_name_history USING btree (id)"
+    },
+    {
+      "name": "twitch_user_name_history_user_observed_idx",
+      "bytes": 8192,
+      "table": "twitch_user_name_history",
+      "definition": "CREATE INDEX twitch_user_name_history_user_observed_idx ON public.twitch_user_name_history USING btree (twitch_user_id, observed_from)"
+    },
+    {
+      "name": "twitch_users_login_idx",
+      "bytes": 10166272,
+      "table": "twitch_users",
+      "definition": "CREATE INDEX twitch_users_login_idx ON public.twitch_users USING btree (login)"
+    },
+    {
+      "name": "twitch_users_pkey",
+      "bytes": 10788864,
+      "table": "twitch_users",
+      "definition": "CREATE UNIQUE INDEX twitch_users_pkey ON public.twitch_users USING btree (twitch_user_id)"
+    },
+    {
+      "name": "worker_heartbeats_worker_name_loop_name_pk",
+      "bytes": 40960,
+      "table": "worker_heartbeats",
+      "definition": "CREATE UNIQUE INDEX worker_heartbeats_worker_name_loop_name_pk ON public.worker_heartbeats USING btree (worker_name, loop_name)"
+    }
+  ],
+  "version": "PostgreSQL 16.14 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+  "relations": [
+    {
+      "name": "chat_messages",
+      "heap_bytes": 2143297536,
+      "index_bytes": 2199306240,
+      "table_bytes": 2144010240,
+      "total_bytes": 4343316480,
+      "last_analyze": "2026-10-08T22:09:49.631015+03:00",
+      "estimated_rows": 8477141,
+      "dead_rows_estimate": 13782,
+      "live_rows_estimate": 8821561
+    },
+    {
+      "name": "raw_irc_messages",
+      "heap_bytes": 1452023808,
+      "index_bytes": 756654080,
+      "table_bytes": 1452507136,
+      "total_bytes": 2209161216,
+      "last_analyze": "2026-10-10T00:44:16.000631+03:00",
+      "estimated_rows": 11158647,
+      "dead_rows_estimate": 151853,
+      "live_rows_estimate": 11252334
+    },
+    {
+      "name": "membership_events",
+      "heap_bytes": 957431808,
+      "index_bytes": 1084727296,
+      "table_bytes": 957726720,
+      "total_bytes": 2042454016,
+      "last_analyze": "2026-10-09T21:38:12.38361+03:00",
+      "estimated_rows": 8806647,
+      "dead_rows_estimate": 1118,
+      "live_rows_estimate": 8942454
+    },
+    {
+      "name": "raw_irc_payload_blocks",
+      "heap_bytes": 3129344,
+      "index_bytes": 1073152,
+      "table_bytes": 1995087872,
+      "total_bytes": 1996161024,
+      "last_analyze": "2026-10-06T18:35:29.299456+03:00",
+      "estimated_rows": 45504,
+      "dead_rows_estimate": 0,
+      "live_rows_estimate": 46350
+    },
+    {
+      "name": "stream_snapshots",
+      "heap_bytes": 512180224,
+      "index_bytes": 575512576,
+      "table_bytes": 512352256,
+      "total_bytes": 1087864832,
+      "last_analyze": "2026-10-07T20:40:02.381618+03:00",
+      "estimated_rows": 3502460,
+      "dead_rows_estimate": 0,
+      "live_rows_estimate": 3688643
+    },
+    {
+      "name": "raw_helix_responses",
+      "heap_bytes": 61128704,
+      "index_bytes": 4898816,
+      "table_bytes": 735518720,
+      "total_bytes": 740417536,
+      "last_analyze": "2026-10-10T03:30:16.040336+03:00",
+      "estimated_rows": 119173,
+      "dead_rows_estimate": 9273,
+      "live_rows_estimate": 120026
+    },
+    {
+      "name": "stream_activity_buckets",
+      "heap_bytes": 308723712,
+      "index_bytes": 175333376,
+      "table_bytes": 308846592,
+      "total_bytes": 484179968,
+      "last_analyze": "2026-10-09T16:25:08.791256+03:00",
+      "estimated_rows": 2340397,
+      "dead_rows_estimate": 278280,
+      "live_rows_estimate": 2396229
+    },
+    {
+      "name": "membership_event_identities",
+      "heap_bytes": 128229376,
+      "index_bytes": 140640256,
+      "table_bytes": 128294912,
+      "total_bytes": 268935168,
+      "last_analyze": "2026-10-10T15:37:27.117903+03:00",
+      "estimated_rows": 1691724,
+      "dead_rows_estimate": 30113,
+      "live_rows_estimate": 1692738
+    },
+    {
+      "name": "ingestion_runs",
+      "heap_bytes": 149053440,
+      "index_bytes": 7684096,
+      "table_bytes": 149127168,
+      "total_bytes": 156811264,
+      "last_analyze": "2026-09-02T14:25:50.7665+03:00",
+      "estimated_rows": 164674,
+      "dead_rows_estimate": 2811,
+      "live_rows_estimate": 175892
+    },
+    {
+      "name": "rate_limit_observations",
+      "heap_bytes": 100179968,
+      "index_bytes": 4857856,
+      "table_bytes": 100245504,
+      "total_bytes": 105103360,
+      "last_analyze": "2026-10-07T20:25:01.724785+03:00",
+      "estimated_rows": 117451,
+      "dead_rows_estimate": 0,
+      "live_rows_estimate": 123057
+    },
+    {
+      "name": "chat_assignment_events",
+      "heap_bytes": 83214336,
+      "index_bytes": 19111936,
+      "table_bytes": 83271680,
+      "total_bytes": 102383616,
+      "last_analyze": "2026-10-05T10:59:54.432896+03:00",
+      "estimated_rows": 415123,
+      "dead_rows_estimate": 0,
+      "live_rows_estimate": 451296
+    },
+    {
+      "name": "twitch_users",
+      "heap_bytes": 75112448,
+      "index_bytes": 20955136,
+      "table_bytes": 75169792,
+      "total_bytes": 96124928,
+      "last_analyze": "2026-10-10T15:20:27.095763+03:00",
+      "estimated_rows": 260648,
+      "dead_rows_estimate": 27043,
+      "live_rows_estimate": 260968
+    },
+    {
+      "name": "chatter_daily_stats",
+      "heap_bytes": 61464576,
+      "index_bytes": 24903680,
+      "table_bytes": 61513728,
+      "total_bytes": 86417408,
+      "last_analyze": "2026-10-10T14:05:25.472567+03:00",
+      "estimated_rows": 468614,
+      "dead_rows_estimate": 67182,
+      "live_rows_estimate": 469558
+    },
+    {
+      "name": "channel_events",
+      "heap_bytes": 32858112,
+      "index_bytes": 35192832,
+      "table_bytes": 32899072,
+      "total_bytes": 68091904,
+      "last_analyze": "2026-10-07T08:54:50.028455+03:00",
+      "estimated_rows": 157469,
+      "dead_rows_estimate": 0,
+      "live_rows_estimate": 165116
+    },
+    {
+      "name": "chat_assignments",
+      "heap_bytes": 45621248,
+      "index_bytes": 19349504,
+      "table_bytes": 45670400,
+      "total_bytes": 65019904,
+      "last_analyze": "2026-10-10T15:44:26.407964+03:00",
+      "estimated_rows": 68236,
+      "dead_rows_estimate": 3575,
+      "live_rows_estimate": 68237
+    },
+    {
+      "name": "raw_eventsub_events",
+      "heap_bytes": 50380800,
+      "index_bytes": 12042240,
+      "table_bytes": 50429952,
+      "total_bytes": 62472192,
+      "last_analyze": "2026-09-10T01:22:07.864792+03:00",
+      "estimated_rows": 53828,
+      "dead_rows_estimate": 2739,
+      "live_rows_estimate": 56533
+    },
+    {
+      "name": "eventsub_subscriptions",
+      "heap_bytes": 43532288,
+      "index_bytes": 3973120,
+      "table_bytes": 43581440,
+      "total_bytes": 47554560,
+      "last_analyze": "2026-10-10T15:46:26.181466+03:00",
+      "estimated_rows": 225,
+      "dead_rows_estimate": 1970,
+      "live_rows_estimate": 225
+    },
+    {
+      "name": "stream_sessions",
+      "heap_bytes": 20160512,
+      "index_bytes": 21716992,
+      "table_bytes": 20201472,
+      "total_bytes": 41918464,
+      "last_analyze": "2026-10-10T14:43:25.79132+03:00",
+      "estimated_rows": 70572,
+      "dead_rows_estimate": 9373,
+      "live_rows_estimate": 70662
+    },
+    {
+      "name": "membership_event_contexts",
+      "heap_bytes": 4382720,
+      "index_bytes": 5136384,
+      "table_bytes": 4423680,
+      "total_bytes": 9560064,
+      "last_analyze": "2026-10-07T17:26:57.633003+03:00",
+      "estimated_rows": 63163,
+      "dead_rows_estimate": 4982,
+      "live_rows_estimate": 66733
+    },
+    {
+      "name": "channel_daily_stats",
+      "heap_bytes": 6332416,
+      "index_bytes": 2875392,
+      "table_bytes": 6373376,
+      "total_bytes": 9248768,
+      "last_analyze": "2026-10-10T15:25:25.990974+03:00",
+      "estimated_rows": 54816,
+      "dead_rows_estimate": 4586,
+      "live_rows_estimate": 54836
+    },
+    {
+      "name": "community_map_snapshots",
+      "heap_bytes": 32768,
+      "index_bytes": 32768,
+      "table_bytes": 3563520,
+      "total_bytes": 3596288,
+      "last_analyze": "2026-10-06T17:40:22.601821+03:00",
+      "estimated_rows": 34,
+      "dead_rows_estimate": 28,
+      "live_rows_estimate": 38
+    },
+    {
+      "name": "channels",
+      "heap_bytes": 2506752,
+      "index_bytes": 434176,
+      "table_bytes": 2547712,
+      "total_bytes": 2981888,
+      "last_analyze": "2026-10-10T15:40:26.005975+03:00",
+      "estimated_rows": 7830,
+      "dead_rows_estimate": 1245,
+      "live_rows_estimate": 7830
+    },
+    {
+      "name": "raw_irc_contexts",
+      "heap_bytes": 1130496,
+      "index_bytes": 1695744,
+      "table_bytes": 1171456,
+      "total_bytes": 2867200,
+      "last_analyze": "2026-10-10T14:14:24.927318+03:00",
+      "estimated_rows": 17177,
+      "dead_rows_estimate": 800,
+      "live_rows_estimate": 17197
+    },
+    {
+      "name": "worker_heartbeats",
+      "heap_bytes": 2613248,
+      "index_bytes": 40960,
+      "table_bytes": 2654208,
+      "total_bytes": 2695168,
+      "last_analyze": "2026-10-10T15:46:26.039522+03:00",
+      "estimated_rows": 11,
+      "dead_rows_estimate": 63,
+      "live_rows_estimate": 11
+    },
+    {
+      "name": "raids",
+      "heap_bytes": 843776,
+      "index_bytes": 1204224,
+      "table_bytes": 884736,
+      "total_bytes": 2088960,
+      "last_analyze": "2026-09-03T00:16:53.562781+03:00",
+      "estimated_rows": 5110,
+      "dead_rows_estimate": 909,
+      "live_rows_estimate": 5484
+    },
+    {
+      "name": "chat_presence_observations",
+      "heap_bytes": 81920,
+      "index_bytes": 131072,
+      "table_bytes": 114688,
+      "total_bytes": 245760,
+      "last_analyze": "2026-10-08T16:00:41.908487+03:00",
+      "estimated_rows": 238,
+      "dead_rows_estimate": 0,
+      "live_rows_estimate": 290
+    },
+    {
+      "name": "chat_presence_snapshots",
+      "heap_bytes": 32768,
+      "index_bytes": 49152,
+      "table_bytes": 65536,
+      "total_bytes": 114688,
+      "last_analyze": "2026-10-01T20:31:09.139249+03:00",
+      "estimated_rows": 107,
+      "dead_rows_estimate": 0,
+      "live_rows_estimate": 161
+    },
+    {
+      "name": "oauth_accounts",
+      "heap_bytes": 16384,
+      "index_bytes": 32768,
+      "table_bytes": 49152,
+      "total_bytes": 81920,
+      "last_analyze": "2026-10-10T15:20:27.099161+03:00",
+      "estimated_rows": 6,
+      "dead_rows_estimate": 7,
+      "live_rows_estimate": 6
+    },
+    {
+      "name": "community_map_state",
+      "heap_bytes": 8192,
+      "index_bytes": 16384,
+      "table_bytes": 49152,
+      "total_bytes": 65536,
+      "last_analyze": "2026-09-23T06:02:45.727091+03:00",
+      "estimated_rows": 1,
+      "dead_rows_estimate": 38,
+      "live_rows_estimate": 1
+    },
+    {
+      "name": "privacy_requests",
+      "heap_bytes": 8192,
+      "index_bytes": 49152,
+      "table_bytes": 16384,
+      "total_bytes": 65536,
+      "last_analyze": null,
+      "estimated_rows": -1,
+      "dead_rows_estimate": 2,
+      "live_rows_estimate": 2
+    },
+    {
+      "name": "sessions",
+      "heap_bytes": 8192,
+      "index_bytes": 16384,
+      "table_bytes": 49152,
+      "total_bytes": 65536,
+      "last_analyze": "2026-10-04T00:29:17.866246+03:00",
+      "estimated_rows": 6,
+      "dead_rows_estimate": 25,
+      "live_rows_estimate": 14
+    },
+    {
+      "name": "subject_privacy_states",
+      "heap_bytes": 8192,
+      "index_bytes": 49152,
+      "table_bytes": 16384,
+      "total_bytes": 65536,
+      "last_analyze": null,
+      "estimated_rows": -1,
+      "dead_rows_estimate": 1,
+      "live_rows_estimate": 1
+    },
+    {
+      "name": "bot_accounts",
+      "heap_bytes": 8192,
+      "index_bytes": 32768,
+      "table_bytes": 16384,
+      "total_bytes": 49152,
+      "last_analyze": null,
+      "estimated_rows": -1,
+      "dead_rows_estimate": 2,
+      "live_rows_estimate": 5
+    },
+    {
+      "name": "app_users",
+      "heap_bytes": 8192,
+      "index_bytes": 32768,
+      "table_bytes": 16384,
+      "total_bytes": 49152,
+      "last_analyze": null,
+      "estimated_rows": -1,
+      "dead_rows_estimate": 8,
+      "live_rows_estimate": 6
+    },
+    {
+      "name": "privacy_request_events",
+      "heap_bytes": 8192,
+      "index_bytes": 32768,
+      "table_bytes": 16384,
+      "total_bytes": 49152,
+      "last_analyze": null,
+      "estimated_rows": -1,
+      "dead_rows_estimate": 0,
+      "live_rows_estimate": 4
+    },
+    {
+      "name": "job_locks",
+      "heap_bytes": 8192,
+      "index_bytes": 16384,
+      "table_bytes": 32768,
+      "total_bytes": 49152,
+      "last_analyze": "2026-10-08T06:03:08.944449+03:00",
+      "estimated_rows": 0,
+      "dead_rows_estimate": 24,
+      "live_rows_estimate": 0
+    },
+    {
+      "name": "bot_account_tokens",
+      "heap_bytes": 8192,
+      "index_bytes": 16384,
+      "table_bytes": 16384,
+      "total_bytes": 32768,
+      "last_analyze": "2026-10-10T03:59:15.918199+03:00",
+      "estimated_rows": 7,
+      "dead_rows_estimate": 5,
+      "live_rows_estimate": 7
+    },
+    {
+      "name": "admin_users",
+      "heap_bytes": 8192,
+      "index_bytes": 16384,
+      "table_bytes": 16384,
+      "total_bytes": 32768,
+      "last_analyze": null,
+      "estimated_rows": -1,
+      "dead_rows_estimate": 0,
+      "live_rows_estimate": 3
+    },
+    {
+      "name": "twitch_user_name_history",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "table_bytes": 8192,
+      "total_bytes": 24576,
+      "last_analyze": null,
+      "estimated_rows": -1,
+      "dead_rows_estimate": 0,
+      "live_rows_estimate": 0
+    },
+    {
+      "name": "chat_room_state_events",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "table_bytes": 8192,
+      "total_bytes": 16384,
+      "last_analyze": null,
+      "estimated_rows": -1,
+      "dead_rows_estimate": 0,
+      "live_rows_estimate": 0
+    },
+    {
+      "name": "irc_connections",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "table_bytes": 8192,
+      "total_bytes": 16384,
+      "last_analyze": null,
+      "estimated_rows": -1,
+      "dead_rows_estimate": 0,
+      "live_rows_estimate": 0
+    },
+    {
+      "name": "event_processing_failures",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "table_bytes": 8192,
+      "total_bytes": 16384,
+      "last_analyze": null,
+      "estimated_rows": -1,
+      "dead_rows_estimate": 0,
+      "live_rows_estimate": 0
+    }
+  ],
+  "captured_at": "2026-10-10T15:46:49.406293+03:00",
+  "database_bytes": 14052342807
+}

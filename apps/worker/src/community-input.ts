@@ -19,24 +19,24 @@ export async function readCommunityInput(db: DbClient, claim: CommunityBuildClai
               r.raw_line like '@%' and split_part(r.raw_line, ' ', 1) !~ '(?:^@|;)source-room-id=[^;]+')
           ) as known_source,
           not exists (select 1 from subject_privacy_states p
-            where p.twitch_user_id = m.chatter_user_id
+            where encode_external_key(p.twitch_user_id) = m.chatter_user_id
               and (p.public_profile_hidden or p.tracking_opted_out or p.data_deleted_at is not null))
           and not exists (select 1 from subject_privacy_states p
-            where p.twitch_user_id = m.broadcaster_user_id
+            where encode_external_key(p.twitch_user_id) = m.broadcaster_user_id
               and (p.public_profile_hidden or p.tracking_opted_out or p.data_deleted_at is not null))
-          and not exists (select 1 from bot_accounts b where b.twitch_user_id = m.chatter_user_id) as permitted
+          and not exists (select 1 from bot_accounts b where encode_external_key(b.twitch_user_id) = m.chatter_user_id) as permitted
         from chat_messages m
-        left join stream_sessions s on s.twitch_stream_id = m.twitch_stream_id and s.broadcaster_user_id = m.broadcaster_user_id
+        left join stream_sessions s on s.storage_key = m.twitch_stream_id and encode_external_key(s.broadcaster_user_id) = m.broadcaster_user_id
         left join raw_irc_messages r on r.id = m.raw_irc_message_id and m.shared_chat_source_channel_id is null
         where m.received_at >= ${claim.windowStart} and m.received_at < ${claim.windowEnd}
       )
     `;
     const members = await tx.execute<{ chatterId: string; channelId: string; first: string; last: string }>(sql`
       ${observed}
-      select chatter_user_id as "chatterId", broadcaster_user_id as "channelId", min(received_at) as first, max(received_at) as last
+      select decode_external_key(chatter_user_id) as "chatterId", decode_external_key(broadcaster_user_id) as "channelId", min(received_at) as first, max(received_at) as last
       from observed where finnish and permitted and known_source and not relayed and chatter_user_id is not null
       group by chatter_user_id, broadcaster_user_id having count(*) >= 3
-      order by chatter_user_id, broadcaster_user_id limit ${maxCommunityMemberships + 1}
+      order by "chatterId", "channelId" limit ${maxCommunityMemberships + 1}
     `);
     if (members.rows.length > maxCommunityMemberships) throw new Error("Community membership budget exceeded");
     const diagnostics = await tx.execute<{ messages: number; missingSession: number; unknownSource: number; relayedMessages: number }>(sql`

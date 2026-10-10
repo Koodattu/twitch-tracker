@@ -504,13 +504,11 @@ const markDeletedChatMessage = async (db: DbClient, message: ParsedIrcMessage) =
   }
 
   const deletedAt = parseTmiTimestamp(message.tags["tmi-sent-ts"]) ?? new Date();
-  await db
-    .update(chatMessages)
-    .set({
-      deletedAt,
-      updatedAt: new Date()
-    })
-    .where(eq(chatMessages.twitchMessageId, targetMessageId));
+  await db.execute(sql`
+    update chat_message_records set deleted_at = ${deletedAt},
+      updated_at = ${new Date()}
+    where twitch_message_id = encode_chat_message_id(${targetMessageId})
+  `);
 };
 
 const markClearedChatMessages = async (db: DbClient, message: ParsedIrcMessage, channelLogin: string | null) => {
@@ -527,13 +525,13 @@ const markClearedChatMessages = async (db: DbClient, message: ParsedIrcMessage, 
   const clearedAt = parseTmiTimestamp(message.tags["tmi-sent-ts"]) ?? new Date();
   const targetUserId = message.tags["target-user-id"];
   await db.execute(sql`
-    update chat_messages
+    update chat_message_records
     set cleared_at = ${clearedAt},
         updated_at = now()
-    where broadcaster_user_id = ${broadcaster.twitchUserId}
-      and twitch_stream_id = ${currentStream.twitchStreamId}
+    where broadcaster_user_id = encode_external_key(${broadcaster.twitchUserId})
+      and twitch_stream_id = encode_external_key(${currentStream.twitchStreamId})
       and received_at <= ${clearedAt}
-      and (${targetUserId ?? null}::text is null or chatter_user_id = ${targetUserId ?? null})
+      and (${targetUserId ?? null}::text is null or chatter_user_id = encode_external_key(${targetUserId ?? null}))
   `);
 };
 

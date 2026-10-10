@@ -1,0 +1,11 @@
+{
+  "at": "2026-10-10T13:59:16.227Z",
+  "node": "v24.19.0",
+  "checks": [
+    "Actual CLI preserves committed checkpoints when the viewer migration fails",
+    "Canonical verifier matches every table at the partial checkpoint",
+    "Resuming completes the remaining migrations and preserves every logical fingerprint",
+    "Repeating the runner is a no-op",
+    "Guarded rollback restores all logical fingerprints and the 0023 journal state"
+  ]
+}

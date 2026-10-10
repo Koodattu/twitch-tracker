@@ -39,6 +39,6 @@ describe.skipIf(database == null)("Compact identifiers with PostgreSQL", () => {
     const messageId = "00112233-4455-6677-8899-aabbccddeeff";
     await db.insert(chatMessages).values({ twitchMessageId: messageId, broadcasterUserId: "channel" });
     await expect(pool.query(`insert into chat_messages (twitch_message_id, broadcaster_user_id)
-      values (decode('01', 'hex') || convert_to($1, 'UTF8'), 'channel')`, [messageId])).rejects.toThrow("chat_message_id_encoding");
+      values (decode('01', 'hex') || convert_to($1, 'UTF8'), encode_external_key('channel'))`, [messageId])).rejects.toThrow("chat_message_id_encoding");
   });
 });

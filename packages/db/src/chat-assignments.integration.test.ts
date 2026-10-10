@@ -34,7 +34,7 @@ describe.skipIf(database == null)("Chat Assignment control with PostgreSQL", () 
       truncate table
         chat_assignment_events,
         chat_assignments,
-        stream_snapshots,
+        stream_snapshot_records,
         stream_sessions,
         subject_privacy_states,
         channels,

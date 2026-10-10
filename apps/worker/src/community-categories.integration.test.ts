@@ -23,11 +23,11 @@ describe.skipIf(database == null)("Historical community categories", () => {
 
   it("uses category duration within the reporting window and carries categories across compact snapshots", async () => {
     await pool.query(`insert into stream_snapshots (twitch_stream_id,broadcaster_user_id,observed_at,category_id,category_name) values
-      ('stream','channel','2026-08-11 01:00Z',null,null),
-      ('stream','channel','2026-08-11 03:00Z','music','Music'),
-      ('stream','channel','2026-08-11 03:01Z','music','Music'),
-      ('stream','channel','2026-08-11 03:02Z','music','Music'),
-      ('stream','channel','2026-08-13 03:00Z','chess','Chess')`);
+      (encode_external_key('stream'),encode_external_key('channel'),'2026-08-11 01:00Z',null,null),
+      (encode_external_key('stream'),encode_external_key('channel'),'2026-08-11 03:00Z','music','Music'),
+      (encode_external_key('stream'),encode_external_key('channel'),'2026-08-11 03:01Z','music','Music'),
+      (encode_external_key('stream'),encode_external_key('channel'),'2026-08-11 03:02Z','music','Music'),
+      (encode_external_key('stream'),encode_external_key('channel'),'2026-08-13 03:00Z','chess','Chess')`);
     const value = graph(); await addCommunityCategories(db,claim,value);
     expect(value.nodes[0]!.category).toEqual({id:"wow",name:"World of Warcraft",share:0.75});
   });
@@ -35,14 +35,14 @@ describe.skipIf(database == null)("Historical community categories", () => {
   it("uses the last category observed before the window, without using a stream's eventual latest category", async () => {
     await pool.query(`update stream_sessions set latest_category_id = 'chess',latest_category_name = 'Chess';
       insert into stream_snapshots (twitch_stream_id,broadcaster_user_id,observed_at,category_id,category_name)
-      values ('stream','channel','2026-08-10 23:00Z','music','Music')`);
+      values (encode_external_key('stream'),encode_external_key('channel'),'2026-08-10 23:00Z','music','Music')`);
     const value = graph(); await addCommunityCategories(db,claim,value);
     expect(value.nodes[0]!.category).toEqual({id:"music",name:"Music",share:1});
   });
 
   it("omits categories when most observed stream time is unknown, including explicit category clearing", async () => {
     await pool.query(`insert into stream_snapshots (twitch_stream_id,broadcaster_user_id,observed_at,category_id,category_name)
-      values ('stream','channel','2026-08-11 01:00Z','','')`);
+      values (encode_external_key('stream'),encode_external_key('channel'),'2026-08-11 01:00Z','','')`);
     const value = graph(); await addCommunityCategories(db,claim,value);
     expect(value.nodes[0]!.category).toBeUndefined();
   });

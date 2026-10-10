@@ -1,0 +1,893 @@
+{
+  "at": "2026-10-10T13:51:52.576Z",
+  "node": "v24.19.0",
+  "privateInputRows": 29917,
+  "checks": [
+    "All logical fields match after combined migration, including PostgreSQL microseconds",
+    "Both reverse migrations preserve every logical field",
+    "100,000 added chat/raw records, 50,000 viewer records, and 20,000 activity buckets remain logically exact"
+  ],
+  "sizes": {
+    "sampleBaseline": {
+      "chat_messages": {
+        "heap": 5013504,
+        "indexes": 3973120,
+        "total": 9027584,
+        "rows": 20856
+      },
+      "stream_snapshots": {
+        "heap": 122880,
+        "indexes": 163840,
+        "total": 327680,
+        "rows": 869
+      },
+      "raw_irc_messages": {
+        "heap": 2236416,
+        "indexes": 1032192,
+        "total": 3309568,
+        "rows": 22460
+      },
+      "twitch_users": {
+        "heap": 360448,
+        "indexes": 155648,
+        "total": 557056,
+        "rows": 4189
+      },
+      "stream_sessions": {
+        "heap": 98304,
+        "indexes": 131072,
+        "total": 270336,
+        "rows": 865
+      },
+      "stream_activity_buckets": {
+        "heap": 0,
+        "indexes": 8192,
+        "total": 16384,
+        "rows": 0
+      },
+      "raw_irc_payload_blocks": {
+        "heap": 8192,
+        "indexes": 16384,
+        "total": 1556480,
+        "rows": 32
+      }
+    },
+    "0024_compact_external_keys": {
+      "chat_messages": {
+        "heap": 5013504,
+        "indexes": 3973120,
+        "total": 9027584,
+        "rows": 20856
+      },
+      "stream_snapshots": {
+        "heap": 122880,
+        "indexes": 163840,
+        "total": 327680,
+        "rows": 869
+      },
+      "raw_irc_messages": {
+        "heap": 2236416,
+        "indexes": 1032192,
+        "total": 3309568,
+        "rows": 22460
+      },
+      "twitch_users": {
+        "heap": 393216,
+        "indexes": 270336,
+        "total": 704512,
+        "rows": 4189
+      },
+      "stream_sessions": {
+        "heap": 106496,
+        "indexes": 172032,
+        "total": 319488,
+        "rows": 865
+      },
+      "stream_activity_buckets": {
+        "heap": 0,
+        "indexes": 8192,
+        "total": 16384,
+        "rows": 0
+      },
+      "raw_irc_payload_blocks": {
+        "heap": 8192,
+        "indexes": 16384,
+        "total": 1556480,
+        "rows": 32
+      }
+    },
+    "0025_compact_chat_records": {
+      "chat_messages": {
+        "heap": 4341760,
+        "indexes": 3407872,
+        "total": 7790592,
+        "rows": 20856
+      },
+      "stream_snapshots": {
+        "heap": 122880,
+        "indexes": 163840,
+        "total": 327680,
+        "rows": 869
+      },
+      "raw_irc_messages": {
+        "heap": 2236416,
+        "indexes": 1032192,
+        "total": 3309568,
+        "rows": 22460
+      },
+      "twitch_users": {
+        "heap": 393216,
+        "indexes": 270336,
+        "total": 704512,
+        "rows": 4189
+      },
+      "stream_sessions": {
+        "heap": 106496,
+        "indexes": 172032,
+        "total": 319488,
+        "rows": 865
+      },
+      "stream_activity_buckets": {
+        "heap": 0,
+        "indexes": 8192,
+        "total": 16384,
+        "rows": 0
+      },
+      "raw_irc_payload_blocks": {
+        "heap": 8192,
+        "indexes": 16384,
+        "total": 1556480,
+        "rows": 32
+      }
+    },
+    "0026_compact_viewer_records": {
+      "chat_messages": {
+        "heap": 4341760,
+        "indexes": 3407872,
+        "total": 7790592,
+        "rows": 20856
+      },
+      "stream_snapshots": {
+        "heap": 106496,
+        "indexes": 147456,
+        "total": 294912,
+        "rows": 869
+      },
+      "raw_irc_messages": {
+        "heap": 2236416,
+        "indexes": 1032192,
+        "total": 3309568,
+        "rows": 22460
+      },
+      "twitch_users": {
+        "heap": 393216,
+        "indexes": 270336,
+        "total": 704512,
+        "rows": 4189
+      },
+      "stream_sessions": {
+        "heap": 106496,
+        "indexes": 172032,
+        "total": 319488,
+        "rows": 865
+      },
+      "stream_activity_buckets": {
+        "heap": 0,
+        "indexes": 8192,
+        "total": 16384,
+        "rows": 0
+      },
+      "raw_irc_payload_blocks": {
+        "heap": 8192,
+        "indexes": 16384,
+        "total": 1556480,
+        "rows": 32
+      }
+    },
+    "0027_compact_raw_records": {
+      "chat_messages": {
+        "heap": 4341760,
+        "indexes": 3407872,
+        "total": 7790592,
+        "rows": 20856
+      },
+      "stream_snapshots": {
+        "heap": 106496,
+        "indexes": 147456,
+        "total": 294912,
+        "rows": 869
+      },
+      "raw_irc_messages": {
+        "heap": 1933312,
+        "indexes": 1032192,
+        "total": 3006464,
+        "rows": 22460
+      },
+      "twitch_users": {
+        "heap": 393216,
+        "indexes": 270336,
+        "total": 704512,
+        "rows": 4189
+      },
+      "stream_sessions": {
+        "heap": 106496,
+        "indexes": 172032,
+        "total": 319488,
+        "rows": 865
+      },
+      "stream_activity_buckets": {
+        "heap": 0,
+        "indexes": 8192,
+        "total": 16384,
+        "rows": 0
+      },
+      "raw_irc_payload_blocks": {
+        "heap": 8192,
+        "indexes": 16384,
+        "total": 1556480,
+        "rows": 32
+      }
+    },
+    "0028_compact_activity_keys": {
+      "chat_messages": {
+        "heap": 4341760,
+        "indexes": 3407872,
+        "total": 7790592,
+        "rows": 20856
+      },
+      "stream_snapshots": {
+        "heap": 106496,
+        "indexes": 147456,
+        "total": 294912,
+        "rows": 869
+      },
+      "raw_irc_messages": {
+        "heap": 1933312,
+        "indexes": 1032192,
+        "total": 3006464,
+        "rows": 22460
+      },
+      "twitch_users": {
+        "heap": 393216,
+        "indexes": 270336,
+        "total": 704512,
+        "rows": 4189
+      },
+      "stream_sessions": {
+        "heap": 106496,
+        "indexes": 172032,
+        "total": 319488,
+        "rows": 865
+      },
+      "stream_activity_buckets": {
+        "heap": 0,
+        "indexes": 8192,
+        "total": 16384,
+        "rows": 0
+      },
+      "raw_irc_payload_blocks": {
+        "heap": 8192,
+        "indexes": 16384,
+        "total": 1556480,
+        "rows": 32
+      }
+    },
+    "sampleCombined": {
+      "chat_messages": {
+        "heap": 4341760,
+        "indexes": 3407872,
+        "total": 7790592,
+        "rows": 20856
+      },
+      "stream_snapshots": {
+        "heap": 106496,
+        "indexes": 147456,
+        "total": 294912,
+        "rows": 869
+      },
+      "raw_irc_messages": {
+        "heap": 1933312,
+        "indexes": 1032192,
+        "total": 3006464,
+        "rows": 22460
+      },
+      "twitch_users": {
+        "heap": 393216,
+        "indexes": 270336,
+        "total": 704512,
+        "rows": 4189
+      },
+      "stream_sessions": {
+        "heap": 106496,
+        "indexes": 172032,
+        "total": 319488,
+        "rows": 865
+      },
+      "stream_activity_buckets": {
+        "heap": 0,
+        "indexes": 8192,
+        "total": 16384,
+        "rows": 0
+      },
+      "raw_irc_payload_blocks": {
+        "heap": 8192,
+        "indexes": 16384,
+        "total": 1556480,
+        "rows": 32
+      }
+    },
+    "workloadBaseline": {
+      "chat_messages": {
+        "heap": 26558464,
+        "indexes": 22519808,
+        "total": 49119232,
+        "rows": 120856
+      },
+      "stream_snapshots": {
+        "heap": 5980160,
+        "indexes": 5791744,
+        "total": 11812864,
+        "rows": 50869
+      },
+      "raw_irc_messages": {
+        "heap": 13156352,
+        "indexes": 6447104,
+        "total": 19644416,
+        "rows": 122460
+      },
+      "twitch_users": {
+        "heap": 1204224,
+        "indexes": 466944,
+        "total": 1712128,
+        "rows": 14189
+      },
+      "stream_sessions": {
+        "heap": 106496,
+        "indexes": 139264,
+        "total": 286720,
+        "rows": 965
+      },
+      "stream_activity_buckets": {
+        "heap": 2023424,
+        "indexes": 1007616,
+        "total": 3072000,
+        "rows": 20000
+      },
+      "raw_irc_payload_blocks": {
+        "heap": 32768,
+        "indexes": 32768,
+        "total": 2686976,
+        "rows": 423
+      }
+    },
+    "workloadCombined": {
+      "chat_messages": {
+        "heap": 22544384,
+        "indexes": 19243008,
+        "total": 41828352,
+        "rows": 120856
+      },
+      "stream_snapshots": {
+        "heap": 4759552,
+        "indexes": 4841472,
+        "total": 9641984,
+        "rows": 50869
+      },
+      "raw_irc_messages": {
+        "heap": 12058624,
+        "indexes": 6447104,
+        "total": 18546688,
+        "rows": 122460
+      },
+      "twitch_users": {
+        "heap": 1327104,
+        "indexes": 802816,
+        "total": 2170880,
+        "rows": 14189
+      },
+      "stream_sessions": {
+        "heap": 114688,
+        "indexes": 180224,
+        "total": 335872,
+        "rows": 965
+      },
+      "stream_activity_buckets": {
+        "heap": 1867776,
+        "indexes": 827392,
+        "total": 2736128,
+        "rows": 20000
+      },
+      "raw_irc_payload_blocks": {
+        "heap": 32768,
+        "indexes": 32768,
+        "total": 2686976,
+        "rows": 423
+      }
+    }
+  },
+  "timing": {
+    "0024_compact_external_keysSampleMigrationMs": 38.60729999999967,
+    "0025_compact_chat_recordsSampleMigrationMs": 391.6792999999998,
+    "0026_compact_viewer_recordsSampleMigrationMs": 27.926799999999275,
+    "0027_compact_raw_recordsSampleMigrationMs": 62.156699999999546,
+    "0028_compact_activity_keysSampleMigrationMs": 12.334800000000541,
+    "userRecent": {
+      "baseline": {
+        "medianMs": 0.8660999999992782,
+        "p95Ms": 1.1317999999955646,
+        "minMs": 0.6714999999967404,
+        "maxMs": 1.1330000000016298,
+        "n": 40
+      },
+      "candidate": {
+        "medianMs": 0.9297000000005937,
+        "p95Ms": 1.2739999999976135,
+        "minMs": 0.7347000000008848,
+        "maxMs": 1.2962999999945168,
+        "n": 40
+      }
+    },
+    "userDeep": {
+      "baseline": {
+        "medianMs": 14.20339999999851,
+        "p95Ms": 16.44419999999809,
+        "minMs": 13.079799999999523,
+        "maxMs": 16.693200000001525,
+        "n": 40
+      },
+      "candidate": {
+        "medianMs": 9.220199999996112,
+        "p95Ms": 10.254299999993236,
+        "minMs": 8.619800000000396,
+        "maxMs": 11.07999999999447,
+        "n": 40
+      }
+    },
+    "channelRecent": {
+      "baseline": {
+        "medianMs": 0.7608000000036554,
+        "p95Ms": 1.210800000000745,
+        "minMs": 0.6295999999929336,
+        "maxMs": 1.3563999999969383,
+        "n": 40
+      },
+      "candidate": {
+        "medianMs": 0.8061999999990803,
+        "p95Ms": 1.2040000000051805,
+        "minMs": 0.6815999999962514,
+        "maxMs": 1.4791999999943073,
+        "n": 40
+      }
+    },
+    "channelDeep": {
+      "baseline": {
+        "medianMs": 1.022400000001653,
+        "p95Ms": 1.3512999999948079,
+        "minMs": 0.8021999999982654,
+        "maxMs": 3.4812999999994645,
+        "n": 40
+      },
+      "candidate": {
+        "medianMs": 1.0230000000010477,
+        "p95Ms": 1.3113000000012107,
+        "minMs": 0.868399999999383,
+        "maxMs": 1.3612999999968451,
+        "n": 40
+      }
+    },
+    "streamRecent": {
+      "baseline": {
+        "medianMs": 0.76759999999922,
+        "p95Ms": 1.183499999999185,
+        "minMs": 0.6010999999998603,
+        "maxMs": 1.5693000000028405,
+        "n": 40
+      },
+      "candidate": {
+        "medianMs": 0.8041999999986729,
+        "p95Ms": 1.090700000000652,
+        "minMs": 0.6538999999975204,
+        "maxMs": 1.4350000000049477,
+        "n": 40
+      }
+    },
+    "viewerRecent": {
+      "baseline": {
+        "medianMs": 0.9544000000023516,
+        "p95Ms": 1.3712000000014086,
+        "minMs": 0.5930999999982305,
+        "maxMs": 1.3787000000011176,
+        "n": 40
+      },
+      "candidate": {
+        "medianMs": 0.9626000000062049,
+        "p95Ms": 1.3505000000004657,
+        "minMs": 0.6332000000038533,
+        "maxMs": 1.3805999999967753,
+        "n": 40
+      }
+    },
+    "viewerDeep": {
+      "baseline": {
+        "medianMs": 1.2036000000007334,
+        "p95Ms": 1.497400000000198,
+        "minMs": 0.9799999999959255,
+        "maxMs": 1.6376999999993131,
+        "n": 40
+      },
+      "candidate": {
+        "medianMs": 1.2492999999958556,
+        "p95Ms": 1.8873999999996158,
+        "minMs": 0.9342000000033295,
+        "maxMs": 1.954200000000128,
+        "n": 40
+      }
+    },
+    "insert1000": {
+      "baseline": {
+        "medianMs": 84.96600000000035,
+        "p95Ms": 92.29039999999804,
+        "minMs": 81.41350000000239,
+        "maxMs": 92.29039999999804,
+        "n": 10
+      },
+      "candidate": {
+        "medianMs": 107.69950000000244,
+        "p95Ms": 114.62760000000708,
+        "minMs": 102.45369999999821,
+        "maxMs": 114.62760000000708,
+        "n": 10
+      }
+    },
+    "erasure": {
+      "baseline": {
+        "medianMs": 4159.2704000000085,
+        "p95Ms": 4240.236600000004,
+        "minMs": 3960.083500000008,
+        "maxMs": 4240.236600000004,
+        "n": 6
+      },
+      "candidate": {
+        "medianMs": 4096.660899999988,
+        "p95Ms": 4227.566799999986,
+        "minMs": 4042.5971999999892,
+        "maxMs": 4227.566799999986,
+        "n": 6
+      },
+      "walBytes": [
+        [
+          73648460,
+          72405361,
+          72405285,
+          119711405,
+          72405280,
+          121139867
+        ],
+        [
+          116424135,
+          72763018,
+          118470460,
+          73762434,
+          72763040,
+          72763101
+        ]
+      ]
+    }
+  },
+  "plans": {
+    "userRecent": [
+      {
+        "executionMs": 0.037,
+        "nodes": [
+          {
+            "type": "Limit",
+            "rows": 51,
+            "loops": 1,
+            "sharedHit": 10
+          },
+          {
+            "type": "Index Scan",
+            "index": "chat_messages_chatter_received_idx",
+            "rows": 51,
+            "loops": 1,
+            "sharedHit": 10
+          }
+        ]
+      },
+      {
+        "executionMs": 0.04,
+        "nodes": [
+          {
+            "type": "Limit",
+            "rows": 51,
+            "loops": 1,
+            "sharedHit": 10
+          },
+          {
+            "type": "Index Scan",
+            "index": "chat_messages_chatter_received_idx",
+            "rows": 51,
+            "loops": 1,
+            "sharedHit": 10
+          }
+        ]
+      }
+    ],
+    "userDeep": [
+      {
+        "executionMs": 12.734,
+        "nodes": [
+          {
+            "type": "Limit",
+            "rows": 51,
+            "loops": 1,
+            "sharedHit": 2732
+          },
+          {
+            "type": "Sort",
+            "rows": 10051,
+            "loops": 1,
+            "sharedHit": 2732
+          },
+          {
+            "type": "Bitmap Heap Scan",
+            "rows": 20000,
+            "loops": 1,
+            "sharedHit": 2732
+          },
+          {
+            "type": "Bitmap Index Scan",
+            "index": "chat_messages_chatter_received_idx",
+            "rows": 20000,
+            "loops": 1,
+            "sharedHit": 101
+          }
+        ]
+      },
+      {
+        "executionMs": 9.066,
+        "nodes": [
+          {
+            "type": "Limit",
+            "rows": 51,
+            "loops": 1,
+            "sharedHit": 2293
+          },
+          {
+            "type": "Sort",
+            "rows": 10051,
+            "loops": 1,
+            "sharedHit": 2293
+          },
+          {
+            "type": "Bitmap Heap Scan",
+            "rows": 20000,
+            "loops": 1,
+            "sharedHit": 2293
+          },
+          {
+            "type": "Bitmap Index Scan",
+            "index": "chat_messages_chatter_received_idx",
+            "rows": 20000,
+            "loops": 1,
+            "sharedHit": 79
+          }
+        ]
+      }
+    ],
+    "channelRecent": [
+      {
+        "executionMs": 0.067,
+        "nodes": [
+          {
+            "type": "Limit",
+            "rows": 51,
+            "loops": 1,
+            "sharedHit": 54
+          },
+          {
+            "type": "Index Scan",
+            "index": "chat_messages_channel_received_idx",
+            "rows": 51,
+            "loops": 1,
+            "sharedHit": 54
+          }
+        ]
+      },
+      {
+        "executionMs": 0.076,
+        "nodes": [
+          {
+            "type": "Limit",
+            "rows": 51,
+            "loops": 1,
+            "sharedHit": 54
+          },
+          {
+            "type": "Index Scan",
+            "index": "chat_messages_channel_received_idx",
+            "rows": 51,
+            "loops": 1,
+            "sharedHit": 54
+          }
+        ]
+      }
+    ],
+    "channelDeep": [
+      {
+        "executionMs": 0.284,
+        "nodes": [
+          {
+            "type": "Limit",
+            "rows": 51,
+            "loops": 1,
+            "sharedHit": 558
+          },
+          {
+            "type": "Index Scan",
+            "index": "chat_messages_channel_received_idx",
+            "rows": 551,
+            "loops": 1,
+            "sharedHit": 558
+          }
+        ]
+      },
+      {
+        "executionMs": 0.315,
+        "nodes": [
+          {
+            "type": "Limit",
+            "rows": 51,
+            "loops": 1,
+            "sharedHit": 558
+          },
+          {
+            "type": "Index Scan",
+            "index": "chat_messages_channel_received_idx",
+            "rows": 551,
+            "loops": 1,
+            "sharedHit": 558
+          }
+        ]
+      }
+    ],
+    "streamRecent": [
+      {
+        "executionMs": 0.057,
+        "nodes": [
+          {
+            "type": "Limit",
+            "rows": 51,
+            "loops": 1,
+            "sharedHit": 54
+          },
+          {
+            "type": "Index Scan",
+            "index": "chat_messages_stream_received_idx",
+            "rows": 51,
+            "loops": 1,
+            "sharedHit": 54
+          }
+        ]
+      },
+      {
+        "executionMs": 0.057,
+        "nodes": [
+          {
+            "type": "Limit",
+            "rows": 51,
+            "loops": 1,
+            "sharedHit": 54
+          },
+          {
+            "type": "Index Scan",
+            "index": "chat_messages_stream_received_idx",
+            "rows": 51,
+            "loops": 1,
+            "sharedHit": 54
+          }
+        ]
+      }
+    ],
+    "viewerRecent": [
+      {
+        "executionMs": 0.048,
+        "nodes": [
+          {
+            "type": "Limit",
+            "rows": 51,
+            "loops": 1,
+            "sharedHit": 54
+          },
+          {
+            "type": "Index Scan",
+            "index": "stream_snapshots_stream_observed_idx",
+            "rows": 51,
+            "loops": 1,
+            "sharedHit": 54
+          }
+        ]
+      },
+      {
+        "executionMs": 0.085,
+        "nodes": [
+          {
+            "type": "Limit",
+            "rows": 51,
+            "loops": 1,
+            "sharedHit": 53
+          },
+          {
+            "type": "Index Scan",
+            "index": "stream_snapshots_stream_observed_idx",
+            "rows": 51,
+            "loops": 1,
+            "sharedHit": 53
+          }
+        ]
+      }
+    ],
+    "viewerDeep": [
+      {
+        "executionMs": 0.438,
+        "nodes": [
+          {
+            "type": "Limit",
+            "rows": 51,
+            "loops": 1,
+            "sharedHit": 505
+          },
+          {
+            "type": "Sort",
+            "rows": 351,
+            "loops": 1,
+            "sharedHit": 505
+          },
+          {
+            "type": "Bitmap Heap Scan",
+            "rows": 500,
+            "loops": 1,
+            "sharedHit": 505
+          },
+          {
+            "type": "Bitmap Index Scan",
+            "index": "stream_snapshots_stream_observed_idx",
+            "rows": 500,
+            "loops": 1,
+            "sharedHit": 5
+          }
+        ]
+      },
+      {
+        "executionMs": 0.397,
+        "nodes": [
+          {
+            "type": "Limit",
+            "rows": 51,
+            "loops": 1,
+            "sharedHit": 503
+          },
+          {
+            "type": "Sort",
+            "rows": 351,
+            "loops": 1,
+            "sharedHit": 503
+          },
+          {
+            "type": "Bitmap Heap Scan",
+            "rows": 500,
+            "loops": 1,
+            "sharedHit": 503
+          },
+          {
+            "type": "Bitmap Index Scan",
+            "index": "stream_snapshots_stream_observed_idx",
+            "rows": 500,
+            "loops": 1,
+            "sharedHit": 3
+          }
+        ]
+      }
+    ]
+  }
+}

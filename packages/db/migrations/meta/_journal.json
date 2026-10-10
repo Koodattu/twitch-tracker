@@ -169,6 +169,41 @@
       "breakpoints": true,
       "tag": "0023_pending_membership_identities",
       "when": 1790658001000
+    },
+    {
+      "version": "7",
+      "idx": 24,
+      "breakpoints": true,
+      "tag": "0024_compact_external_keys",
+      "when": 1791630000000
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1791630001000,
+      "tag": "0025_compact_chat_records",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1791630002000,
+      "tag": "0026_compact_viewer_records",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1791630003000,
+      "tag": "0027_compact_raw_records",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1791630004000,
+      "tag": "0028_compact_activity_keys",
+      "breakpoints": true
     }
   ]
 }

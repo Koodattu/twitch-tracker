@@ -93,8 +93,8 @@ export async function getChannelDetail(db: DbClient, broadcasterId: string, kind
       viewerCountMax: streamActivityBuckets.viewerCountMax, messageCount: streamActivityBuckets.messageCount,
       activeChatterCount: streamActivityBuckets.activeChatterCount, joinCount: streamActivityBuckets.joinCount,
       partCount: streamActivityBuckets.partCount, eventCounts: streamActivityBuckets.eventCounts
-    }).from(streamActivityBuckets).innerJoin(streamSessions, eq(streamActivityBuckets.twitchStreamId, streamSessions.twitchStreamId))
+    }).from(streamActivityBuckets).innerJoin(streamSessions, eq(streamActivityBuckets.twitchStreamId, streamSessions.storageKey))
       .where(eq(streamSessions.broadcasterUserId, broadcasterId))
-      .orderBy(desc(streamActivityBuckets.bucketStart), desc(streamActivityBuckets.twitchStreamId), desc(streamActivityBuckets.bucketMinutes)).limit(limit).offset(offset), page);
+      .orderBy(desc(streamActivityBuckets.bucketStart), desc(streamSessions.twitchStreamId), desc(streamActivityBuckets.bucketMinutes)).limit(limit).offset(offset), page);
   }
 }

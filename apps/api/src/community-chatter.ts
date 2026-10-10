@@ -28,14 +28,14 @@ export async function getCommunityChatterActivity(db: DbClient, login: string, e
     const channelIds = sql`array[${sql.join(ids.map(id => sql`${id}`), sql`, `)}]::text[]`;
     const activity = ids.length === 0 ? [] : (await tx.execute<CommunityChatterActivity["channels"][number]>(sql`
       with messages as (
-        select m.broadcaster_user_id as channel, count(*)::int as messages,
+        select decode_external_key(m.broadcaster_user_id) as channel, count(*)::int as messages,
           count(distinct (m.received_at at time zone 'UTC')::date)::int as days, max(m.received_at) as last
         from chat_messages m
-        join stream_sessions s on s.twitch_stream_id = m.twitch_stream_id and s.broadcaster_user_id = m.broadcaster_user_id
+        join stream_sessions s on s.storage_key = m.twitch_stream_id and encode_external_key(s.broadcaster_user_id) = m.broadcaster_user_id
         left join raw_irc_messages r on r.id = m.raw_irc_message_id and m.shared_chat_source_channel_id is null
-        where m.chatter_user_id = ${user.id} and m.received_at >= ${snapshot.windowStart} and m.received_at < ${snapshot.windowEnd}
-          and s.is_finnish_eligible and m.broadcaster_user_id = any(${channelIds})
-          and not exists (select 1 from subject_privacy_states p where p.twitch_user_id = m.broadcaster_user_id
+        where m.chatter_user_id = encode_external_key(${user.id}) and m.received_at >= ${snapshot.windowStart} and m.received_at < ${snapshot.windowEnd}
+          and s.is_finnish_eligible and m.broadcaster_user_id = any(array(select encode_external_key(id) from unnest(${channelIds}) id))
+          and not exists (select 1 from subject_privacy_states p where encode_external_key(p.twitch_user_id) = m.broadcaster_user_id
             and (p.public_profile_hidden or p.tracking_opted_out or p.data_deleted_at is not null))
           and (m.shared_chat_source_channel_id = m.broadcaster_user_id or (m.shared_chat_source_channel_id is null
             and coalesce(r.unrelayed_source, r.raw_line like '@%' and split_part(r.raw_line, ' ', 1) !~ '(?:^@|;)source-room-id=[^;]+')))

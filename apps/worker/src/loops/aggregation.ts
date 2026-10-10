@@ -161,7 +161,7 @@ const rollupStreamMembershipBuckets = async (context: WorkerContext, bucketMinut
       updated_at
     )
     select
-      twitch_stream_id,
+      encode_external_key(twitch_stream_id),
       date_bin(make_interval(mins => ${bucketMinutes}), coalesce(event_at, received_at), timestamptz '1970-01-01') as bucket_start,
       ${bucketMinutes} as bucket_minutes,
       count(*) filter (where event_type = 'join')::int as join_count,
@@ -206,7 +206,7 @@ const rollupStreamEventBuckets = async (context: WorkerContext, bucketMinutes: n
       updated_at
     )
     select
-      twitch_stream_id,
+      encode_external_key(twitch_stream_id),
       bucket_start,
       ${bucketMinutes} as bucket_minutes,
       jsonb_object_agg(event_type, event_count) as event_counts,
@@ -264,7 +264,7 @@ const rollupChannelDailyViewers = async (context: WorkerContext, lookbackHours: 
       updated_at
     )
     select
-      broadcaster_user_id,
+      decode_external_key(broadcaster_user_id),
       to_char(observed_at at time zone 'UTC', 'YYYY-MM-DD') as day,
       0 as stream_count,
       0 as live_seconds,
@@ -300,7 +300,7 @@ const rollupChannelDailyMessages = async (context: WorkerContext, lookbackHours:
       updated_at
     )
     select
-      broadcaster_user_id,
+      decode_external_key(broadcaster_user_id),
       to_char(received_at at time zone 'UTC', 'YYYY-MM-DD') as day,
       0 as stream_count,
       0 as live_seconds,
@@ -328,7 +328,7 @@ const rollupChatterDaily = async (context: WorkerContext, lookbackHours: number)
       updated_at
     )
     select
-      chatter_user_id,
+      decode_external_key(chatter_user_id),
       to_char(received_at at time zone 'UTC', 'YYYY-MM-DD') as day,
       count(*)::int as message_count,
       count(distinct broadcaster_user_id)::int as channels_active,

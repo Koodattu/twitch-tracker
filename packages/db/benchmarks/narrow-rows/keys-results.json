@@ -1,0 +1,198 @@
+{
+  "created_at": "2026-10-10T12:51:46.329Z",
+  "node": "v24.4.1",
+  "input_rows": 21725,
+  "input_sha256": "4b4137bda69df5c158b3add0384558fea22557192498882c570378f1b2c4391f",
+  "groups": {
+    "chat": {
+      "rows": 20856,
+      "baseline": {
+        "heap_bytes": 5013504,
+        "table_bytes": 5054464,
+        "index_bytes": 3973120,
+        "total_bytes": 9027584
+      },
+      "candidate": {
+        "heap_bytes": 4612096,
+        "table_bytes": 4653056,
+        "index_bytes": 3407872,
+        "total_bytes": 8060928
+      },
+      "heap": {
+        "baseline_aligned_bytes": 237.01419255849635,
+        "candidate_aligned_bytes": 218.23053317990028
+      },
+      "indexes": [
+        {
+          "table_name": "chat_base",
+          "name": "chat_base_broadcaster_user_id_received_at_idx",
+          "bytes": 860160,
+          "definition": "CREATE INDEX chat_base_broadcaster_user_id_received_at_idx ON narrow_audit.chat_base USING btree (broadcaster_user_id, received_at)"
+        },
+        {
+          "table_name": "chat_base",
+          "name": "chat_base_chatter_user_id_received_at_idx",
+          "bytes": 860160,
+          "definition": "CREATE INDEX chat_base_chatter_user_id_received_at_idx ON narrow_audit.chat_base USING btree (chatter_user_id, received_at)"
+        },
+        {
+          "table_name": "chat_base",
+          "name": "chat_base_coalesce_idx",
+          "bytes": 24576,
+          "definition": "CREATE INDEX chat_base_coalesce_idx ON narrow_audit.chat_base USING brin (COALESCE(sent_at, received_at)) WITH (pages_per_range='32', autosummarize='on')"
+        },
+        {
+          "table_name": "chat_base",
+          "name": "chat_base_pkey",
+          "bytes": 860160,
+          "definition": "CREATE UNIQUE INDEX chat_base_pkey ON narrow_audit.chat_base USING btree (twitch_message_id)"
+        },
+        {
+          "table_name": "chat_base",
+          "name": "chat_base_received_at_idx",
+          "bytes": 483328,
+          "definition": "CREATE INDEX chat_base_received_at_idx ON narrow_audit.chat_base USING btree (received_at)"
+        },
+        {
+          "table_name": "chat_base",
+          "name": "chat_base_twitch_stream_id_received_at_idx",
+          "bytes": 860160,
+          "definition": "CREATE INDEX chat_base_twitch_stream_id_received_at_idx ON narrow_audit.chat_base USING btree (twitch_stream_id, received_at)"
+        },
+        {
+          "table_name": "chat_keys",
+          "name": "chat_keys_broadcaster_user_id_received_at_idx",
+          "bytes": 671744,
+          "definition": "CREATE INDEX chat_keys_broadcaster_user_id_received_at_idx ON narrow_audit.chat_keys USING btree (broadcaster_user_id, received_at)"
+        },
+        {
+          "table_name": "chat_keys",
+          "name": "chat_keys_chatter_user_id_received_at_idx",
+          "bytes": 671744,
+          "definition": "CREATE INDEX chat_keys_chatter_user_id_received_at_idx ON narrow_audit.chat_keys USING btree (chatter_user_id, received_at)"
+        },
+        {
+          "table_name": "chat_keys",
+          "name": "chat_keys_coalesce_idx",
+          "bytes": 24576,
+          "definition": "CREATE INDEX chat_keys_coalesce_idx ON narrow_audit.chat_keys USING brin (COALESCE(sent_at, received_at)) WITH (pages_per_range='32', autosummarize='on')"
+        },
+        {
+          "table_name": "chat_keys",
+          "name": "chat_keys_pkey",
+          "bytes": 860160,
+          "definition": "CREATE UNIQUE INDEX chat_keys_pkey ON narrow_audit.chat_keys USING btree (twitch_message_id)"
+        },
+        {
+          "table_name": "chat_keys",
+          "name": "chat_keys_received_at_idx",
+          "bytes": 483328,
+          "definition": "CREATE INDEX chat_keys_received_at_idx ON narrow_audit.chat_keys USING btree (received_at)"
+        },
+        {
+          "table_name": "chat_keys",
+          "name": "chat_keys_twitch_stream_id_received_at_idx",
+          "bytes": 671744,
+          "definition": "CREATE INDEX chat_keys_twitch_stream_id_received_at_idx ON narrow_audit.chat_keys USING btree (twitch_stream_id, received_at)"
+        }
+      ]
+    },
+    "viewer": {
+      "rows": 869,
+      "baseline": {
+        "heap_bytes": 122880,
+        "table_bytes": 163840,
+        "index_bytes": 163840,
+        "total_bytes": 327680
+      },
+      "candidate": {
+        "heap_bytes": 114688,
+        "table_bytes": 155648,
+        "index_bytes": 147456,
+        "total_bytes": 303104
+      },
+      "heap": {
+        "baseline_aligned_bytes": 139.2451093210587,
+        "candidate_aligned_bytes": 123.24510932105869
+      },
+      "indexes": [
+        {
+          "table_name": "viewer_base",
+          "name": "viewer_base_broadcaster_user_id_observed_at_idx",
+          "bytes": 57344,
+          "definition": "CREATE INDEX viewer_base_broadcaster_user_id_observed_at_idx ON narrow_audit.viewer_base USING btree (broadcaster_user_id, observed_at)"
+        },
+        {
+          "table_name": "viewer_base",
+          "name": "viewer_base_pkey",
+          "bytes": 49152,
+          "definition": "CREATE UNIQUE INDEX viewer_base_pkey ON narrow_audit.viewer_base USING btree (id)"
+        },
+        {
+          "table_name": "viewer_base",
+          "name": "viewer_base_twitch_stream_id_observed_at_idx",
+          "bytes": 57344,
+          "definition": "CREATE INDEX viewer_base_twitch_stream_id_observed_at_idx ON narrow_audit.viewer_base USING btree (twitch_stream_id, observed_at)"
+        },
+        {
+          "table_name": "viewer_keys",
+          "name": "viewer_keys_broadcaster_user_id_observed_at_idx",
+          "bytes": 49152,
+          "definition": "CREATE INDEX viewer_keys_broadcaster_user_id_observed_at_idx ON narrow_audit.viewer_keys USING btree (broadcaster_user_id, observed_at)"
+        },
+        {
+          "table_name": "viewer_keys",
+          "name": "viewer_keys_pkey",
+          "bytes": 49152,
+          "definition": "CREATE UNIQUE INDEX viewer_keys_pkey ON narrow_audit.viewer_keys USING btree (id)"
+        },
+        {
+          "table_name": "viewer_keys",
+          "name": "viewer_keys_twitch_stream_id_observed_at_idx",
+          "bytes": 49152,
+          "definition": "CREATE INDEX viewer_keys_twitch_stream_id_observed_at_idx ON narrow_audit.viewer_keys USING btree (twitch_stream_id, observed_at)"
+        }
+      ]
+    }
+  },
+  "checks": [
+    {
+      "check": "chat_all_fields_exact",
+      "rows": 20856,
+      "passed": true
+    },
+    {
+      "check": "viewer_all_fields_exact",
+      "rows": 869,
+      "passed": true
+    },
+    {
+      "check": "distinct_external_spellings_preserved",
+      "passed": true
+    }
+  ],
+  "postgres": "PostgreSQL 16.14 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+  "dictionaries": {
+    "users": {
+      "rows": 4191,
+      "heap_bytes": 188416,
+      "table_bytes": 221184,
+      "index_bytes": 262144,
+      "total_bytes": 483328,
+      "sequence_bytes": 8192
+    },
+    "streams": {
+      "rows": 865,
+      "heap_bytes": 49152,
+      "table_bytes": 81920,
+      "index_bytes": 90112,
+      "total_bytes": 172032,
+      "sequence_bytes": 8192
+    }
+  },
+  "index_control": {
+    "rows": 100000,
+    "text_bytes": 4079616,
+    "integer_bytes": 3178496
+  }
+}

@@ -1,0 +1,231 @@
+{
+  "captured_at": "2026-10-10T15:46:49.406293+03:00",
+  "database_gib": 13.08726408239454,
+  "scope": "Six major native-row relations; raw wire blocks and response payload compression excluded",
+  "row_count_source": "pg_stat_user_tables.n_live_tup estimates; reltuples shown as sensitivity, not exact counts",
+  "sample_method": "Three fixed-seed SYSTEM(0.08) page samples per relation, aggregates only, each under the 20000-row cap",
+  "index_control_bytes_saved_per_row": 9.0112,
+  "groups": [
+    {
+      "table": "chat_messages",
+      "sample_rows": 22282,
+      "production_row_estimate": 8821561,
+      "alternative_row_estimate": 8477141,
+      "heap_key_bytes_saved_per_row": 18.657571133650492,
+      "heap_compact_bytes_saved_per_row": 54.41630015258954,
+      "index_bytes_saved_per_row": 27.0336,
+      "index_credit_is_upper_estimate": false,
+      "baseline_model_minus_actual_avg_bytes": 0,
+      "keys_gross_gib": 0.37538581836683393,
+      "compact_gross_gib": 0.6691694843023811,
+      "heap_compact_per_row_seed_range": [
+        54.32994705966519,
+        54.39048248512887,
+        54.519668737060044
+      ]
+    },
+    {
+      "table": "stream_snapshots",
+      "sample_rows": 10146,
+      "production_row_estimate": 3688643,
+      "alternative_row_estimate": 3502460,
+      "heap_key_bytes_saved_per_row": 16,
+      "heap_compact_bytes_saved_per_row": 39.51823378671398,
+      "index_bytes_saved_per_row": 18.0224,
+      "index_credit_is_upper_estimate": false,
+      "baseline_model_minus_actual_avg_bytes": 0,
+      "keys_gross_gib": 0.11687771193981172,
+      "compact_gross_gib": 0.19767028841462547,
+      "heap_compact_per_row_seed_range": [
+        39.4883997620464,
+        39.509684266383644,
+        39.56218905472636
+      ]
+    },
+    {
+      "table": "raw_irc_messages",
+      "sample_rows": 26285,
+      "production_row_estimate": 11252334,
+      "alternative_row_estimate": 11158647,
+      "heap_key_bytes_saved_per_row": 0,
+      "heap_compact_bytes_saved_per_row": 31.54833555259654,
+      "index_bytes_saved_per_row": 0,
+      "index_credit_is_upper_estimate": false,
+      "baseline_model_minus_actual_avg_bytes": 0,
+      "keys_gross_gib": 0,
+      "compact_gross_gib": 0.330612444115701,
+      "heap_compact_per_row_seed_range": [
+        31.45900552486188,
+        31.56705241660994,
+        31.62474765467283
+      ]
+    },
+    {
+      "table": "membership_events",
+      "sample_rows": 21793,
+      "production_row_estimate": 8942454,
+      "alternative_row_estimate": 8806647,
+      "heap_key_bytes_saved_per_row": 0,
+      "heap_compact_bytes_saved_per_row": 9.916945808287068,
+      "index_bytes_saved_per_row": 0,
+      "index_credit_is_upper_estimate": false,
+      "baseline_model_minus_actual_avg_bytes": 0,
+      "keys_gross_gib": 0,
+      "compact_gross_gib": 0.08259139183079817,
+      "heap_compact_per_row_seed_range": [
+        9.725848166742736,
+        9.808233188442856,
+        10.201676128683431
+      ]
+    },
+    {
+      "table": "membership_event_identities",
+      "sample_rows": 5283,
+      "production_row_estimate": 1692738,
+      "alternative_row_estimate": 1691724,
+      "heap_key_bytes_saved_per_row": 4.889646034450109,
+      "heap_compact_bytes_saved_per_row": 4.889646034450109,
+      "index_bytes_saved_per_row": 18.0224,
+      "index_credit_is_upper_estimate": true,
+      "baseline_model_minus_actual_avg_bytes": 0.0015142911224756972,
+      "keys_gross_gib": 0.036120499465859504,
+      "compact_gross_gib": 0.036120499465859504,
+      "heap_compact_per_row_seed_range": [
+        4.828558008454678,
+        4.913099870298311,
+        4.952853598014883
+      ]
+    },
+    {
+      "table": "stream_activity_buckets",
+      "sample_rows": 7284,
+      "production_row_estimate": 2396229,
+      "alternative_row_estimate": 2340397,
+      "heap_key_bytes_saved_per_row": 8,
+      "heap_compact_bytes_saved_per_row": 16.53157605711148,
+      "index_bytes_saved_per_row": 9.0112,
+      "index_credit_is_upper_estimate": false,
+      "baseline_model_minus_actual_avg_bytes": 0,
+      "keys_gross_gib": 0.037963251364231114,
+      "compact_gross_gib": 0.05700284683011117,
+      "heap_compact_per_row_seed_range": [
+        16.4309580634163,
+        16.441229656419537,
+        16.762973352033654
+      ]
+    }
+  ],
+  "dictionary_charge": [
+    {
+      "table": "twitch_users",
+      "estimated_rows": 260968,
+      "bytes_per_dictionary_row": 115.32522071104748,
+      "projected_bytes": 30104384.198520638
+    },
+    {
+      "table": "stream_sessions",
+      "estimated_rows": 70662,
+      "bytes_per_dictionary_row": 198.88092485549132,
+      "projected_bytes": 14061515.912138727
+    }
+  ],
+  "keys_gross_gib": 0.5663472811367363,
+  "keys_net_gib_range": [
+    0.496802536047381,
+    0.525214581335467
+  ],
+  "compact_gross_gib": 1.3731669549594763,
+  "compact_gross_using_reltuples_gib": 1.331706467814786,
+  "compact_gross_density_sensitivity_gib": 1.5838027462225284,
+  "density_sensitivity": "Assumed 90% heap and 70% B-tree occupancy, not measured production bloat",
+  "compact_after_user_stream_maps_before_login_map_gib": 1.332034255158207,
+  "compact_login_dictionary_cost": "Not measured; historical login cardinality cannot safely be inferred from current user rows",
+  "combined_plan": {
+    "keys_net_gib_range": [
+      0.496802536047381,
+      0.525214581335467
+    ],
+    "additional_row_encoding_gross_gib": 0.80681967382274,
+    "total_before_historical_login_maps_gib_range": [
+      1.3036222098701211,
+      1.332034255158207
+    ],
+    "growth_assumption": "Same observation mix, widths, index occupancy and proportional dictionary growth; no calendar forecast",
+    "growth_scenarios": [
+      {
+        "retained_history_multiplier": 1,
+        "savings_before_historical_login_maps_gib_range": [
+          1.3036222098701211,
+          1.332034255158207
+        ]
+      },
+      {
+        "retained_history_multiplier": 2,
+        "savings_before_historical_login_maps_gib_range": [
+          2.6072444197402422,
+          2.664068510316414
+        ]
+      },
+      {
+        "retained_history_multiplier": 3,
+        "savings_before_historical_login_maps_gib_range": [
+          3.9108666296103634,
+          3.996102765474621
+        ]
+      }
+    ],
+    "marginal_gross_mib_per_million": [
+      {
+        "table": "chat_messages",
+        "mib": 77.67667784937815
+      },
+      {
+        "table": "stream_snapshots",
+        "mib": 54.87502459212683
+      },
+      {
+        "table": "raw_irc_messages",
+        "mib": 30.086837341877498
+      },
+      {
+        "table": "membership_events",
+        "mib": 9.457536514555995
+      },
+      {
+        "table": "membership_event_identities",
+        "mib": 21.85062983937274
+      },
+      {
+        "table": "stream_activity_buckets",
+        "mib": 24.359489495383723
+      }
+    ],
+    "nonadditive_candidates": [
+      "Raw metadata blocks overlap with raw row compaction",
+      "History blocks and posting pages are alternative chat/viewer layouts",
+      "Existing production compaction is already in the baseline"
+    ],
+    "release_requirements": [
+      "Combined physical footprint including every dictionary/index/sequence",
+      "No material history, diagnostics, ingestion or erasure regression on comparable workloads",
+      "Exact values, uniqueness, source links, historical-login erasure and rollback preserved",
+      "Encode new writes and migrate retained history; plan physical reclamation separately"
+    ]
+  },
+  "limitations": [
+    "Width model is not an implementation or an absolute bound on all possible encodings",
+    "No production-scale latency, concurrent ingestion, erasure or migration benchmark",
+    "No bloat-reclamation or deletion credit; original UUIDs and binary message IDs retained",
+    "Physical fixture excludes FK/check validation on both sides; no FK correctness claim"
+  ],
+  "validation": {
+    "all_sample_columns_round_trip": 21725,
+    "distinct_external_spellings": true,
+    "physical_vs_model_max_mean_difference_bytes": 0.004962779156315378,
+    "baseline_uses_smaller_of_physical_and_model": true,
+    "no_sample_hit_cap": true,
+    "new_observation_exports": 0,
+    "cumulative_prior_extracted_rows": 29917,
+    "cumulative_prior_extracted_bytes": 25117896
+  }
+}
