@@ -15,11 +15,11 @@
     "@twitch-tracker/db": "workspace:*",
     "@twitch-tracker/shared": "workspace:*",
     "@twitch-tracker/twitch": "workspace:*",
-    "drizzle-orm": "0.45.2",
+    "drizzle-orm": "0.45.3",
     "graphology": "0.26.0",
     "graphology-communities-louvain": "2.0.2",
     "graphology-layout-forceatlas2": "0.10.1",
-    "zod": "4.4.3"
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@types/node": "24.13.3",
