@@ -8,7 +8,10 @@ export async function readCommunityInput(db: DbClient, claim: CommunityBuildClai
   return db.transaction(async (tx) => {
     await tx.execute(sql`set local statement_timeout = '90s'`);
     await tx.execute(sql`set local work_mem = '32MB'`);
-    const observed = sql`
+    const result = await tx.execute<{
+      members: Array<{ chatterId: string; channelId: string; first: string; last: string }>;
+      messages: number; missingSession: number; unknownSource: number; relayedMessages: number;
+    }>(sql`
       with observed as materialized (
         select m.chatter_user_id, m.broadcaster_user_id, m.received_at,
           m.twitch_stream_id is null as missing_session,
@@ -29,26 +32,36 @@ export async function readCommunityInput(db: DbClient, claim: CommunityBuildClai
         left join stream_sessions s on s.storage_key = m.twitch_stream_id and encode_external_key(s.broadcaster_user_id) = m.broadcaster_user_id
         left join raw_irc_messages r on r.id = m.raw_irc_message_id and m.shared_chat_source_channel_id is null
         where m.received_at >= ${claim.windowStart} and m.received_at < ${claim.windowEnd}
+      ), grouped as materialized (
+        -- Share one message/raw scan between membership and coverage. Keep the
+        -- observed boundary so aggregate filters do not duplicate privacy checks
+        -- or pull millions of raw-record lookups into an ordered nested loop.
+        select chatter_user_id, broadcaster_user_id,
+          min(received_at) filter (where finnish and permitted and known_source and not relayed) as first,
+          max(received_at) filter (where finnish and permitted and known_source and not relayed) as last,
+          count(*) filter (where finnish and permitted and known_source and not relayed) as qualifying,
+          count(*) as messages,
+          count(*) filter (where missing_session) as missing_session,
+          count(*) filter (where finnish and permitted and not coalesce(known_source, false)) as unknown_source,
+          count(*) filter (where finnish and permitted and relayed) as relayed_messages
+        from observed group by chatter_user_id, broadcaster_user_id
+      ), members as (
+        select decode_external_key(chatter_user_id) as "chatterId",
+          decode_external_key(broadcaster_user_id) as "channelId", first, last
+        from grouped where qualifying >= 3 and chatter_user_id is not null
+        order by "chatterId", "channelId" limit ${maxCommunityMemberships + 1}
       )
-    `;
-    const members = await tx.execute<{ chatterId: string; channelId: string; first: string; last: string }>(sql`
-      ${observed}
-      select decode_external_key(chatter_user_id) as "chatterId", decode_external_key(broadcaster_user_id) as "channelId", min(received_at) as first, max(received_at) as last
-      from observed where finnish and permitted and known_source and not relayed and chatter_user_id is not null
-      group by chatter_user_id, broadcaster_user_id having count(*) >= 3
-      order by "chatterId", "channelId" limit ${maxCommunityMemberships + 1}
+      select coalesce((select jsonb_agg(m) from members m), '[]'::jsonb) as members,
+        coalesce(sum(messages), 0)::int as messages,
+        coalesce(sum(missing_session), 0)::int as "missingSession",
+        coalesce(sum(unknown_source), 0)::int as "unknownSource",
+        coalesce(sum(relayed_messages), 0)::int as "relayedMessages"
+      from grouped
     `);
-    if (members.rows.length > maxCommunityMemberships) throw new Error("Community membership budget exceeded");
-    const diagnostics = await tx.execute<{ messages: number; missingSession: number; unknownSource: number; relayedMessages: number }>(sql`
-      ${observed}
-      select count(*)::int as messages,
-        count(*) filter (where missing_session)::int as "missingSession",
-        count(*) filter (where finnish and permitted and not coalesce(known_source, false))::int as "unknownSource",
-        count(*) filter (where finnish and permitted and relayed)::int as "relayedMessages"
-      from observed
-    `);
+    const { members, ...diagnostics } = result.rows[0]!;
+    if (members.length > maxCommunityMemberships) throw new Error("Community membership budget exceeded");
     const presence = await readCommunityPresence(tx, claim);
-    const combined = new Map(members.rows.map((row) => [`${row.chatterId}\0${row.channelId}`, { ...row, weight: 1 }]));
+    const combined = new Map(members.map((row) => [`${row.chatterId}\0${row.channelId}`, { ...row, weight: 1 }]));
     for (const row of presence.members) {
       const key = `${row.chatterId}\0${row.channelId}`;
       if (!combined.has(key)) {
@@ -63,7 +76,7 @@ export async function readCommunityInput(db: DbClient, claim: CommunityBuildClai
       if (first == null || rowFirst < first) first = rowFirst;
       if (last == null || rowLast > last) last = rowLast;
     }
-    const coverage: CommunityCoverage = { ...diagnostics.rows[0]!, thresholds: communityMapThresholds, qualifyingMemberships: combined.size, presence: presence.coverage,
+    const coverage: CommunityCoverage = { ...diagnostics, thresholds: communityMapThresholds, qualifyingMemberships: combined.size, presence: presence.coverage,
       firstObservedAt: first?.toISOString() ?? null, lastObservedAt: last?.toISOString() ?? null };
     return { memberships: [...combined.values()].map(({ chatterId, channelId, weight }) => ({ chatterId, channelId, weight })), coverage };
   }, { isolationLevel: "repeatable read", accessMode: "read only" });

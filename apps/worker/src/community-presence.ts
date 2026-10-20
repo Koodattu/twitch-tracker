@@ -9,26 +9,33 @@ export async function readCommunityPresence(db: Pick<DbClient, "execute">, claim
     events: number; unresolvedEvents: number; recoveredEvents: number; observedChannels: number; snapshotChannels: number;
   }>(sql`
     with evidence as materialized (
-      select lower(chatter_login) as login, (received_at at time zone 'UTC')::date as day, decode_external_key(chatter_user_id) as id
+      -- Deduplicate compact identities before decoding: repeated messages add no
+      -- evidence, but different IDs on the same login/day must remain ambiguous.
+      select lower(chatter_login) as login, (received_at at time zone 'UTC')::date as day, chatter_user_id as id
       from chat_messages where received_at >= ${claim.windowStart} and received_at < ${claim.windowEnd}
         and chatter_login is not null and chatter_user_id is not null
-      union all
-      select lower(chatter_login), (observed_at at time zone 'UTC')::date, chatter_user_id
+      union
+      select lower(chatter_login), (observed_at at time zone 'UTC')::date, encode_external_key(chatter_user_id)
       from chat_presence_observations where observed_at >= ${claim.windowStart} and observed_at < ${claim.windowEnd}
         and chatter_login is not null and chatter_user_id is not null
     ), identities as materialized (
-      select login, day, min(id) as id from evidence group by login, day having count(distinct id) = 1
+      select login, day, decode_external_key((array_agg(id))[1]) as id
+      from evidence group by login, day having count(*) = 1
     ), events as materialized (
-      select coalesce(m.chatter_user_id, i.id) as person, m.broadcaster_user_id as channel,
-        m.received_at as observed, m.chatter_user_id is null and i.id is not null as recovered, false as snapshot
-      from chat_membership_events m
-      join stream_sessions s on s.twitch_stream_id = m.twitch_stream_id and s.broadcaster_user_id = m.broadcaster_user_id
-      left join identities i on m.chatter_user_id is null and i.login = lower(m.chatter_login)
+      select coalesce(identity.chatter_user_id, i.id) as person, c.broadcaster_user_id as channel,
+        m.received_at as observed, identity.chatter_user_id is null and i.id is not null as recovered, false as snapshot
+      from membership_events m
+      join membership_event_contexts c on c.id = m.context_id
+      join membership_event_identities identity on identity.id = m.identity_id
+      join stream_sessions s on s.twitch_stream_id = c.twitch_stream_id and s.broadcaster_user_id = c.broadcaster_user_id
+      left join identities i on identity.chatter_user_id is null and i.login = lower(identity.chatter_login)
         and i.day = (m.received_at at time zone 'UTC')::date
       where m.received_at >= ${claim.windowStart} and m.received_at < ${claim.windowEnd}
         and s.is_finnish_eligible and m.received_at >= s.started_at
         and (s.ended_at is null or m.received_at <= s.ended_at)
-        and m.source = encode_common_label('irc_membership', 'irc_membership')
+        -- The view reconstructs the default source with coalesce, hiding its
+        -- statistics. NULL is exactly irc_membership; non-defaults start with !.
+        and m.source_override is null
       union all
       select p.chatter_user_id, p.broadcaster_user_id, p.observed_at, false, true
       from chat_presence_observations p

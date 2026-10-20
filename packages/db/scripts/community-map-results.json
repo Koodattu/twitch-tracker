@@ -1,0 +1,83 @@
+{
+  "baselineRevision": "d0b5f69642d9023c102a431a189dad1dafc6fddb",
+  "node": "v24.19.0",
+  "postgres": "PostgreSQL 17.5 on x86_64-windows, compiled by msvc-19.44.35209, 64-bit",
+  "workload": {
+    "messages": 1000000,
+    "rawRecords": 1300000,
+    "membershipEvents": 60000,
+    "people": 1000,
+    "channels": 100,
+    "days": 30
+  },
+  "samples": {
+    "before": [],
+    "after": [
+      {
+        "messageMs": 3472.5406000000075,
+        "presenceMs": 1790.310599999997,
+        "totalMs": 5262.851200000005
+      },
+      {
+        "messageMs": 3524.635599999994,
+        "presenceMs": 1799.4159999999974,
+        "totalMs": 5324.051599999992
+      },
+      {
+        "messageMs": 3487.9541000000027,
+        "presenceMs": 1750.3315000000002,
+        "totalMs": 5238.285600000003
+      },
+      {
+        "messageMs": 3489.023399999991,
+        "presenceMs": 1801.6581000000006,
+        "totalMs": 5290.6814999999915
+      }
+    ]
+  },
+  "plans": {
+    "beforeMessages": {
+      "executed": true,
+      "executionMs": 3603.635,
+      "sharedReadBlocks": 44853,
+      "tempReadBlocks": 7093,
+      "tempWrittenBlocks": 11853,
+      "ctes": {
+        "CTE observed": 1000000
+      }
+    },
+    "afterMessages": {
+      "executed": true,
+      "executionMs": 3627.767,
+      "sharedReadBlocks": 44789,
+      "tempReadBlocks": 7093,
+      "tempWrittenBlocks": 11853,
+      "ctes": {
+        "CTE observed": 1000000,
+        "CTE grouped": 1000
+      }
+    },
+    "beforePresence": {
+      "executed": false,
+      "ctes": {}
+    },
+    "afterPresence": {
+      "executed": true,
+      "executionMs": 1864.234,
+      "sharedReadBlocks": 18793,
+      "tempReadBlocks": 3915,
+      "tempWrittenBlocks": 3916,
+      "ctes": {
+        "CTE evidence": 30000,
+        "CTE identities": 30000,
+        "CTE events": 60000,
+        "CTE permitted": 60000
+      }
+    }
+  },
+  "baselineFailure": {
+    "code": "57014",
+    "timeoutMs": 90000
+  },
+  "equivalenceReference": "Baseline SQL with enable_nestloop=off (untimed)"
+}

@@ -87,6 +87,43 @@ describe.skipIf(database == null)("Community presence with PostgreSQL", () => {
     expect((await read()).memberships).toEqual([]);
   });
 
+  it("reads the native default source without admitting escaped non-default sources", async () => {
+    await pool.query(`insert into chat_membership_events
+      (broadcaster_user_id,twitch_stream_id,chatter_user_id,event_type,received_at,source)
+      select 'a','a',person,'join',date_trunc('day',now()) - make_interval(days => day),
+        encode_common_label(source,'irc_membership')
+      from (values ('person-1','irc_membership'),('person-2','other'),('person-3','')) v(person,source)
+      cross join generate_series(1,2) day`);
+    const input = await read();
+    expect(input.memberships).toEqual([{ chatterId: "person-1", channelId: "a", weight: 0.25 }]);
+    expect(input.coverage.presence).toMatchObject({ events: 2, recoveredEvents: 0, unresolvedEvents: 0 });
+  });
+
+  it("deduplicates compact evidence across sources without collapsing distinct ID spellings or rare conflicts", async () => {
+    await pool.query(`insert into twitch_users(twitch_user_id) values ('7'),('007'),('4294967296'),('ää');
+      insert into chat_messages(twitch_message_id,broadcaster_user_id,chatter_user_id,chatter_login,received_at)
+      select encode_chat_message_id(gen_random_uuid()::text),encode_external_key('evidence'),
+        encode_external_key(person),login,date_trunc('day',now()) - make_interval(days => day)
+      from (values ('4294967296','MiXeD'),('7','collision'),('ää','unicode'),('7','rare')) v(person,login)
+      cross join generate_series(1,2) day cross join generate_series(1,20) duplicate;
+      insert into chat_presence_snapshots(broadcaster_user_id,twitch_stream_id,source,sampled_at,request_status)
+      select 'foreign','foreign','helix.get_chatters',date_trunc('day',now()) - make_interval(days => day),'failed'
+      from generate_series(1,2) day;
+      insert into chat_presence_observations(snapshot_id,broadcaster_user_id,twitch_stream_id,chatter_user_id,chatter_login,observed_at,source,dedupe_key)
+      select id,'foreign','foreign',person,login,sampled_at,'helix.get_chatters',id::text||login
+      from chat_presence_snapshots cross join
+        (values ('4294967296','mixed'),('007','collision'),('hidden','rare')) v(person,login);
+      insert into chat_membership_events(broadcaster_user_id,twitch_stream_id,chatter_login,event_type,received_at)
+      select 'a','a',login,'join',date_trunc('day',now()) - make_interval(days => day) + interval '1 hour'
+      from unnest(array['mixed','collision','unicode','rare']) login cross join generate_series(1,2) day`);
+    const input = await read();
+    expect(input.memberships).toEqual([
+      { chatterId: "4294967296", channelId: "a", weight: 0.25 },
+      { chatterId: "ää", channelId: "a", weight: 0.25 }
+    ]);
+    expect(input.coverage.presence).toMatchObject({ events: 8, recoveredEvents: 4, unresolvedEvents: 4 });
+  });
+
   it("uses positive observations from partial snapshots, without counting duplicates or inferring absence", async () => {
     await pool.query(`insert into chat_presence_snapshots (broadcaster_user_id, twitch_stream_id, source, sampled_at, request_status)
       select 'a','a','helix.get_chatters',date_trunc('day', now()) - make_interval(days => day),'truncated' from generate_series(1,2) day;

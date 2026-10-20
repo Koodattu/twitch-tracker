@@ -97,4 +97,33 @@ describe.skipIf(database == null)("Community builds with PostgreSQL", () => {
     expect(snapshot.edges.every((edge: { shared: number; score: number }) => edge.shared === 10 && edge.score === 1)).toBe(true);
     expect(JSON.stringify(snapshot)).not.toContain("chatter-");
   });
+
+  it("keeps half-open window boundaries and qualifying times when sharing membership and coverage aggregation", async () => {
+    await pool.query(`insert into twitch_users(twitch_user_id) values ('100'),('7'),('007');
+      insert into stream_sessions(twitch_stream_id,broadcaster_user_id,started_at,is_finnish_eligible)
+      values ('100','100','2026-09-01',true);
+      insert into chat_messages(twitch_message_id,broadcaster_user_id,twitch_stream_id,chatter_user_id,received_at,shared_chat_source_channel_id)
+      select encode_chat_message_id(gen_random_uuid()::text),encode_external_key('100'),encode_external_key('100'),
+        encode_external_key(person),observed::timestamptz,encode_external_key(source)
+      from (values
+        ('7','2026-09-20T00:00:00Z','100'),
+        ('7','2026-09-20T00:00:01Z','100'),
+        ('7','2026-10-19T23:59:59.999Z','100'),
+        ('7','2026-09-19T23:59:59.999Z','100'),
+        ('7','2026-10-20T00:00:00Z','100'),
+        ('007','2026-09-21T00:00:00Z','100'),
+        ('007','2026-09-22T00:00:00Z','100'),
+        ('007','2026-09-23T00:00:00Z','7'),
+        ('007','2026-09-24T00:00:00Z',null),
+        (null,'2026-09-25T00:00:00Z','100')) v(person,observed,source)`);
+    const input = await readCommunityInput(db, {
+      owner: "fixture", requestVersion: 0, privacyVersion: 0, previous: null,
+      windowStart: new Date("2026-09-20T00:00:00Z"), windowEnd: new Date("2026-10-20T00:00:00Z")
+    });
+    expect(input.memberships).toEqual([{ chatterId: "7", channelId: "100", weight: 1 }]);
+    expect(input.coverage).toMatchObject({
+      messages: 8, missingSession: 0, unknownSource: 1, relayedMessages: 1, qualifyingMemberships: 1,
+      firstObservedAt: "2026-09-20T00:00:00.000Z", lastObservedAt: "2026-10-19T23:59:59.999Z"
+    });
+  });
 });

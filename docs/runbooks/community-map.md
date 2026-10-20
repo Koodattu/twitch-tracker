@@ -1,5 +1,8 @@
 # Community map
 
+For the October 2026 build failure investigation, local benchmark and worker-only
+rollout procedure, see [Community map timeout repair](community-map-timeouts.md).
+
 The public explorer is at `/communities`. In **Admin → Ingestion**, the **Community map → Build now** button queues a rebuild and shows its progress and last successful build. It requires the existing admin session and a same-origin request. Repeated pending requests coalesce.
 
 The explorer fills the viewport below the site navigation. Search, community filters, channel details, map controls, and the explanation float over the graph. Mouse-wheel zoom follows the cursor; touch gestures support pan and pinch zoom. Keyboard users can select channels from search, use arrow keys to pan, +/− to zoom, Home to fit the map, and Escape to close panels. Mobile channel details use a scrollable bottom panel, with search and connection-list navigation positioning the selected channel above it. Clicking a circle only selects it and preserves the camera. Reporting dates, coverage, and the recipe explanation are available under **How it works**.
