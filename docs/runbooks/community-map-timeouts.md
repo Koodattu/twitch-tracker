@@ -1,5 +1,30 @@
 # Community map timeout repair — 2026-10-20
 
+## Production follow-up — 2026-10-21
+
+The original fix was pushed to a feature branch while the VM auto-deployer watches
+`main`; it had not been deployed. After operator-authorized promotion to main,
+release `3a26825` deployed successfully but its message query still timed out at
+90 seconds. The initial local benchmark below therefore did not establish a
+complete production repair.
+
+The follow-up moves privacy/bot classification after person/channel grouping.
+Those predicates are constant for each group within the existing repeatable-read
+transaction. Total-message and missing-session diagnostics still include all
+messages; qualification, unknown-source and relayed diagnostics still apply
+privacy filtering. Removing correlated predicates from the message scan allows
+parallel joins and partial aggregation, without materializing every joined row.
+
+A single bounded read-only production EXPLAIN ANALYZE for the completed window
+`[2026-09-21, 2026-10-21)` completed in **64.306 seconds**, with the unchanged
+90-second timeout and 32 MB work_mem while a backup was running. It processed
+5,734,122 message rows, grouped them into 178,704 person/channel pairs and returned
+107,218 message-qualified memberships. Only aggregate query-plan statistics were
+retrieved. This measures the message query, not presence, layout or publication.
+The 16 focused community integration tests, worker compilation and focused lint
+passed for this follow-up. The original synthetic timings below describe the
+first implementation, not this follow-up.
+
 The production health report counted 76 failed builds and matching PostgreSQL
 statement timeouts in 24 hours. The last successful snapshot was
 `2026-10-10T03:02:57.079Z`. Working chat ingestion and worker heartbeats did not
@@ -28,7 +53,8 @@ or index is required.
 Non-executing production EXPLAIN confirms one message hash-join pass and a
 parallel native membership scan in the candidate. A ten-minute baseline message
 probe read 875 messages in 1.43 seconds, with an eight-second statement timeout.
-No full-window production query, rebuild, deployment or production write was performed.
+During the October 20 investigation, no full-window production query, rebuild,
+deployment or production write was performed.
 The exact contribution of each cost to the production failures remains unmeasured;
 the production-sized end-to-end build must still be verified during rollout.
 
