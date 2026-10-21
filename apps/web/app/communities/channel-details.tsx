@@ -29,7 +29,7 @@ export function ChannelDetails({ node, connections, community, onSelect, onClose
       <div><h2>{channelName(node)}</h2>{node.login != null && <Link href={`/channels/${encodeURIComponent(node.login)}`}>View channel profile</Link>}</div>
       <button className="community-icon-button" aria-label="Close channel details" onClick={onClose}>×</button>
     </div>
-    <p className="community-detail-period">In this 30-day map</p>
+    <p className="community-detail-period">In this map</p>
     <dl className="community-detail-stats"><div><dt>People in chat</dt><dd>{formatCount(participants(node))}</dd></div><div><dt>Connected channels</dt><dd>{formatCount(connections.length)}</dd></div></dl>
     {node.community != null && <section className="community-category-summary" aria-labelledby="community-category-title">
       <h3 id="community-category-title"><span className="community-color" style={{ background: communityColor(node.community) }} />Community details · {community.length} channels</h3>

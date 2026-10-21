@@ -6,7 +6,7 @@ import { readCommunityPresence } from "./community-presence.js";
 
 export async function readCommunityInput(db: DbClient, claim: CommunityBuildClaim) {
   return db.transaction(async (tx) => {
-    await tx.execute(sql`set local statement_timeout = '90s'`);
+    await tx.execute(sql`set local statement_timeout = '180s'`);
     await tx.execute(sql`set local work_mem = '32MB'`);
     const result = await tx.execute<{
       members: Array<{ chatterId: string; channelId: string; first: string; last: string }>;
@@ -63,10 +63,9 @@ export async function readCommunityInput(db: DbClient, claim: CommunityBuildClai
     `);
     const { members, ...diagnostics } = result.rows[0]!;
     if (members.length > maxCommunityMemberships) throw new Error("Community membership budget exceeded");
-    // The full 30-day presence query measured 113 seconds in production.
-    // Give this stage room to finish within the existing four-minute build
-    // budget; message reads retain their separate 90-second limit.
-    await tx.execute(sql`set local statement_timeout = '150s'`);
+    // The 30-day presence query measured 113 seconds in production. Allow
+    // the 60-day scan more headroom within the ten-minute build budget.
+    await tx.execute(sql`set local statement_timeout = '300s'`);
     const presence = await readCommunityPresence(tx, claim);
     const combined = new Map(members.map((row) => [`${row.chatterId}\0${row.channelId}`, { ...row, weight: 1 }]));
     for (const row of presence.members) {

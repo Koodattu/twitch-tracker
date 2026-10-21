@@ -2,7 +2,7 @@ export type * from "./stream-detail.js";
 export type * from "./channel-detail.js";
 export type * from "./community-map.js";
 
-export const communityMapRecipe = "finnish-presence-v4";
+export const communityMapRecipe = "finnish-presence-v5";
 export const channelPeriodDays = [7, 30, 90] as const;
 export type ChannelPeriodDays = typeof channelPeriodDays[number];
 export const earliestChannelPeriodEnd = "2011-01-01";
@@ -13,7 +13,7 @@ export function isChannelDay(value: unknown, today = new Date().toISOString().sl
     && value >= "2010-10-04" && value <= today
     && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
 }
-export const communityMapThresholds = { channelPeople: 5, sharedPeople: 3 } as const;
+export const communityMapThresholds = { channelPeople: 5, sharedPeople: 5 } as const;
 export const communityNodeRadius = (people: number) => Math.min(17, 3 + Math.sqrt(people) * 0.6);
 
 export const appModes = ["local", "private_mvp", "production"] as const;

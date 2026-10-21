@@ -13,6 +13,13 @@ const database = url == null ? null : createDb(url);
 const coverage: CommunityCoverage = { messages: 0, firstObservedAt: null, lastObservedAt: null, missingSession: 0, unknownSource: 0, relayedMessages: 0, qualifyingMemberships: 0 };
 
 describe("Community schedule", () => {
+  it("includes exactly 60 completed UTC days across calendar boundaries", () => {
+    for (const manual of [false, true]) {
+      const window = communityWindow(new Date("2026-10-21T12:00:00Z"), manual);
+      expect(window.windowStart.toISOString()).toBe("2026-08-22T00:00:00.000Z");
+      expect(window.windowEnd.toISOString()).toBe("2026-10-21T00:00:00.000Z");
+    }
+  });
   it("uses the latest due UTC window across midnight, restart, and the nightly boundary", () => {
     expect(communityWindow(new Date("2026-09-06T02:59:00Z")).windowEnd.toISOString()).toBe("2026-09-05T00:00:00.000Z");
     expect(communityWindow(new Date("2026-09-06T03:00:00Z")).windowEnd.toISOString()).toBe("2026-09-06T00:00:00.000Z");

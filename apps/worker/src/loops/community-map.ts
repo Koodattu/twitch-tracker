@@ -10,7 +10,7 @@ export async function runCommunityBuild(context: WorkerContext) {
   const claim = await claimCommunityBuild(context.db);
   if (claim == null) return { skipped: "No build due or another worker owns the build." };
   const abort = new AbortController();
-  const signal = AbortSignal.any([abort.signal, context.abortSignal, AbortSignal.timeout(240_000)]);
+  const signal = AbortSignal.any([abort.signal, context.abortSignal, AbortSignal.timeout(600_000)]);
   let renewal: Promise<void> | null = null;
   const timer = setInterval(() => {
     if (renewal != null) return;

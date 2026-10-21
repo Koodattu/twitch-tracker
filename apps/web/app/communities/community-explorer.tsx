@@ -219,6 +219,7 @@ export function CommunityExplorer({ map, canLookupChatter = false }: { map: Comm
     return () => resize.disconnect();
   }, []);
   const reportingEnd = new Date(new Date(map.windowEnd).getTime() - 1).toISOString().slice(0, 10);
+  const reportingDays = Math.round((Date.parse(map.windowEnd) - Date.parse(map.windowStart)) / 86_400_000);
 
   return <div className="community-explorer" data-search-open={searchOpen || optionsOpen || lookupOpen} onKeyDown={(event) => {
     if (event.key === "Escape") { setSelected(null); setSearchOpen(false); setHelpOpen(false); setOptionsOpen(false); setLookupOpen(false); svg.current?.focus({ preventScroll: true }); }
@@ -288,7 +289,7 @@ export function CommunityExplorer({ map, canLookupChatter = false }: { map: Comm
 
     <div className="community-heading"><h1>Chat communities</h1>
       <p>{formatCount(visibleMap.graph.nodes.length)} of {formatCount(map.graph.nodes.length)} channels shown <span>·</span> {formatCount(communities.length)} communities</p></div>
-    <div className="community-date"><strong>30-day map</strong><span>Updated {formatDateTime(map.generatedAt)}</span></div>
+    <div className="community-date"><strong>{reportingDays}-day map</strong><span>Updated {formatDateTime(map.generatedAt)}</span></div>
 
     {map.graph.nodes.length === 0 ? <div className="community-empty community-glass"><EmptyState title="Not enough recorded chat activity" description="No channels meet the activity threshold for this reporting window yet." /></div> :
       <section className="community-search community-glass" aria-label="Find a channel">
@@ -346,7 +347,7 @@ export function CommunityExplorer({ map, canLookupChatter = false }: { map: Comm
         </div>}
       </section>}
 
-    {requested.length > 0 && selectedNode == null && <div className="community-details community-glass" role="status"><p>The linked channel is unavailable in this 30-day map. Find another channel or use Fit map to reset.</p></div>}
+    {requested.length > 0 && selectedNode == null && <div className="community-details community-glass" role="status"><p>The linked channel is unavailable in this map. Find another channel or use Fit map to reset.</p></div>}
     {selectedNode != null && <ChannelDetails key={selectedNode.id} node={selectedNode} connections={connections}
       community={communities.find(item => item.id === selectedNode.community)?.nodes ?? []}
       onSelect={node => select(node, true)} onClose={() => { setSelected(null); svg.current?.focus(); }} />}

@@ -18,7 +18,7 @@ export type CommunityBuildClaim = {
 export function communityWindow(now: Date, manual = false) {
   const midnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   const end = midnight - (!manual && now.getUTCHours() < 3 ? dayMs : 0);
-  return { windowStart: new Date(end - 30 * dayMs), windowEnd: new Date(end) };
+  return { windowStart: new Date(end - 60 * dayMs), windowEnd: new Date(end) };
 }
 
 export async function requestCommunityBuild(db: DbClient) {

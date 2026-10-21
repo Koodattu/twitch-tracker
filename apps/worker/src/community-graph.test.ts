@@ -35,10 +35,10 @@ describe("Community graph", () => {
     expect(weak.graph.edges).toHaveLength(0);
   });
 
-  it("includes five-person channels and three-person overlaps, while keeping smaller overlaps isolated", () => {
-    const { graph } = buildCommunityGraph({ memberships: [...audience("a",0,5),...audience("b",2,5),...audience("c",5,5)], previous:null });
+  it("includes five-person overlaps, while keeping four-person overlaps isolated", () => {
+    const { graph } = buildCommunityGraph({ memberships: [...audience("a",0,5),...audience("b",0,5),...audience("c",1,5)], previous:null });
     expect(graph.nodes).toHaveLength(3);
-    expect(graph.edges).toEqual([{source:"a",target:"b",shared:3,score:0.6}]);
+    expect(graph.edges).toEqual([{source:"a",target:"b",shared:5,score:1}]);
     expect(graph.nodes.find((node)=>node.id === "c")!.community).toBeNull();
   });
 
