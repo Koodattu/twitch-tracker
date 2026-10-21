@@ -25,6 +25,15 @@ The 16 focused community integration tests, worker compilation and focused lint
 passed for this follow-up. The original synthetic timings below describe the
 first implementation, not this follow-up.
 
+Release `15593f2` completed the message stage, but the subsequent presence stage
+hit its separate 90-second timeout. One bounded read-only diagnostic of the
+unchanged presence SQL completed in **113.281 seconds** over 5,793,392 events,
+returning 260,155 qualified memberships. Query-rewrite experiments did not provide
+reliable headroom under 90 seconds and were not retained. The presence stage now
+has a **150-second statement limit**; the message stage remains at 90 seconds and
+the overall build budget remains four minutes. No graph thresholds, identity or
+privacy rules change. Actual end-to-end publication must verify this budget.
+
 The production health report counted 76 failed builds and matching PostgreSQL
 statement timeouts in 24 hours. The last successful snapshot was
 `2026-10-10T03:02:57.079Z`. Working chat ingestion and worker heartbeats did not
