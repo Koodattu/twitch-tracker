@@ -32,6 +32,16 @@ load_backup_settings() {
   BACKUP_CRITICAL_USED_PERCENT="${BACKUP_CRITICAL_USED_PERCENT:-90}"
   BACKUP_HEALTH_MAX_AGE_SECONDS="${BACKUP_HEALTH_MAX_AGE_SECONDS:-172800}"
   BACKUP_RETENTION_DRY_RUN="${BACKUP_RETENTION_DRY_RUN:-false}"
+  BACKUP_DELETE_BEFORE_CREATE="${BACKUP_DELETE_BEFORE_CREATE:-false}"
+
+  case "$BACKUP_DELETE_BEFORE_CREATE" in
+    true|false) ;;
+    *) backup_error "BACKUP_DELETE_BEFORE_CREATE must be true or false."; return 1 ;;
+  esac
+  if [ "$BACKUP_DELETE_BEFORE_CREATE" = "true" ] && [ "$BACKUP_RETENTION_DRY_RUN" = "true" ]; then
+    backup_error "Delete-before-create cannot be combined with retention dry run."
+    return 1
+  fi
 
   if ! is_positive_integer "$BACKUP_RETENTION_DAYS"; then
     backup_error "BACKUP_RETENTION_DAYS must be a positive integer."
@@ -193,6 +203,23 @@ backup_preflight() {
     previous_size="$(backup_file_size "$previous")"
   fi
   required_bytes=$((BACKUP_MIN_FREE_BYTES + previous_size))
+  # This explicit policy accepts having no current backup if the new dump fails.
+  # Check that reclaiming the old archive would suffice before removing it.
+  reclaimable_bytes=0
+  if [ "$BACKUP_DELETE_BEFORE_CREATE" = "true" ]; then
+    reclaimable_bytes="$previous_size"
+  fi
+  if [ $((available_bytes + reclaimable_bytes)) -lt "$required_bytes" ]; then
+    backup_error "backup_preflight_failed reason=insufficient_free_space available_bytes=$available_bytes required_bytes=$required_bytes reserve_bytes=$BACKUP_MIN_FREE_BYTES estimated_dump_bytes=$previous_size"
+    return 1
+  fi
+  if [ "$BACKUP_DELETE_BEFORE_CREATE" = "true" ] && [ "$previous_size" -gt 0 ]; then
+    backup_log "backup_replace_before_create filename=$(basename "$previous") bytes=$previous_size"
+    remove_backup_pair "$previous" || return 1
+    rm -f "$BACKUP_DIR/.last-success"
+    set -- $(backup_filesystem_stats)
+    available_bytes="$1"
+  fi
   if [ "$available_bytes" -lt "$required_bytes" ]; then
     backup_error "backup_preflight_failed reason=insufficient_free_space available_bytes=$available_bytes required_bytes=$required_bytes reserve_bytes=$BACKUP_MIN_FREE_BYTES estimated_dump_bytes=$previous_size"
     return 1

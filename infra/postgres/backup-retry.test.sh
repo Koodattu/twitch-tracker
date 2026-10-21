@@ -47,4 +47,20 @@ rm "$TEST_FAILURE_FILE"
 sh "$script_dir/backup.sh" > "$test_root/output" 2>&1
 [ ! -e "$BACKUP_DIR/.last-failure" ]
 sh "$script_dir/backup-health.sh" > "$test_root/health" 2>&1
+# The explicitly enabled replacement policy must not advertise a deleted archive
+# as a recovery point if pg_dump fails after removing it.
+export BACKUP_DELETE_BEFORE_CREATE=true
+previous_dump="$(awk '{print $3}' "$BACKUP_DIR/.last-success")"
+touch "$TEST_FAILURE_FILE"
+if sh "$script_dir/backup.sh" > "$test_root/output" 2>&1; then
+  echo 'Expected failed replacement' >&2; exit 1
+fi
+[ ! -e "$BACKUP_DIR/$previous_dump" ]
+[ ! -e "$BACKUP_DIR/$previous_dump.sha256" ]
+[ ! -e "$BACKUP_DIR/.last-success" ]
+[ -s "$BACKUP_DIR/.last-failure" ]
+rm "$TEST_FAILURE_FILE"
+sh "$script_dir/backup.sh" > "$test_root/output" 2>&1
+sh "$script_dir/backup-health.sh" > "$test_root/health" 2>&1
+
 echo 'backup retry tests passed'

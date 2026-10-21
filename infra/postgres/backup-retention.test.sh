@@ -46,6 +46,7 @@ reset_case() {
   BACKUP_CRITICAL_USED_PERCENT=90
   BACKUP_HEALTH_MAX_AGE_SECONDS=172800
   BACKUP_RETENTION_DRY_RUN=false
+  BACKUP_DELETE_BEFORE_CREATE=false
   export BACKUP_DIR BACKUP_RETENTION_DAYS BACKUP_MAX_COUNT BACKUP_MAX_TOTAL_BYTES
   export BACKUP_MIN_FREE_BYTES BACKUP_WARN_USED_PERCENT BACKUP_CRITICAL_USED_PERCENT
   export BACKUP_HEALTH_MAX_AGE_SECONDS BACKUP_RETENTION_DRY_RUN
@@ -155,5 +156,30 @@ mark_known_good twitch_tracker_20260101T000000Z.dump
 backup_mtime="$(backup_file_mtime "$BACKUP_DIR/twitch_tracker_20260101T000000Z.dump")"
 assert_equal "$(backup_seconds_until_due 86400 "$((backup_mtime + 3600))")" 82800
 assert_equal "$(backup_seconds_until_due 86400 "$((backup_mtime + 86400))")" 0
+
+reset_case replace_before_create
+create_complete_backup twitch_tracker_20260101T000000Z.dump 40
+mark_known_good twitch_tracker_20260101T000000Z.dump
+BACKUP_MIN_FREE_BYTES=50
+backup_filesystem_stats() {
+  if [ -f "$BACKUP_DIR/twitch_tracker_20260101T000000Z.dump" ]; then
+    printf '60 70\n'
+  else
+    printf '100 60\n'
+  fi
+}
+if backup_preflight >/dev/null 2>&1; then fail 'default policy must preserve the old backup'; fi
+assert_exists "$BACKUP_DIR/twitch_tracker_20260101T000000Z.dump"
+BACKUP_DELETE_BEFORE_CREATE=true
+BACKUP_MIN_FREE_BYTES=110
+if backup_preflight >/dev/null 2>&1; then fail 'must reject insufficient space even after reclaim'; fi
+assert_exists "$BACKUP_DIR/twitch_tracker_20260101T000000Z.dump"
+BACKUP_MIN_FREE_BYTES=50
+backup_preflight >/dev/null
+assert_missing "$BACKUP_DIR/twitch_tracker_20260101T000000Z.dump"
+assert_missing "$BACKUP_DIR/twitch_tracker_20260101T000000Z.dump.sha256"
+assert_missing "$BACKUP_DIR/.last-success"
+BACKUP_RETENTION_DRY_RUN=true
+if load_backup_settings >/dev/null 2>&1; then fail 'must reject delete-before-create with dry run'; fi
 
 printf 'backup retention tests passed\n'

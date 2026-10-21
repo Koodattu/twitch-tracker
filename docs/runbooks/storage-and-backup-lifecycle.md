@@ -12,7 +12,7 @@ rollback procedure, use [the storage compaction rollout](storage-compaction-roll
 The backup service creates a PostgreSQL custom-format archive with explicit
 `gzip:6` compression by default. It validates the archive catalog, creates a
 SHA-256 sidecar, publishes the completed pair, and updates `.last-success`
-before pruning anything.
+before pruning anything under the default policy.
 
 Local retention is the intersection of three limits:
 
@@ -23,7 +23,7 @@ Local retention is the intersection of three limits:
 - `BACKUP_MAX_TOTAL_BYTES`: keep the newest contiguous set of complete dumps
   whose dump bytes fit this cap.
 
-The `.last-success` backup is always preserved, even when it alone exceeds a
+Under the default policy, the `.last-success` backup is preserved, even when it alone exceeds a
 cap. If the marker is missing, malformed, or points to a missing dump/checksum
 pair, pruning fails without deleting anything. Incomplete dumps without a
 checksum are reported and ignored. Pruning runs only after a new dump has
@@ -46,6 +46,21 @@ A failed attempt records `.last-failure`, immediately fails the health check,
 and retries after at most five minutes. A validated replacement clears the
 failure marker; the previous good backup remains protected throughout. A
 restart with an outstanding failure retries immediately.
+
+### Explicit delete-before-create policy
+
+`BACKUP_DELETE_BEFORE_CREATE=true` removes the current marked archive and its
+checksum before creating the replacement. It first checks that reclaimed space
+would cover the estimated dump plus the configured free-space reserve. A failed
+replacement can leave no current recovery archive; the health check remains
+failed and retries continue. The default is `false`, and this option cannot be
+combined with retention dry run. It does not delete separate migration recovery
+archives outside `BACKUP_DIR`.
+
+The operator authorized this policy for Twitch Tracker on 2026-10-21. Enable it
+in the production environment file and recreate the backup service. Successful
+replacement still requires archive-catalog validation and a checksum before
+the service reports success.
 
 `BACKUP_OFF_HOST_CONFIRMED=true` is an operator attestation. When it is false,
 backup creation continues but emits a warning. Set it to true only after
