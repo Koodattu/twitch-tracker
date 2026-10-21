@@ -27,27 +27,32 @@ export function buildCommunityGraph({ memberships, previous }: CommunityGraphInp
     if (!visits.has(chatter)) visits.set(chatter, []);
     visits.get(chatter)!.push(id);
   }
-  const counts = new Map<string, { shared: number; weighted: number }>();
   let pairContributions = 0;
   let maxChannelsPerChatter = 0;
-  for (const [chatter, ids] of visits) {
+  for (const ids of visits.values()) {
     maxChannelsPerChatter = Math.max(maxChannelsPerChatter, ids.length);
     pairContributions += ids.length * (ids.length - 1) / 2;
     if (pairContributions > 10_000_000) throw new Error("Community pair budget exceeded");
-    for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
-      const key = `${ids[i]}\0${ids[j]}`;
-      const count = counts.get(key) ?? { shared: 0, weighted: 0 };
-      count.shared++;
-      count.weighted += Math.min(audiences.get(ids[i]!)!.get(chatter)!, audiences.get(ids[j]!)!.get(chatter)!);
-      counts.set(key, count);
-      if (counts.size > 1_000_000) throw new Error("Community edge budget exceeded");
-    }
   }
   const candidates: CommunityEdge[] = [];
-  for (const [key, { shared, weighted }] of counts) {
-    if (shared < communityMapThresholds.sharedPeople) continue;
-    const [source, target] = key.split("\0") as [string, string];
-    candidates.push({ source, target, shared, score: weighted / Math.sqrt(audiences.get(source)!.size * audiences.get(target)!.size) });
+  // Count one source's neighbors at a time. Weak pairs can be discarded before
+  // moving on, rather than retaining millions of them for the entire graph.
+  for (const source of channels) {
+    const counts = new Map<string, { shared: number; weighted: number }>();
+    for (const [chatter, weight] of audiences.get(source)!) {
+      for (const target of visits.get(chatter)!) {
+        if (compare(source, target) >= 0) continue;
+        const count = counts.get(target) ?? { shared: 0, weighted: 0 };
+        count.shared++;
+        count.weighted += Math.min(weight, audiences.get(target)!.get(chatter)!);
+        counts.set(target, count);
+      }
+    }
+    for (const [target, { shared, weighted }] of counts) {
+      if (shared < communityMapThresholds.sharedPeople) continue;
+      candidates.push({ source, target, shared, score: weighted / Math.sqrt(audiences.get(source)!.size * audiences.get(target)!.size) });
+      if (candidates.length > 1_000_000) throw new Error("Community edge budget exceeded");
+    }
   }
   candidates.sort((a, b) => b.score - a.score || b.shared - a.shared || compare(a.source, b.source) || compare(a.target, b.target));
   const ranks = new Map<string, number>();

@@ -5,6 +5,16 @@ import { runGraphThread } from "./loops/community-map.js";
 const audience = (channelId: string, start: number, count: number) => Array.from({ length: count }, (_, index) => ({ channelId, chatterId: `user-${index + start}` }));
 
 describe("Community graph", () => {
+  it("discards more than a million weak pairs before retaining candidate edges", () => {
+    const memberships = Array.from({ length: 1500 }, (_, i) => [
+      { channelId: `channel-${i}`, chatterId: "shared" },
+      ...Array.from({ length: 4 }, (_, j) => ({ channelId: `channel-${i}`, chatterId: `only-${i}-${j}` }))
+    ]).flat();
+    const { graph, diagnostics } = buildCommunityGraph({ memberships, previous: null });
+    expect(graph.nodes).toHaveLength(1500);
+    expect(graph.edges).toEqual([]);
+    expect(diagnostics.pairContributions).toBe(1_124_250);
+  });
   it("includes lurkers with weaker connections and counts mixed evidence once", () => {
     const lurkers = [...audience("a", 0, 10), ...audience("b", 0, 10)].map((row) => ({ ...row, weight: 0.25 }));
     const presence = buildCommunityGraph({ memberships: lurkers, previous: null }).graph;
