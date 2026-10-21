@@ -46,7 +46,7 @@ Worker heartbeat and ingestion records use `community-map`. Every completed buil
 
 ## Resource limits
 
-The message query has a 180-second statement timeout and the presence query has a 300-second statement timeout and 32 MB PostgreSQL `work_mem` per operation. Graph computation runs in a separate worker thread with a 512 MB old-generation heap limit and a 90-second deadline; category enrichment has a separate 30-second SQL timeout; the overall build deadline is ten minutes. Lease renewal runs every 30 seconds.
+The message query has a 180-second statement timeout and the presence query has a 300-second statement timeout and 32 MB PostgreSQL `work_mem` per operation. Graph computation runs in a separate worker thread with a 512 MB old-generation heap limit and a 90-second deadline; category enrichment has a separate 90-second SQL timeout; the overall build deadline is ten minutes. Lease renewal runs every 30 seconds.
 
 The builder rejects more than 500,000 memberships, 10,000 qualifying channels, 10 million pair contributions, one million candidate pairs meeting the shared-person threshold, or a 10 MB graph payload. Pairs are counted one source channel at a time, discarding weak pairs before moving to the next channel. Exceeding a limit fails the build instead of silently dropping channels. These are operational limits, not privacy guarantees.
 

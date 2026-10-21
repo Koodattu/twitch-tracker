@@ -5,7 +5,7 @@ import type { CommunityGraph } from "@twitch-tracker/shared";
 export async function addCommunityCategories(db: Pick<DbClient, "transaction">, claim: CommunityBuildClaim, graph: CommunityGraph) {
   if (graph.nodes.length === 0) return;
   const result = await db.transaction(async (tx) => {
-    await tx.execute(sql`set local statement_timeout = '30s'`);
+    await tx.execute(sql`set local statement_timeout = '90s'`);
     await tx.execute(sql`set local work_mem = '32MB'`);
     return tx.execute<{ channel: string; id: string; name: string; share: number }>(sql`
       with sessions as materialized (
