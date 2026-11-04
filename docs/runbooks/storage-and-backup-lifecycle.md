@@ -123,7 +123,7 @@ index, TOAST, row-count, WAL, and temporary-I/O deltas over time.
 
 ## Data lifecycle
 
-Membership JOIN/PART events are now the exception to the historical policy below:
+Membership JOIN/PART events and their duplicate wire records are now the exception to the historical policy below:
 see [daily summaries and seven-day detail retention](membership-daily-retention.md),
 authorized on 2026-11-04. Preserve daily appearance counts and separately labelled
 matched/estimated presence durations, then retire eligible source events.

@@ -225,6 +225,20 @@
       "when": 1793779202000,
       "tag": "0031_reuse_membership_rollup_workspace",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1793779203000,
+      "tag": "0032_membership_rollup_batches",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1793779204000,
+      "tag": "0033_expire_membership_wire_records",
+      "breakpoints": true
     }
   ]
 }

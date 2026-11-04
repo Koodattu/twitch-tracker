@@ -1,8 +1,9 @@
 # Daily membership summaries and seven-day detail retention
 
 The operator authorized this retention change on 2026-11-04. It replaces
-indefinite JOIN/PART event retention in ADR 0017. Chat messages, viewer samples,
-raw IRC evidence, and EventSub retention are unchanged.
+indefinite JOIN/PART event retention in ADR 0017. The operator also authorized
+expiry of duplicate JOIN/PART wire records. Chat messages, viewer samples,
+other IRC commands, and EventSub retention are unchanged.
 
 ## Meaning
 
@@ -35,18 +36,25 @@ Durations describe chat presence, never verified video viewing:
 ## Processing and retention
 
 The maintenance loop processes up to 50 expired contexts every five minutes,
-one atomic transaction per context. A context becomes eligible when its stream
+in atomic batches of at most 25 contexts. A context becomes eligible when its stream
 has ended and both stream end and its latest event precede UTC midnight minus
 seven days. Active streams remain detailed until they finish. This intentional
 exception avoids splitting sessions at the retention boundary. Offline contexts
 process their expired events even if fresh offline observations keep arriving;
 those observations have appearance counts but no stream duration.
 
-Queue locks exclude simultaneous processors. Summary writes, preservation of
-legacy raw-evidence erasure links, source deletion and unreferenced identity
+Queue locks exclude simultaneous processors. Summary writes, temporary preservation
+of legacy raw-evidence erasure links, source deletion and unreferenced identity
 cleanup commit together. Failed transactions can be retried. Late events after
 a context was summarized add counts but no additional duration, avoiding overlap
 with already finalized time. Deduplication of raw events is bounded by retention.
+
+After summarization, maintenance removes up to 5,000 expired JOIN/PART wire
+records per pass. A wire record remains while any detailed membership, chat
+message, channel event, or room-state event references it. Deletion clears its
+compressed archive slot and privacy lookup in the same transaction, preserving
+all other slots in mixed-command archive blocks. Unrecognized command records
+retain their privacy links. The backfill command repeats both stages to completion.
 
 Detailed histories show the retained events; the private chatter page combines
 all summarized and recent appearance counts. Its duration columns include only
@@ -68,8 +76,8 @@ are intentionally no longer retained in this ledger after summarization.
 2. Run integration tests on synthetic data, including missing/repeated events,
    overlap, midnight, retries, retention, community parity and privacy erasure.
    Build matching DB/API/worker/web images and pass release checks.
-3. Apply migration 0029 with the worker stopped. It adds storage and an index;
-   it does not delete history during application migration.
+3. Apply migrations 0029–0033 with the worker stopped. They add storage, indexes
+   and batch functions; they do not delete history during application migration.
 4. Record the original event count and current membership relation sizes. Run
    `node dist/rollup-membership.js --database twitch_tracker --apply` in the new
    migration image. The operation is resumable. Monitor volume and WAL headroom.

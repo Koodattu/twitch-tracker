@@ -1,5 +1,5 @@
 import { createDb } from "./index.js";
-import { rollupExpiredMembership } from "./membership-retention.js";
+import { expireMembershipWire, rollupExpiredMembership } from "./membership-retention.js";
 
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error("DATABASE_URL is required");
@@ -12,11 +12,14 @@ const { db, pool } = createDb(url);
 try {
   let events = 0;
   let contexts = 0;
+  let wireRecords = 0;
   while (true) {
     const result = await rollupExpiredMembership(db, 100);
+    const expiredWireRecords = await expireMembershipWire(db);
+    wireRecords += expiredWireRecords;
     events += result.events;
     contexts += result.contexts;
-    console.log(JSON.stringify({ ...result, totalEvents: events, totalContexts: contexts }));
-    if (result.contexts < 100) break;
+    console.log(JSON.stringify({ ...result, expiredWireRecords, totalEvents: events, totalContexts: contexts, totalWireRecords: wireRecords }));
+    if (result.contexts < 100 && expiredWireRecords === 0) break;
   }
 } finally { await pool.end(); }

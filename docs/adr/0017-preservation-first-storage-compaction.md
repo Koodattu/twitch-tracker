@@ -2,7 +2,8 @@
 
 Status: accepted
 
-Amended on 2026-11-04: membership JOIN/PART history now follows the explicitly
+Amended on 2026-11-04: membership JOIN/PART history and duplicate JOIN/PART wire
+records now follow the explicitly
 authorized [daily summary and seven-day detail policy](../runbooks/membership-daily-retention.md).
 The other preservation rules below remain in force.
 

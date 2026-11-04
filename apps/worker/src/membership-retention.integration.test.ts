@@ -1,5 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { createDb, rollupExpiredMembership } from "@twitch-tracker/db";
+import { createDb, expireMembershipWire, rollupExpiredMembership } from "@twitch-tracker/db";
 import { readCommunityPresence } from "./community-presence.js";
 
 const url = process.env.TEST_DATABASE_URL;
@@ -144,6 +144,41 @@ describe.skipIf(database == null)("Daily membership retention", () => {
       expect((await client.query("select count(*)::int n from membership_rollup_input")).rows[0].n).toBe(0);
     } finally { client.release(); }
     expect(await totals()).toMatchObject({appearances:2});
+  });
+
+  it("batches contexts without merging the same person's time across channels", async () => {
+    await add("join","2020-01-01 23:00Z");
+    await pool.query(`insert into twitch_users(twitch_user_id,login) values('other','other');
+      insert into stream_sessions(twitch_stream_id,broadcaster_user_id,started_at,ended_at,is_finnish_eligible)
+        values('other-stream','other','2020-01-01 20:00Z','2020-01-02 04:00Z',true);
+      select insert_membership_event('other','person','person','other-stream','join','2020-01-01 23:00Z',null,sha256(uuid_send(gen_random_uuid())),null);`);
+    expect(await rollupExpiredMembership(db)).toMatchObject({contexts:2,events:2});
+    expect(await totals()).toMatchObject({appearances:2,matched:0,estimated:36_000_000});
+  });
+
+  it("expires only unreferenced old JOIN/PART wire copies and clears just their archived slots", async () => {
+    const raw = (await pool.query(`insert into raw_irc_records(raw_line,parsed_command,received_at) values
+      (':person JOIN #channel','!JOIN','2020-01-01 21:00Z'),
+      (':person PART #channel','!PART','2020-01-01 22:00Z'),
+      (':person PRIVMSG #channel :keep this message','','2020-01-01 23:00Z'),
+      (':person JOIN #channel','!JOIN','2020-01-02 00:00Z'),
+      (':person JOIN #channel','!JOIN',now()) returning id`)).rows;
+    await pool.query(`select insert_membership_event('channel','person','person','stream','join','2020-01-02 00:00Z',null,sha256(uuid_send(gen_random_uuid())),$1)`,[raw[3].id]);
+    await pool.query("insert into membership_raw_evidence values($1,'person','person')",[raw[0].id]);
+    await pool.query("select compact_raw_irc_batch('2020-01-03',256)");
+    const client = await pool.connect();
+    try {
+      await client.query("begin");
+      expect((await client.query("select expire_membership_wire_batch('2020-01-03',5000) n")).rows[0].n).toBe(2);
+      await client.query("rollback");
+    } finally { client.release(); }
+    expect((await pool.query("select count(*)::int n from raw_irc_records")).rows[0].n).toBe(5);
+    expect(await expireMembershipWire(db)).toBe(2);
+    expect((await pool.query("select count(*)::int n from raw_irc_records")).rows[0].n).toBe(3);
+    expect((await pool.query("select count(*)::int n from membership_raw_evidence")).rows[0].n).toBe(0);
+    expect((await pool.query("select read_raw_irc_line(raw_line,payload_block_id,payload_position) line from raw_irc_records where id=$1",[raw[2].id])).rows[0].line).toBe(':person PRIVMSG #channel :keep this message');
+    expect((await pool.query("select count(*)::int n from raw_irc_payload_blocks b cross join lateral unnest(b.lines) line where b.id=(select payload_block_id from raw_irc_records where id=$1) and line is null",[raw[2].id])).rows[0].n).toBe(2);
+    await expect(pool.query("select expire_membership_wire_batch(now(),5000)")).rejects.toThrow("Seven complete days");
   });
 
   it("rolls back totals and deletion together and preserves legacy privacy links", async () => {
