@@ -27,7 +27,9 @@ Durations describe chat presence, never verified video viewing:
   anonymous observations contribute counts only.
 - Capture windows start when the bot's room JOIN is observed, or at the first
   membership event if that acknowledgement is missing. Socket disconnect and
-  room PART close coverage. An unclean restart closes abandoned windows at their
+  room PART close coverage. Uninterrupted room coverage carries across stream
+  boundaries, and an open connection covers through a completed stream's end.
+  An unclean restart closes abandoned windows at their
   last observed membership signal, avoiding invented time during an outage.
 
 ## Processing and retention

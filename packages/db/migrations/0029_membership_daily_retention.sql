@@ -83,10 +83,13 @@ CREATE INDEX membership_evidence_login_idx ON membership_raw_evidence(chatter_lo
 --> statement-breakpoint
 CREATE FUNCTION record_membership_capture(bot uuid,connection uuid,channel text,stream text,observed timestamptz)
 RETURNS integer LANGUAGE plpgsql AS $$
-DECLARE result integer;
+DECLARE result integer; coverage_started timestamptz;
 BEGIN
+ SELECT min(w.started_at) INTO coverage_started FROM membership_capture_windows w
+ JOIN membership_event_contexts c ON c.id=w.context_id
+ WHERE w.connection_id=connection AND c.broadcaster_user_id=channel AND w.ended_at IS NULL;
  INSERT INTO membership_capture_windows(context_id,bot_account_id,connection_id,started_at,last_seen_at)
- VALUES(get_membership_context(channel,stream),bot,connection,observed,observed)
+ VALUES(get_membership_context(channel,stream),bot,connection,coalesce(coverage_started,observed),observed)
  ON CONFLICT(connection_id,context_id) WHERE ended_at IS NULL DO UPDATE SET last_seen_at=greatest(membership_capture_windows.last_seen_at,excluded.last_seen_at)
  RETURNING id INTO result;
  RETURN result;
@@ -124,7 +127,7 @@ BEGIN
    coalesce('id:'||i.chatter_user_id,'login:'||lower(i.chatter_login),'anonymous') AS subject_key,
    s.started_at AS stream_start,s.ended_at AS stream_end,
    greatest(s.started_at,w.started_at) AS coverage_start,
-   least(s.ended_at,coalesce(w.ended_at,w.last_seen_at)) AS coverage_end,
+   least(s.ended_at,w.ended_at) AS coverage_end,
    s.is_finnish_eligible AND e.source_override IS NULL AND e.received_at>=s.started_at
      AND e.received_at<=s.ended_at AS community_eligible
  FROM membership_events e JOIN membership_event_identities i ON i.id=e.identity_id

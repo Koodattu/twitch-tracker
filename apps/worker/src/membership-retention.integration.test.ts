@@ -86,6 +86,24 @@ describe.skipIf(database == null)("Daily membership retention", () => {
     expect(await rollupExpiredMembership(db)).toMatchObject({ contexts: 0 });
   });
 
+  it("uses stream end for a missing PART while the bot remains connected", async () => {
+    const c = await capture("2020-01-01 22:00Z","2020-01-01 23:00Z");
+    await pool.query("update membership_capture_windows set ended_at=null where id=$1",[c]);
+    await add("join","2020-01-01 23:00Z",c);
+    await rollupExpiredMembership(db);
+    expect(await totals()).toMatchObject({appearances:1,matched:0,estimated:18_000_000});
+  });
+
+  it("carries uninterrupted room coverage across a stream boundary for a missing JOIN", async () => {
+    const query = `select record_membership_capture('00000000-0000-0000-0000-000000000001',
+      '00000000-0000-0000-0000-000000000002','channel',$1,$2) as id`;
+    await pool.query(query,[null,"2020-01-01 19:00Z"]);
+    const c = (await pool.query(query,["stream","2020-01-01 23:00Z"])).rows[0].id;
+    await add("part","2020-01-01 23:00Z",c);
+    await rollupExpiredMembership(db);
+    expect(await totals()).toMatchObject({appearances:1,matched:0,estimated:10_800_000});
+  });
+
   it("expires offline history even when the same channel has fresh offline events", async () => {
     await pool.query(`insert into chat_membership_events(broadcaster_user_id,chatter_user_id,chatter_login,event_type,received_at)
       values('channel','person','person','join','2020-01-01'),('channel','person','person','part',now());`);
