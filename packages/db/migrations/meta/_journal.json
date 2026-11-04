@@ -204,6 +204,13 @@
       "when": 1791630004000,
       "tag": "0028_compact_activity_keys",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1793779200000,
+      "tag": "0029_membership_daily_retention",
+      "breakpoints": true
     }
   ]
 }

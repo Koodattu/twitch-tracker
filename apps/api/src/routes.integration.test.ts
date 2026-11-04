@@ -65,6 +65,25 @@ describe.skipIf(database == null)("Analytics routes with PostgreSQL", () => {
     vi.unstubAllGlobals();
   });
 
+  it("exposes processed membership totals and erases their summary and legacy raw links", async () => {
+    await pool.query(`update stream_sessions set ended_at='2026-09-05 11:00Z';
+      insert into chat_membership_events(broadcaster_user_id,twitch_stream_id,chatter_user_id,chatter_login,event_type,received_at)
+      values ('broadcaster','stream','chatter','chatter','join','2026-09-05 10:10Z'),
+        ('broadcaster','stream','chatter','chatter','part','2026-09-05 10:40Z');
+      select rollup_expired_membership();`);
+    const raw = (await pool.query("insert into raw_irc_records(raw_line) values(':chatter JOIN #channel') returning id")).rows[0].id;
+    await pool.query("insert into membership_raw_evidence values($1,'chatter','chatter')",[raw]);
+    const profile = await app.request("/api/private/chatters/chatter",{headers});
+    expect(profile.status).toBe(200);
+    expect((await profile.json()).data.membershipTotals).toEqual([expect.objectContaining({appearances:2,matchedHours:0,estimatedHours:0.5})]);
+    await db.update(appUsers).set({isAdmin:true}).where(eq(appUsers.twitchUserId,"chatter"));
+    const request = (await pool.query("insert into privacy_requests(request_type,subject_twitch_user_id) values('data_deletion','chatter') returning id")).rows[0];
+    expect((await app.request(`/api/internal/privacy-requests/${request.id}/complete`,{method:"POST",headers})).status).toBe(200);
+    expect((await pool.query("select count(*)::int n from membership_daily_summaries")).rows[0].n).toBe(0);
+    expect((await pool.query("select count(*)::int n from membership_raw_evidence")).rows[0].n).toBe(0);
+    expect((await pool.query("select raw_line from raw_irc_records where id=$1",[raw])).rows[0].raw_line).toBe("[redacted by subject data deletion]");
+  });
+
   it.each([
     "/api/streams/recent?limit=bad",
     "/api/channels?page=0",

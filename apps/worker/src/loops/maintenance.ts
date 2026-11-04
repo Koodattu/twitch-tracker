@@ -1,4 +1,4 @@
-import { createChatAssignmentControl } from "@twitch-tracker/db";
+import { createChatAssignmentControl, rollupExpiredMembership } from "@twitch-tracker/db";
 import { sql } from "drizzle-orm";
 import type { WorkerContext } from "../worker.js";
 import { startIntervalLoop } from "./common.js";
@@ -11,6 +11,7 @@ export const runMaintenanceLoop = (context: WorkerContext) => {
     intervalMs: context.config.MAINTENANCE_INTERVAL_MS,
     context,
     run: async () => {
+      const membershipRollup = await rollupExpiredMembership(context.db);
       const rawPayloadRetentionDays = context.config.RAW_PAYLOAD_RETENTION_DAYS;
       const staleAssignmentGraceMinutes = context.config.STALE_ASSIGNMENT_GRACE_MINUTES;
 
@@ -50,6 +51,7 @@ export const runMaintenanceLoop = (context: WorkerContext) => {
       });
 
       return {
+        membershipRollup,
         rawPayloadRetentionDays,
         compactedRawIrcMessages,
         staleAssignmentGraceMinutes,

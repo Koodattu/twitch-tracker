@@ -1846,6 +1846,26 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
       .orderBy(desc(chatMembershipEvents.receivedAt))
       .limit(300);
 
+    const membershipTotals = (await db.execute(sql`
+      with facts as (
+        select c.broadcaster_user_id,d.join_count+d.part_count as appearances,
+          d.matched_milliseconds,d.estimated_milliseconds,d.last_observed_at
+        from membership_daily_summaries d join membership_event_contexts c on c.id=d.context_id
+        where d.chatter_user_id=${chatter.twitchUserId}
+          or (d.chatter_user_id is null and d.chatter_login=${chatter.login ?? params.login.toLowerCase()})
+        union all
+        select broadcaster_user_id,1,0::bigint,0::bigint,received_at from chat_membership_events
+        where chatter_user_id=${chatter.twitchUserId}
+          or (chatter_user_id is null and chatter_login=${chatter.login ?? params.login.toLowerCase()})
+      ) select f.broadcaster_user_id as "broadcasterUserId",u.login as "broadcasterLogin",
+        u.display_name as "broadcasterDisplayName",sum(f.appearances)::float8 as appearances,
+        sum(f.matched_milliseconds)::float8/3600000 as "matchedHours",
+        sum(f.estimated_milliseconds)::float8/3600000 as "estimatedHours",max(f.last_observed_at) as "lastObservedAt"
+      from facts f join twitch_users u on u.twitch_user_id=f.broadcaster_user_id
+      group by f.broadcaster_user_id,u.login,u.display_name
+      order by appearances desc,f.broadcaster_user_id limit 100
+    `)).rows;
+
     const presenceObservations = await db
       .select({
         id: chatPresenceObservations.id,
@@ -1867,6 +1887,7 @@ export const createApiApp = ({ config, db }: CreateApiAppInput) => {
       data: {
         user: chatter,
         privateMvpProfile: true,
+        membershipTotals,
         summary: {
           messageCount: summary?.messageCount ?? 0,
           channelCount: summary?.channelCount ?? 0,
@@ -2274,6 +2295,9 @@ const redactSubjectData = async (db: DbClient, twitchUserId: string) => {
       from chat_membership_events
       where raw_irc_message_id is not null
         and (chatter_user_id = ${twitchUserId} or (${subjectLogin} <> '' and chatter_login = ${subjectLogin}))
+      union
+      select raw_irc_message_id from membership_raw_evidence
+      where chatter_user_id=${twitchUserId} or (${subjectLogin}<>'' and chatter_login=${subjectLogin})
     ),
     linked_raw_eventsub as (
       select raw_eventsub_event_id as id
@@ -2352,6 +2376,16 @@ const redactSubjectData = async (db: DbClient, twitchUserId: string) => {
     deleted_chatter_daily_stats as (
       delete from chatter_daily_stats
       where chatter_user_id = ${twitchUserId}
+      returning 1
+    ),
+    deleted_membership_summaries as (
+      delete from membership_daily_summaries
+      where chatter_user_id=${twitchUserId} or (${subjectLogin}<>'' and chatter_login=${subjectLogin})
+      returning 1
+    ),
+    deleted_membership_evidence as (
+      delete from membership_raw_evidence
+      where chatter_user_id=${twitchUserId} or (${subjectLogin}<>'' and chatter_login=${subjectLogin})
       returning 1
     ),
     revoked_sessions as (

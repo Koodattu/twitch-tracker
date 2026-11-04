@@ -59,6 +59,7 @@ describe("IRC Shared Chat persistence", () => {
     const messages: Array<typeof chatMessages.$inferInsert> = [];
     const rawLines: string[] = [];
     const db = {
+      execute: vi.fn(async () => ({ rows: [] })),
       insert: (table: unknown) => ({
         values: (value: typeof chatMessages.$inferInsert & typeof rawIrcMessages.$inferInsert) => {
           if (table === chatMessages) messages.push(value);

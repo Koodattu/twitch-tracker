@@ -2,6 +2,10 @@
 
 Status: accepted
 
+Amended on 2026-11-04: membership JOIN/PART history now follows the explicitly
+authorized [daily summary and seven-day detail policy](../runbooks/membership-daily-retention.md).
+The other preservation rules below remain in force.
+
 The tracker keeps historical product facts indefinitely unless an explicit
 privacy request requires deletion. This includes chat messages, membership
 events, viewer observations, stream and channel events, raw EventSub payloads,

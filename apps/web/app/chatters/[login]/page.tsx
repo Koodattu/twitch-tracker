@@ -49,6 +49,14 @@ type PrivateChatterProfile = {
     eventAt: string | null;
     receivedAt: string;
   }>;
+  membershipTotals: Array<{
+    broadcasterUserId: string;
+    broadcasterLogin: string | null;
+    broadcasterDisplayName: string | null;
+    appearances: number;
+    matchedHours: number;
+    estimatedHours: number;
+  }>;
   presenceObservations: Array<{
     id: string;
     broadcasterLogin: string | null;
@@ -143,7 +151,25 @@ export default async function ChatterPage({ params }: { params: Promise<{ login:
           </section>
 
           <section className="panel">
-            <div className="panel-header"><div className="panel-heading"><h2>Presence and membership</h2><p>Chat membership and authorized presence observations</p></div><StatusPill>{profile.presenceObservations.length + profile.membershipEvents.length} signals</StatusPill></div>
+            <div className="panel-header"><div className="panel-heading"><h2>Chat presence by channel</h2><p>Each JOIN or PART counts as one appearance signal. Time is chat presence, not verified viewing.</p></div></div>
+            <p className="data-note">Duration totals include processed streams older than seven days. Estimated hours use missing-event boundaries; historical records without connection coverage are also estimates. Recent signals are included in appearances.</p>
+            {profile.membershipTotals.length === 0 ? <EmptyState title="No membership totals" description="No retained membership signals are connected to this chatter." /> : (
+              <div className="table-scroll" role="region" aria-label="Chat presence totals by channel" tabIndex={0}>
+                <table className="table">
+                  <thead><tr><th scope="col">Channel</th><th scope="col">Appearances</th><th scope="col">Matched hours</th><th scope="col">Estimated hours</th></tr></thead>
+                  <tbody>{profile.membershipTotals.map(row => <tr key={row.broadcasterUserId}>
+                    <td>{row.broadcasterLogin == null ? "Unknown channel" : <Link href={`/channels/${row.broadcasterLogin}`}>{row.broadcasterDisplayName ?? row.broadcasterLogin}</Link>}</td>
+                    <td className="number-cell">{formatCount(row.appearances)}</td>
+                    <td className="number-cell">{row.matchedHours.toFixed(2)}</td>
+                    <td className="number-cell">{row.estimatedHours.toFixed(2)}</td>
+                  </tr>)}</tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
+          <section className="panel">
+            <div className="panel-header"><div className="panel-heading"><h2>Recent presence and membership</h2><p>Detailed membership signals are kept for seven days after a stream ends. Older signals become daily summaries.</p></div><StatusPill>{profile.presenceObservations.length + profile.membershipEvents.length} signals</StatusPill></div>
             {profile.presenceObservations.length === 0 && profile.membershipEvents.length === 0 ? (
               <EmptyState title="No presence evidence" description="No retained membership or presence observations are connected to this chatter." />
             ) : (

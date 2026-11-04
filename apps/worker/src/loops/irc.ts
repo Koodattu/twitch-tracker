@@ -13,12 +13,14 @@ import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { resolveBotCredentialsPool, type ResolvedBotAccountCredentials } from "../bot-auth.js";
 import type { WorkerContext } from "../worker.js";
 import { startIntervalLoop } from "./common.js";
+import { randomUUID } from "node:crypto";
 import { findMembershipIdentity } from "./membership-identity.js";
 
 const staleJoiningTimeoutMs = 2 * 60 * 1000;
 const unavailableAfterConsecutiveDisconnects = 3;
 
 type BotConnection = {
+  id: string;
   adapter: TwitchIrcAdapter;
   connected: boolean;
   login: string;
@@ -70,6 +72,9 @@ export const runIrcLoop = (context: WorkerContext) => {
       reason: "irc_connection_starting",
       observedAt: new Date()
     });
+    // An unclean process exit must not extend coverage through the outage.
+    await context.db.execute(sql`update membership_capture_windows set ended_at=last_seen_at
+      where bot_account_id=${bot.botAccountId}::uuid and ended_at is null`);
 
     const adapter = new SocketIrcAdapter({
       login: bot.login,
@@ -83,6 +88,8 @@ export const runIrcLoop = (context: WorkerContext) => {
           connection.disconnecting ??= (async () => {
             // A pending message can mark a room joined; requeue only after those writes finish.
             await Promise.allSettled(connection.pendingMessages);
+            await context.db.execute(sql`update membership_capture_windows set ended_at=now()
+              where connection_id=${connection.id}::uuid and ended_at is null`);
             if (reason === "socket_closed" || reason === "connect_failed") {
               await recordUnexpectedDisconnect(bot.botAccountId);
             }
@@ -106,7 +113,7 @@ export const runIrcLoop = (context: WorkerContext) => {
             if (message.command === "001") {
               await markConnectionHealthy(bot.botAccountId);
             }
-            await persistRawIrcMessage(context.db, bot.botAccountId, bot.login, message);
+            await persistRawIrcMessage(context.db, bot.botAccountId, bot.login, message, connection.id);
           })();
           connection.pendingMessages.add(pending);
           try {
@@ -138,6 +145,7 @@ export const runIrcLoop = (context: WorkerContext) => {
       }
     });
     const connection: BotConnection = {
+      id: randomUUID(),
       adapter, connected: false, login: bot.login,
       pendingMessages: new Set(), disconnecting: null
     };
@@ -288,18 +296,27 @@ const isAuthenticationFailureNotice = (message: ParsedIrcMessage) =>
   message.command === "NOTICE"
     && (message.trailing ?? "").toLowerCase().includes("authentication failed");
 
-const persistRawIrcMessage = async (db: DbClient, botAccountId: string, botLogin: string, message: ParsedIrcMessage) => {
+const persistRawIrcMessage = async (db: DbClient, botAccountId: string, botLogin: string, message: ParsedIrcMessage, connectionId: string) => {
   const channelLogin = getChannelLogin(message);
 
   if (message.command === "JOIN" || message.command === "PART") {
     if (getUserLogin(message) === botLogin) {
       if (message.command === "JOIN") {
         await markAssignmentJoined(db, botAccountId, channelLogin);
+        const broadcaster = await findUserByLogin(db, channelLogin);
+        if (broadcaster != null) {
+          const stream = await findCurrentStream(db, broadcaster.twitchUserId);
+          await db.execute(sql`select record_membership_capture(${botAccountId}::uuid,${connectionId}::uuid,
+            ${broadcaster.twitchUserId},${stream?.twitchStreamId ?? null},now())`);
+        }
       } else {
         await markAssignmentParted(db, botAccountId, channelLogin);
+        await db.execute(sql`update membership_capture_windows w set ended_at=now()
+          from membership_event_contexts c join twitch_users u on u.twitch_user_id=c.broadcaster_user_id
+          where w.context_id=c.id and w.connection_id=${connectionId}::uuid and u.login=${channelLogin} and w.ended_at is null`);
       }
     } else {
-      await persistMembershipEvent(db, botAccountId, message, null, channelLogin);
+      await persistMembershipEvent(db, botAccountId, message, null, channelLogin, connectionId);
     }
     return;
   }
@@ -420,7 +437,8 @@ export const persistMembershipEvent = async (
   botAccountId: string,
   message: ParsedIrcMessage,
   rawIrcMessageId: string | null,
-  channelLogin: string | null
+  channelLogin: string | null,
+  connectionId?: string
 ) => {
   const broadcaster = await findUserByLogin(db, channelLogin);
   if (broadcaster == null) {
@@ -438,10 +456,14 @@ export const persistMembershipEvent = async (
     `);
     if (restricted.rows.length > 0) return;
     const chatterUserId = await findMembershipIdentity(tx, chatterLogin, eventAt);
-    await tx.execute(sql`select id from insert_membership_event(
+    const capture = connectionId == null ? null : (await tx.execute<{ id: number }>(sql`
+      select record_membership_capture(${botAccountId}::uuid,${connectionId}::uuid,
+        ${broadcaster.twitchUserId},${currentStream?.twitchStreamId ?? null},${eventAt}) as id
+    `)).rows[0]!.id;
+    await tx.execute(sql`select id from insert_captured_membership_event(
       ${broadcaster.twitchUserId}, ${chatterUserId}, ${chatterLogin}, ${currentStream?.twitchStreamId ?? null},
       ${message.command === "JOIN" ? "join" : "part"}::chat_membership_event_type,
-      ${eventAt}::timestamptz, ${chatterUserId == null ? null : eventAt}::timestamptz, decode('','hex'), ${rawIrcMessageId}::uuid
+      ${eventAt}::timestamptz, ${chatterUserId == null ? null : eventAt}::timestamptz, decode('','hex'), ${rawIrcMessageId}::uuid, ${capture}::int
     )`);
   });
 

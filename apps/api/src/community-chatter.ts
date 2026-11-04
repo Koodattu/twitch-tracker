@@ -41,13 +41,19 @@ export async function getCommunityChatterActivity(db: DbClient, login: string, e
             and coalesce(r.unrelayed_source, r.raw_line like '@%' and split_part(r.raw_line, ' ', 1) !~ '(?:^@|;)source-room-id=[^;]+')))
         group by m.broadcaster_user_id
       ), presence_events as (
-        select m.broadcaster_user_id as channel, m.received_at as observed from chat_membership_events m
+        select m.broadcaster_user_id as channel, m.received_at as observed, m.received_at as last_observed from chat_membership_events m
         join stream_sessions s on s.twitch_stream_id = m.twitch_stream_id and s.broadcaster_user_id = m.broadcaster_user_id
         where m.chatter_user_id = ${user.id} and m.received_at >= ${snapshot.windowStart} and m.received_at < ${snapshot.windowEnd}
           and s.is_finnish_eligible and m.received_at >= s.started_at and (s.ended_at is null or m.received_at <= s.ended_at)
           and m.source = encode_common_label('irc_membership', 'irc_membership')
         union all
-        select p.broadcaster_user_id, p.observed_at from chat_presence_observations p
+        select c.broadcaster_user_id,d.community_first_at,d.community_last_at
+        from membership_daily_summaries d join membership_event_contexts c on c.id=d.context_id
+        join stream_sessions s on s.twitch_stream_id=c.twitch_stream_id and s.broadcaster_user_id=c.broadcaster_user_id
+        where d.chatter_user_id=${user.id} and d.community_first_at>=${snapshot.windowStart}
+          and d.community_last_at<${snapshot.windowEnd} and d.community_event_count>0 and s.is_finnish_eligible
+        union all
+        select p.broadcaster_user_id, p.observed_at, p.observed_at from chat_presence_observations p
         join chat_presence_snapshots snap on snap.id = p.snapshot_id
           and snap.broadcaster_user_id = p.broadcaster_user_id and snap.twitch_stream_id = p.twitch_stream_id
         join stream_sessions s on s.twitch_stream_id = p.twitch_stream_id and s.broadcaster_user_id = p.broadcaster_user_id
@@ -60,11 +66,11 @@ export async function getCommunityChatterActivity(db: DbClient, login: string, e
             and (p.public_profile_hidden or p.tracking_opted_out or p.data_deleted_at is not null)
         )
       ), presence as (
-        select channel, count(distinct (observed at time zone 'UTC')::date)::int as days, max(observed) as last
+        select channel, count(distinct (observed at time zone 'UTC')::date)::int as days, max(last_observed) as last
         from permitted_presence where channel = any(${channelIds})
           and (select count(distinct channel) from permitted_presence) <= 50
         group by channel having count(distinct (observed at time zone 'UTC')::date) >= 2
-          and max(observed) - min(observed) >= interval '6 hours'
+          and max(last_observed) - min(observed) >= interval '6 hours'
       )
       select coalesce(m.channel, p.channel) as "channelId", coalesce(m.messages, 0) as messages,
         coalesce(m.days, 0) as "messageDays", coalesce(p.days, 0) as "presenceDays",

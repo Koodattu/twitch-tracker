@@ -79,6 +79,7 @@ const start = async () => {
   const returning = vi.fn(async () => [{ id: "raw-message" }]);
   const saveMessage = vi.fn(async () => undefined);
   const db = {
+    execute: vi.fn(async () => ({ rows: [] })),
     insert: () => ({ values: () => ({ returning, onConflictDoNothing: saveMessage }) }),
     select: () => ({
       from: (table: unknown) => {
