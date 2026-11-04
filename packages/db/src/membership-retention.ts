@@ -27,7 +27,7 @@ export async function expireMembershipWire(db: DbClient) {
     await tx.execute(sql`set local lock_timeout = '2s'`);
     await tx.execute(sql`set local statement_timeout = '60s'`);
     return (await tx.execute<{ count: number }>(sql`
-      select expire_membership_wire_batch(date_trunc('day',now(),'UTC')-interval '7 days',5000) as count
+      select expire_membership_wire_batch(date_trunc('day',now(),'UTC')-interval '7 days',500) as count
     `)).rows[0]!.count;
   });
 }

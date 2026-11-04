@@ -239,6 +239,13 @@
       "when": 1793779204000,
       "tag": "0033_expire_membership_wire_records",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1793779205000,
+      "tag": "0034_membership_wire_reference_order",
+      "breakpoints": true
     }
   ]
 }

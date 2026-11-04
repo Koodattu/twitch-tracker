@@ -49,7 +49,7 @@ cleanup commit together. Failed transactions can be retried. Late events after
 a context was summarized add counts but no additional duration, avoiding overlap
 with already finalized time. Deduplication of raw events is bounded by retention.
 
-After summarization, maintenance removes up to 5,000 expired JOIN/PART wire
+After summarization, maintenance removes up to 500 expired JOIN/PART wire
 records per pass. A wire record remains while any detailed membership, chat
 message, channel event, or room-state event references it. Deletion clears its
 compressed archive slot and privacy lookup in the same transaction, preserving
@@ -76,7 +76,7 @@ are intentionally no longer retained in this ledger after summarization.
 2. Run integration tests on synthetic data, including missing/repeated events,
    overlap, midnight, retries, retention, community parity and privacy erasure.
    Build matching DB/API/worker/web images and pass release checks.
-3. Apply migrations 0029–0033 with the worker stopped. They add storage, indexes
+3. Apply migrations 0029–0034 with the worker stopped. They add storage, indexes
    and batch functions; they do not delete history during application migration.
 4. Record the original event count and current membership relation sizes. Run
    `node dist/rollup-membership.js --database twitch_tracker --apply` in the new
