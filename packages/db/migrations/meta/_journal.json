@@ -211,6 +211,13 @@
       "when": 1793779200000,
       "tag": "0029_membership_daily_retention",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1793779201000,
+      "tag": "0030_membership_rollup_planning",
+      "breakpoints": true
     }
   ]
 }
