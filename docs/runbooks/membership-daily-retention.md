@@ -37,7 +37,8 @@ one atomic transaction per context. A context becomes eligible when its stream
 has ended and both stream end and its latest event precede UTC midnight minus
 seven days. Active streams remain detailed until they finish. This intentional
 exception avoids splitting sessions at the retention boundary. Offline contexts
-are eligible based on their latest event alone.
+process their expired events even if fresh offline observations keep arriving;
+those observations have appearance counts but no stream duration.
 
 Queue locks exclude simultaneous processors. Summary writes, preservation of
 legacy raw-evidence erasure links, source deletion and unreferenced identity

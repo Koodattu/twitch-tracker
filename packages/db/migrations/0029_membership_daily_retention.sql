@@ -20,17 +20,20 @@ CREATE INDEX membership_events_context_received_idx ON membership_events(context
 --> statement-breakpoint
 CREATE TABLE membership_rollup_queue (
  context_id integer PRIMARY KEY REFERENCES membership_event_contexts(id),
+ first_event_at timestamptz NOT NULL,
  last_event_at timestamptz NOT NULL
 );
 --> statement-breakpoint
-CREATE INDEX membership_rollup_due_idx ON membership_rollup_queue(last_event_at,context_id);
+CREATE INDEX membership_rollup_due_idx ON membership_rollup_queue(first_event_at,context_id);
 --> statement-breakpoint
-INSERT INTO membership_rollup_queue SELECT context_id,max(received_at) FROM membership_events GROUP BY context_id;
+INSERT INTO membership_rollup_queue SELECT context_id,min(received_at),max(received_at) FROM membership_events GROUP BY context_id;
 --> statement-breakpoint
 CREATE FUNCTION queue_membership_rollup() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
- INSERT INTO membership_rollup_queue VALUES(NEW.context_id,NEW.received_at)
- ON CONFLICT(context_id) DO UPDATE SET last_event_at=greatest(membership_rollup_queue.last_event_at,excluded.last_event_at);
+ INSERT INTO membership_rollup_queue VALUES(NEW.context_id,NEW.received_at,NEW.received_at)
+ ON CONFLICT(context_id) DO UPDATE SET
+ first_event_at=least(membership_rollup_queue.first_event_at,excluded.first_event_at),
+ last_event_at=greatest(membership_rollup_queue.last_event_at,excluded.last_event_at);
  RETURN NEW;
 END $$;
 --> statement-breakpoint
@@ -112,8 +115,8 @@ BEGIN
  SELECT q.context_id INTO target FROM membership_rollup_queue q
  JOIN membership_event_contexts c ON c.id=q.context_id
  LEFT JOIN stream_sessions s ON s.twitch_stream_id=c.twitch_stream_id
- WHERE q.last_event_at<cutoff AND (c.twitch_stream_id IS NULL OR s.ended_at<cutoff)
- ORDER BY q.last_event_at,q.context_id LIMIT 1 FOR UPDATE OF q SKIP LOCKED;
+ WHERE q.first_event_at<cutoff AND (c.twitch_stream_id IS NULL OR (s.ended_at<cutoff AND q.last_event_at<cutoff))
+ ORDER BY q.first_event_at,q.context_id LIMIT 1 FOR UPDATE OF q SKIP LOCKED;
  IF target IS NULL THEN RETURN jsonb_build_object('context',NULL,'events',0,'summaries',0); END IF;
 
  CREATE TEMP TABLE membership_rollup_input ON COMMIT DROP AS
@@ -209,6 +212,6 @@ BEGIN
  DELETE FROM membership_capture_windows w WHERE w.context_id=target
    AND NOT EXISTS(SELECT 1 FROM membership_events e WHERE e.capture_window_id=w.id);
  DELETE FROM membership_rollup_queue WHERE context_id=target;
- INSERT INTO membership_rollup_queue SELECT target,max(received_at) FROM membership_events WHERE context_id=target HAVING count(*)>0;
+ INSERT INTO membership_rollup_queue SELECT target,min(received_at),max(received_at) FROM membership_events WHERE context_id=target HAVING count(*)>0;
  RETURN jsonb_build_object('context',target,'events',removed,'summaries',summary_count);
 END $$;

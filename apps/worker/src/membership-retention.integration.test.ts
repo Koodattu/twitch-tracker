@@ -86,6 +86,14 @@ describe.skipIf(database == null)("Daily membership retention", () => {
     expect(await rollupExpiredMembership(db)).toMatchObject({ contexts: 0 });
   });
 
+  it("expires offline history even when the same channel has fresh offline events", async () => {
+    await pool.query(`insert into chat_membership_events(broadcaster_user_id,chatter_user_id,chatter_login,event_type,received_at)
+      values('channel','person','person','join','2020-01-01'),('channel','person','person','part',now());`);
+    expect(await rollupExpiredMembership(db)).toMatchObject({contexts:1,events:1});
+    expect(await totals()).toMatchObject({appearances:1,matched:0,estimated:0});
+    expect((await pool.query("select count(*)::int n from membership_events")).rows[0].n).toBe(1);
+  });
+
   it("opens a new coverage window when the same socket rejoins a room", async () => {
     const query = `select record_membership_capture('00000000-0000-0000-0000-000000000001',
       '00000000-0000-0000-0000-000000000002','channel','stream',$1) as id`;
