@@ -218,6 +218,13 @@
       "when": 1793779201000,
       "tag": "0030_membership_rollup_planning",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1793779202000,
+      "tag": "0031_reuse_membership_rollup_workspace",
+      "breakpoints": true
     }
   ]
 }

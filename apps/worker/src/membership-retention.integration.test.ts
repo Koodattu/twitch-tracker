@@ -132,6 +132,20 @@ describe.skipIf(database == null)("Daily membership retention", () => {
     expect(await totals()).toMatchObject({appearances:4,estimated:7_200_000});
   });
 
+  it("reuses an empty connection-local workspace across committed batches", async () => {
+    await add("join","2020-01-01 23:00Z");
+    const client = await pool.connect();
+    try {
+      await client.query("select rollup_expired_membership()");
+      const first = (await client.query("select 'pg_temp.membership_rollup_input'::regclass::oid as id")).rows[0].id;
+      await add("part","2020-01-02 01:00Z");
+      await client.query("select rollup_expired_membership()");
+      expect((await client.query("select 'pg_temp.membership_rollup_input'::regclass::oid as id")).rows[0].id).toBe(first);
+      expect((await client.query("select count(*)::int n from membership_rollup_input")).rows[0].n).toBe(0);
+    } finally { client.release(); }
+    expect(await totals()).toMatchObject({appearances:2});
+  });
+
   it("rolls back totals and deletion together and preserves legacy privacy links", async () => {
     const raw = (await pool.query("insert into raw_irc_records(raw_line,received_at) values(':person JOIN #channel','2020-01-01 23:00Z') returning id")).rows[0].id;
     await pool.query(`select insert_membership_event('channel','person','person','stream','join','2020-01-01 23:00Z',null,sha256(uuid_send(gen_random_uuid())),$1)`,[raw]);
