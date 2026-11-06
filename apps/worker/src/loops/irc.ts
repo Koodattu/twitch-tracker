@@ -423,6 +423,7 @@ const persistChatMessage = async (
       emotes: { raw: message.tags.emotes ?? "" },
       replyParentMessageId: message.tags["reply-parent-msg-id"] ?? null,
       sharedChatSourceChannelId: message.tags["source-room-id"] || null,
+      unrelayedSource: message.rawLine.startsWith("@") && !/(?:^@|;)source-room-id=[^;]+/.test(message.rawLine.split(" ", 1)[0]!),
       rawIrcMessageId
     })
     .onConflictDoNothing();

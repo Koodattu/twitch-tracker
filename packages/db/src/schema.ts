@@ -315,6 +315,7 @@ export const chatMessages = pgTable("chat_messages", {
   emotes: compactJson<Record<string, unknown>>()("emotes").default(sql`decode('00', 'hex')`).notNull(),
   replyParentMessageId: compactMessageId("reply_parent_message_id"),
   sharedChatSourceChannelId: compactExternalKey("shared_chat_source_channel_id"),
+  unrelayedSource: boolean("unrelayed_source"),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
   clearedAt: timestamp("cleared_at", { withTimezone: true }),
   rawIrcMessageId: uuid("raw_irc_message_id").references(() => rawIrcMessages.id),

@@ -1,5 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { claimCommunityBuild, communityWindow, createDb, failCommunityBuild, invalidateCommunityMaps,
+import { claimCommunityBuild, communityWindow, createDb, expireChatWire, failCommunityBuild, invalidateCommunityMaps,
   publishCommunityMap, renewCommunityLease, requestCommunityBuild } from "@twitch-tracker/db";
 import { loadConfig } from "@twitch-tracker/config";
 import { DisabledHelixAdapter } from "@twitch-tracker/twitch";
@@ -80,12 +80,13 @@ describe.skipIf(database == null)("Community builds with PostgreSQL", () => {
     await pool.query("insert into bot_accounts (twitch_user_id, login) values ('bot','bot'); insert into subject_privacy_states (twitch_user_id, public_profile_hidden) values ('hidden',true),('800',true)");
     await pool.query(`insert into chat_messages (twitch_message_id, broadcaster_user_id, twitch_stream_id, chatter_user_id, received_at, shared_chat_source_channel_id)
       select encode_chat_message_id(gen_random_uuid()::text), encode_external_key(channel), encode_external_key(case when channel = '500' then null else channel end), encode_external_key(person),
-        date_trunc('day', now()) - interval '1 day', encode_external_key(case when channel = '300' then '100' when channel = '600' then null else channel end)
+        date_trunc('day', now()) - interval '40 days', encode_external_key(case when channel = '300' then '100' when channel = '600' then null else channel end)
       from unnest(array['100','200','300','400','500','600','700','800','900']) as channel
       cross join unnest(array['bot','hidden','chatter-1','chatter-2','chatter-3','chatter-4','chatter-5','chatter-6','chatter-7','chatter-8','chatter-9','chatter-10']) as person
       cross join generate_series(1,3) as message where channel <> '700' or message < 3`);
-    await pool.query(`insert into raw_irc_messages (id, raw_line) values ('00000000-0000-0000-0000-000000000001','@id=ordinary;room-id=900 :chatter PRIVMSG #channel :Hello');
-      update chat_messages set shared_chat_source_channel_id = null, raw_irc_message_id = '00000000-0000-0000-0000-000000000001' where broadcaster_user_id = encode_external_key('900')`);
+    await pool.query(`insert into raw_irc_messages (id, raw_line,received_at,parsed_command,processing_status)
+      values ('00000000-0000-0000-0000-000000000001','@id=ordinary;room-id=900 :chatter PRIVMSG #channel :Hello',now()-interval '40 days','','processed');
+      update chat_messages set shared_chat_source_channel_id = null, raw_text='Hello',raw_irc_message_id = '00000000-0000-0000-0000-000000000001' where broadcaster_user_id = encode_external_key('900')`);
     await requestCommunityBuild(db);
     const claim = (await claimCommunityBuild(db))!;
     const input = await readCommunityInput(db, claim);
@@ -94,6 +95,8 @@ describe.skipIf(database == null)("Community builds with PostgreSQL", () => {
     expect(input.memberships.every((row) => row.chatterId.startsWith("chatter-"))).toBe(true);
     expect(input.coverage).toMatchObject({ missingSession: 36, unknownSource: 30, relayedMessages: 30 });
     await pool.query("select compact_raw_irc_batch(now())");
+    expect(await readCommunityInput(db, claim)).toEqual(input);
+    expect(await expireChatWire(db)).toBe(1);
     expect(await readCommunityInput(db, claim)).toEqual(input);
     await pool.query("delete from job_locks");
     const result = await runCommunityBuild({ config: loadConfig({ DATABASE_URL: url, SESSION_SECRET: "s".repeat(48) }), db,

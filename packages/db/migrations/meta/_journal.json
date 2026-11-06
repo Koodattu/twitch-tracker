@@ -246,6 +246,13 @@
       "when": 1793779205000,
       "tag": "0034_membership_wire_reference_order",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1793980800000,
+      "tag": "0035_chat_wire_retention",
+      "breakpoints": true
     }
   ]
 }

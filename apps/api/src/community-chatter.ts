@@ -38,7 +38,7 @@ export async function getCommunityChatterActivity(db: DbClient, login: string, e
           and not exists (select 1 from subject_privacy_states p where encode_external_key(p.twitch_user_id) = m.broadcaster_user_id
             and (p.public_profile_hidden or p.tracking_opted_out or p.data_deleted_at is not null))
           and (m.shared_chat_source_channel_id = m.broadcaster_user_id or (m.shared_chat_source_channel_id is null
-            and coalesce(r.unrelayed_source, r.raw_line like '@%' and split_part(r.raw_line, ' ', 1) !~ '(?:^@|;)source-room-id=[^;]+')))
+            and coalesce(m.unrelayed_source, r.unrelayed_source, r.raw_line like '@%' and split_part(r.raw_line, ' ', 1) !~ '(?:^@|;)source-room-id=[^;]+')))
         group by m.broadcaster_user_id
       ), presence_events as (
         select m.broadcaster_user_id as channel, m.received_at as observed, m.received_at as last_observed from chat_membership_events m

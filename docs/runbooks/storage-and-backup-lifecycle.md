@@ -123,6 +123,10 @@ index, TOAST, row-count, WAL, and temporary-I/O deltas over time.
 
 ## Data lifecycle
 
+Normalized chat-message wire copies follow the
+[thirty-day chat wire policy](chat-wire-retention.md), authorized on 2026-11-06.
+Structured chat history and other IRC command retention remain unchanged.
+
 Membership JOIN/PART events and their duplicate wire records are now the exception to the historical policy below:
 see [daily summaries and seven-day detail retention](membership-daily-retention.md),
 authorized on 2026-11-04. Preserve daily appearance counts and separately labelled

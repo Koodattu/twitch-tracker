@@ -5,7 +5,9 @@ Status: accepted
 Amended on 2026-11-04: membership JOIN/PART history and duplicate JOIN/PART wire
 records now follow the explicitly
 authorized [daily summary and seven-day detail policy](../runbooks/membership-daily-retention.md).
-The other preservation rules below remain in force.
+Amended on 2026-11-06: normalized chat-message wire copies now follow the
+explicitly authorized [thirty-day chat wire policy](../runbooks/chat-wire-retention.md).
+Structured messages remain indefinitely. The other preservation rules below remain in force.
 
 The tracker keeps historical product facts indefinitely unless an explicit
 privacy request requires deletion. This includes chat messages, membership

@@ -78,9 +78,10 @@ const start = async () => {
   fixture.completion = stop.promise;
   const returning = vi.fn(async () => [{ id: "raw-message" }]);
   const saveMessage = vi.fn(async () => undefined);
+  const values = vi.fn(() => ({ returning, onConflictDoNothing: saveMessage }));
   const db = {
     execute: vi.fn(async () => ({ rows: [] })),
-    insert: () => ({ values: () => ({ returning, onConflictDoNothing: saveMessage }) }),
+    insert: () => ({ values }),
     select: () => ({
       from: (table: unknown) => {
         const rows = table === twitchUsers ? [{ twitchUserId: "channel-id" }]
@@ -98,10 +99,22 @@ const start = async () => {
     abortSignal: new AbortController().signal
   });
   expect((await fixture.run!()).failedBotAccounts).toBe(0);
-  return { stop: stop.resolve, completion, returning, saveMessage, events: fixture.events[0]! };
+  return { stop: stop.resolve, completion, returning, saveMessage, values, events: fixture.events[0]! };
 };
 
 describe("IRC connection lifecycle", () => {
+  it.each([
+    ["@id=ordinary :person PRIVMSG #channel :Hello",true],
+    ["@id=relay;source-room-id=other :person PRIVMSG #channel :Hello",false],
+    [":person PRIVMSG #channel :Hello",false],
+    ["@id=duplicate;source-room-id=other;source-room-id= :person PRIVMSG #channel :Hello",false]
+  ] as const)("stores source evidence for %s", async (line, expected) => {
+    const worker = await start();
+    await worker.events.rawMessage(parseIrcLine(line));
+    expect(worker.values).toHaveBeenCalledWith(expect.objectContaining({ rawText:"Hello",unrelayedSource:expected }));
+    worker.stop();
+    await worker.completion;
+  });
   it("rejoins rooms left marked joined by a previous worker", async () => {
     const worker = await start();
     expect(fixture.join).toHaveBeenCalledWith("channel");

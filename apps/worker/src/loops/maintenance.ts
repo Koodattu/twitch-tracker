@@ -1,4 +1,4 @@
-import { createChatAssignmentControl, expireMembershipWire, rollupExpiredMembership } from "@twitch-tracker/db";
+import { createChatAssignmentControl, expireChatWire, expireMembershipWire, rollupExpiredMembership } from "@twitch-tracker/db";
 import { sql } from "drizzle-orm";
 import type { WorkerContext } from "../worker.js";
 import { startIntervalLoop } from "./common.js";
@@ -13,6 +13,12 @@ export const runMaintenanceLoop = (context: WorkerContext) => {
     run: async () => {
       const membershipRollup = await rollupExpiredMembership(context.db);
       const expiredMembershipWireRecords = await expireMembershipWire(context.db);
+      let expiredChatWireRecords = 0;
+      for (let batch = 0; batch < 5; batch++) {
+        const expired = await expireChatWire(context.db);
+        expiredChatWireRecords += expired;
+        if (expired < 1000) break;
+      }
       const rawPayloadRetentionDays = context.config.RAW_PAYLOAD_RETENTION_DAYS;
       const staleAssignmentGraceMinutes = context.config.STALE_ASSIGNMENT_GRACE_MINUTES;
 
@@ -54,6 +60,7 @@ export const runMaintenanceLoop = (context: WorkerContext) => {
       return {
         membershipRollup,
         expiredMembershipWireRecords,
+        expiredChatWireRecords,
         rawPayloadRetentionDays,
         compactedRawIrcMessages,
         staleAssignmentGraceMinutes,
