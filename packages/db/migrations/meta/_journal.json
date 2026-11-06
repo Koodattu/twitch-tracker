@@ -253,6 +253,13 @@
       "when": 1793980800000,
       "tag": "0035_chat_wire_retention",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1793980801000,
+      "tag": "0036_payload_delete_lock_order",
+      "breakpoints": true
     }
   ]
 }

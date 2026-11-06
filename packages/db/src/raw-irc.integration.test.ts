@@ -77,6 +77,52 @@ describe.skipIf(database == null)("Lossless raw IRC blocks with PostgreSQL", () 
     expect((await pool.query("select lines[$2::int] as line from raw_irc_payload_blocks where id=$1", [target.payload_block_id, target.payload_position])).rows[0].line).toBeNull();
   });
 
+  it("does not hold later archive blocks while waiting for an earlier block", async () => {
+    // Physical order opposes ID order, so a hash-join update must not choose lock order.
+    await pool.query(`insert into raw_irc_payload_blocks(id,lines) overriding system value
+      values (20,array['b-delete','b-independent']), (10,array['a-delete','a-keep'])`);
+    const records = (await pool.query<{ id: string; payload_block_id: string; payload_position: number }>(`
+      insert into raw_irc_records(raw_line,received_at,payload_block_id,payload_position)
+      values ('',now(),20,1),('',now(),20,2),('',now(),10,1),('',now(),10,2)
+      returning id,payload_block_id,payload_position`)).rows;
+    const batchIds = records.filter(row => row.payload_position === 1).map(row => row.id);
+    const independentId = records.find(row => row.payload_block_id === "20" && row.payload_position === 2)!.id;
+    const gate = await pool.connect();
+    const batch = await pool.connect();
+    const independent = await pool.connect();
+    let pendingBatch: Promise<unknown> | undefined;
+    try {
+      await gate.query("begin");
+      const gatePid = (await gate.query("select pg_backend_pid() as pid")).rows[0].pid as number;
+      await gate.query("select id from raw_irc_payload_blocks where id=10 for update");
+      await batch.query("begin");
+      await batch.query("set local enable_nestloop=off; set local enable_mergejoin=off; set local statement_timeout='10s'");
+      const batchPid = (await batch.query("select pg_backend_pid() as pid")).rows[0].pid as number;
+      pendingBatch = batch.query("delete from raw_irc_records where id=any($1::uuid[])", [batchIds])
+        .then(() => null, (error: unknown) => error);
+      await expect.poll(async () => (await pool.query("select $1=any(pg_blocking_pids($2)) as waiting", [gatePid,batchPid])).rows[0].waiting,
+        { timeout: 5000, interval: 20 }).toBe(true);
+
+      await independent.query("begin");
+      await independent.query("set local statement_timeout='1s'");
+      await expect(independent.query("delete from raw_irc_records where id=$1", [independentId]))
+        .resolves.toMatchObject({ rowCount: 1 });
+      await independent.query("commit");
+      await gate.query("rollback");
+      expect(await pendingBatch).toBeNull();
+      await batch.query("commit");
+      expect((await pool.query("select id,lines from raw_irc_payload_blocks order by id")).rows).toEqual([
+        { id: "10", lines: [null,"a-keep"] }, { id: "20", lines: [null,null] }
+      ]);
+    } finally {
+      await gate.query("rollback");
+      if (pendingBatch != null) await pendingBatch;
+      await batch.query("rollback");
+      await independent.query("rollback");
+      gate.release(); batch.release(); independent.release();
+    }
+  });
+
   it("fails closed on an invalid locator and rejects invalid batch sizes", async () => {
     await seed();
     await expect(pool.query("select compact_raw_irc_batch(now(), 0)")).rejects.toThrow("batch size");

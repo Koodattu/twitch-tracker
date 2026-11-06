@@ -21,6 +21,10 @@ and clearing compressed archive slots are one retryable transaction. Other slots
 in mixed archive blocks are preserved. The existing privacy coordination lock
 prevents races with subject erasure.
 
+Migration 0036 locks affected archive blocks in ascending ID order before updating
+their slots. This prevents overlapping expiry batches from choosing conflicting
+lock orders through different update plans.
+
 Maintenance expires at most 5,000 copies every five minutes in 1,000-row batches.
 For the initial backlog, run the migration image command:
 
@@ -41,6 +45,9 @@ Also fingerprint retained non-chat wire payloads. Compare
 counts and both canonical fingerprints after processing the fenced data.
 
 Use bounded transactions and monitor table growth, WAL and temporary-file space.
+During the initial backfill, BRIN autosummarization repeatedly interrupted chat
+autovacuum. Pausing the backfill and completing a normal online vacuum cleared
+the accumulated dead row references while application ingestion stayed online.
 Reclaim the chat records, raw records, and payload-block tables only after
 preservation checks pass, with application writers paused and enough space for
 each rewrite. Restore services and verify ingestion, community behavior, and a
