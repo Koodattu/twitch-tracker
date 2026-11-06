@@ -104,3 +104,10 @@ The first release recovery archive is on the VM root disk at
 Catalog/checksum validation is not a full restore drill. Retain it through release
 verification. A code rollback cannot reconstruct discarded membership sequences;
 full data rollback requires restoring this archive and loses subsequent writes.
+
+On 2026-11-06, consistent-snapshot verification matched all 14,572,627 retained
+non-membership IRC records and both canonical fingerprints. The table rewrites
+then reduced the database from 20.63 GiB to 15.73 GiB. Scheduled production backups
+now use `/srv/backups/twitch-tracker` on the VM root disk, keeping their working
+space separate from PostgreSQL's attached data volume. The pre-migration recovery
+archive above remains separate from normal backup rotation.
