@@ -83,6 +83,15 @@ are intentionally no longer retained in this ledger after summarization.
    migration image. The operation is resumable. Monitor volume and WAL headroom.
    Require remaining raw count plus summed appearance counts to equal baseline
    (with API privacy writes paused during this comparison).
+   Verify retained non-membership IRC payloads before reclaiming storage. When
+   splitting that verification into multiple queries, use one `REPEATABLE READ,
+   READ ONLY` transaction so concurrent archive compaction cannot move records
+   between query snapshots. Archive-block buckets are only processing partitions:
+   compare the total record count and both summed canonical payload fingerprints
+   across all buckets, because block locations legitimately change. Require every
+   bucket exactly once. Canonical values must include record ID, command, received
+   time, and decoded payload, excluding storage locations. Keep the original
+   baseline and failed verification output for diagnosis; never bypass a mismatch.
 5. Reclaim the event and identity tables with a separately scheduled rewrite
    while writers remain stopped, only after rechecking space. Deletion alone
    leaves reusable pages rather than guaranteeing filesystem savings. Compare
