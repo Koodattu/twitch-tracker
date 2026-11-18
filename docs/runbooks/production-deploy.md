@@ -11,7 +11,7 @@ This runbook deploys the public, fail-closed Compose stack. It does not approve 
 - An off-host mount, or a separately replicated mount, for database backups.
 - A maintenance window if the existing PostgreSQL volume has not recently been backed up and restored.
 
-The checked-in database image is PostgreSQL 16.14. Do not point PostgreSQL 18 at the existing `twitch-tracker_postgres_data` volume. A 16-to-18 upgrade needs a new volume and a tested dump/restore or `pg_upgrade` procedure.
+The checked-in database image is PostgreSQL 16.16. Do not point PostgreSQL 18 at the existing `twitch-tracker_postgres_data` volume. A 16-to-18 upgrade needs a new volume and a tested dump/restore or `pg_upgrade` procedure.
 
 ## 2. Production configuration and secrets
 

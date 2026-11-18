@@ -7,7 +7,7 @@ export default defineConfig(
   ...nextTypeScript,
   {
     settings: {
-      react: { version: "19.2" }
+      react: { version: "19.3" }
     },
     rules: {
       "@next/next/no-html-link-for-pages": "off"

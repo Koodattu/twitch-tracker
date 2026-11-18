@@ -1035,14 +1035,14 @@ End-to-end checks:
 
 Manual private-MVP checks:
 
-- `corepack pnpm smoke:twitch -- --require-live` passes with real Twitch
+- `pnpm smoke:twitch -- --require-live` passes with real Twitch
   credentials before claiming Twitch ingestion has been verified
 - one bot account can connect to IRC
 - assigned channels are joined within rate limits
 - JOIN/PART and messages are stored
 - ended streams free assignments
 - reconnect preserves or reconciles assignments safely
-- `corepack pnpm smoke:twitch -- --require-live --eventsub-callback` passes
+- `pnpm smoke:twitch -- --require-live --eventsub-callback` passes
   before claiming production EventSub callback readiness
 
 ## 21. Implementation Phases

@@ -4,11 +4,10 @@ A production-oriented Twitch analytics stack for Finnish-language streams. It in
 
 ## Development
 
-Use Node 24.22.2 and the pinned pnpm version:
+Use Node 26.13.1 and the pinned pnpm version:
 
 ```powershell
-corepack enable
-corepack prepare pnpm@11.21.0 --activate
+npm install --global pnpm@12.21.0
 pnpm install --frozen-lockfile
 ```
 

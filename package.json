@@ -2,23 +2,23 @@
   "name": "twitch-tracker",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@11.21.0",
+  "packageManager": "pnpm@12.21.0",
   "engines": {
-    "node": ">=24.22.2 <25"
+    "node": ">=26.13.1 <27"
   },
   "scripts": {
-    "build": "corepack pnpm -r build",
+    "build": "pnpm -r build",
     "check:structure": "node scripts/check-structure.mjs",
-    "dev": "corepack pnpm -r --parallel dev",
+    "dev": "pnpm -r --parallel dev",
     "lint": "eslint . --max-warnings=0",
-    "smoke:twitch": "corepack pnpm --filter @twitch-tracker/worker smoke:twitch",
+    "smoke:twitch": "pnpm --filter @twitch-tracker/worker smoke:twitch",
     "test": "vitest run",
-    "typecheck": "corepack pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {
     "eslint": "9.39.5",
-    "eslint-config-next": "16.3.8",
+    "eslint-config-next": "16.4.6",
     "typescript": "6.0.3",
-    "vitest": "4.1.12"
+    "vitest": "5.1.1"
   }
 }

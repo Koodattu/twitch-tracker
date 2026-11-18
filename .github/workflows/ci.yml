@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 20
     services:
       postgres:
-        image: postgres:16.14-alpine3.24@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+        image: postgres:16.16-alpine3.24@sha256:81e77a4833487b8132fe4b00bedd39dc3f74b8641e387f19312a48f7de218c2e
         env:
           POSTGRES_USER: twitch_tracker
           POSTGRES_PASSWORD: twitch_tracker_test
@@ -37,14 +37,12 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
 
-      - name: Enable pinned pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@11.21.0 --activate
+      - name: Install pinned pnpm
+        run: npm install --global pnpm@12.21.0
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -80,5 +78,5 @@ jobs:
           -e PUBLIC_DOMAIN=tracker.example.com
           -e CADDY_EMAIL=operations@example.com
           -v "$PWD/infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro"
-          caddy:2.11.4-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+          caddy:2.11.9-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
           caddy validate --config /etc/caddy/Caddyfile

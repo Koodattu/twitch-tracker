@@ -78,25 +78,14 @@ Review application changes with `git diff 85dd30b14d4bb7accdb6c86bd7bfb28a3b8013
 
 ## Runtime
 
-Use the repository's Node 24.19 and pnpm 11.21.0 with installed locked dependencies. Commands below run in PowerShell from the repository root unless specified otherwise. On the machine used for this run, select the bundled compatible runtime in each terminal:
-
-```powershell
-$env:PATH = "$env:USERPROFILE\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin;" + $env:PATH
-node --version
-```
-
-The machine's default Node 24.4.1 is unsupported. Its Corepack executable can still select that older runtime despite PATH ordering. In the commands below, substitute this invocation for `pnpm` on that machine:
-
-```powershell
-node 'C:\Program Files\nodejs\node_modules\corepack\dist\pnpm.js' --version
-```
+Use the Node version in `.node-version` and install the pinned pnpm version as described in the [development setup](../../README.md#development). Run the following PowerShell commands from the repository root.
 
 ## Disposable PostgreSQL
 
 Create a new task-owned container. An existing container with the same name must be inspected before reuse or removal. This command uses a tmpfs database with no persistent volume:
 
 ```powershell
-docker run --detach --name twitch-tracker-goal-test --label purpose=twitch-tracker-goal-improvement --cpus 2 --memory 1g --publish 127.0.0.1:55432:5432 --tmpfs /var/lib/postgresql/data:rw,size=768m --env POSTGRES_USER=goal_test --env POSTGRES_PASSWORD=goal_test_local_only --env POSTGRES_DB=twitch_tracker_goal_test postgres:16.14-alpine3.24@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+docker run --detach --name twitch-tracker-goal-test --label purpose=twitch-tracker-goal-improvement --cpus 2 --memory 1g --publish 127.0.0.1:55432:5432 --tmpfs /var/lib/postgresql/data:rw,size=768m --env POSTGRES_USER=goal_test --env POSTGRES_PASSWORD=goal_test_local_only --env POSTGRES_DB=twitch_tracker_goal_test postgres:16.16-alpine3.24@sha256:81e77a4833487b8132fe4b00bedd39dc3f74b8641e387f19312a48f7de218c2e
 docker exec twitch-tracker-goal-test pg_isready -U goal_test -d twitch_tracker_goal_test
 ```
 
@@ -135,7 +124,7 @@ Open <http://127.0.0.1:3300>. Search for `LumiStudio`, open `AuroraPelaa`, inspe
 
 ## Verification
 
-In a root terminal with Node 24.19 selected:
+In a terminal at the repository root:
 
 ```powershell
 $env:TEST_DATABASE_URL = 'postgres://goal_test:goal_test_local_only@127.0.0.1:55432/twitch_tracker_goal_test'

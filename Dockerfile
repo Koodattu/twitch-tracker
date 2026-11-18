@@ -1,13 +1,13 @@
-# syntax=docker/dockerfile:1@sha256:87999aa3d42bdc6bea60565083ee17e86d1f3339802f543c0d03998580f9cb89
+# syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
 
-ARG NODE_IMAGE=node:24.22.2-bookworm-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c
-ARG POSTGRES_IMAGE=postgres:16.14-alpine3.24@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+ARG NODE_IMAGE=node:26.13.1-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1
+ARG POSTGRES_IMAGE=postgres:16.16-alpine3.24@sha256:81e77a4833487b8132fe4b00bedd39dc3f74b8641e387f19312a48f7de218c2e
 
 FROM ${NODE_IMAGE} AS base
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 WORKDIR /workspace
-RUN corepack enable && corepack prepare pnpm@11.21.0 --activate
+RUN npm install --global pnpm@12.21.0
 
 FROM base AS dependencies
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
@@ -19,7 +19,7 @@ COPY packages/config/package.json packages/config/package.json
 COPY packages/db/package.json packages/db/package.json
 COPY packages/shared/package.json packages/shared/package.json
 COPY packages/twitch/package.json packages/twitch/package.json
-RUN --mount=type=cache,id=twitch-tracker-pnpm-11,target=/pnpm/store,sharing=locked \
+RUN --mount=type=cache,id=twitch-tracker-pnpm-12,target=/pnpm/store,sharing=locked \
     pnpm install --frozen-lockfile
 
 FROM dependencies AS build

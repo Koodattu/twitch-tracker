@@ -5,7 +5,7 @@ Use this before calling the Twitch-backed implementation complete.
 ## Local No-Credential Check
 
 ```sh
-corepack pnpm smoke:twitch
+pnpm smoke:twitch
 ```
 
 This verifies config parsing and reports missing live credentials as skipped
@@ -30,7 +30,7 @@ Then provide bot credentials by either:
 Then run:
 
 ```sh
-corepack pnpm smoke:twitch -- --require-live
+pnpm smoke:twitch -- --require-live
 ```
 
 This requires:
@@ -59,7 +59,7 @@ The public API URL must resolve to the API service and serve HTTPS on port 443.
 With the API running, run:
 
 ```sh
-corepack pnpm smoke:twitch -- --require-live --eventsub-callback
+pnpm smoke:twitch -- --require-live --eventsub-callback
 ```
 
 The callback check sends a signed EventSub challenge to
@@ -73,7 +73,7 @@ By default, the IRC smoke joins the bot account's own channel. To join a
 specific test channel:
 
 ```sh
-corepack pnpm smoke:twitch -- --require-live --irc-channel=some_channel
+pnpm smoke:twitch -- --require-live --irc-channel=some_channel
 ```
 
 Use a channel where joining with the bot account is acceptable.
